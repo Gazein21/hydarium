@@ -1,0 +1,1 @@
+[{ "modid": "hydarium", "name": "Hydarium", "description": "Le mode Hydarium pour 1.8.9 : HUD, luminosité, zoom, sprint automatique.", "version": "${version}", "mcversion": "${mcversion}", "logoFile": "icon.png", "authorList": ["Hydarium"] }]

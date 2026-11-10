@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "hydarium",
+  "version": "${version}",
+  "name": "Hydarium",
+  "description": "Le mode Hydarium : HUD (FPS, CPS, touches, coordonnées, armure, effets…), luminosité, zoom, sprint automatique, marche automatique. Se règle depuis le launcher.",
+  "authors": ["Hydarium"],
+  "icon": "assets/hydarium/icon.png",
+  "license": "All-Rights-Reserved",
+  "environment": "client",
+  "mixins": ["hydarium.mixins.json"],
+  "entrypoints": { "client": ["net.hydarium.client.HydariumClient"] },
+  "depends": { "fabricloader": ">=0.15.0", "minecraft": "~1.20.1", "java": ">=17", "fabric-api": "*" }
+}

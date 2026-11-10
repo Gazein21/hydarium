@@ -1,0 +1,14 @@
+node_modules/
+dist/
+build-jre/
+.build-tools/
+build-client/*.jar
+client-mod/*/build/
+client-mod/*/.gradle/
+client-mod/*/run/
+build.log
+dev.log
+.node/
+.node-tmp/
+.DS_Store
+Thumbs.db

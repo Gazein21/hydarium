@@ -1,0 +1,9 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "net.hydarium.client.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "refmap": "hydarium-fabric-1.21.1-refmap.json",
+  "client": ["OptionInstanceAccessor", "OptionsAccessor"],
+  "injectors": { "defaultRequire": 0 }
+}

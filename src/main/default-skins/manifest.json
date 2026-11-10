@@ -1,0 +1,84 @@
+{
+  "_aide": "Chaque entrée = un skin préinstallé. Deux origines : 'source':'mojang' = extrait du client.jar de Minecraft au premier usage (jamais stocké dans le dépôt) ; 'file' = PNG 64×64 placé dans ce dossier (ton skin maison). 'variant' = classic (bras 4 px) ou slim (bras 3 px). 'group' = mojang ou hydarium. Une entrée dont le PNG est absent est ignorée sans erreur : tu peux préparer la tienne à l'avance. L'id ne doit JAMAIS changer après publication (il retient les skins retirés par les joueurs).",
+  "skins": [
+    {
+      "id": "mc-steve",
+      "name": "Steve",
+      "variant": "classic",
+      "group": "mojang",
+      "source": "mojang",
+      "texture": "entity/player/wide/steve.png"
+    },
+    {
+      "id": "mc-alex",
+      "name": "Alex",
+      "variant": "slim",
+      "group": "mojang",
+      "source": "mojang",
+      "texture": "entity/player/slim/alex.png"
+    },
+    {
+      "id": "mc-ari",
+      "name": "Ari",
+      "variant": "classic",
+      "group": "mojang",
+      "source": "mojang",
+      "texture": "entity/player/wide/ari.png"
+    },
+    {
+      "id": "mc-efe",
+      "name": "Efe",
+      "variant": "slim",
+      "group": "mojang",
+      "source": "mojang",
+      "texture": "entity/player/slim/efe.png"
+    },
+    {
+      "id": "mc-kai",
+      "name": "Kai",
+      "variant": "classic",
+      "group": "mojang",
+      "source": "mojang",
+      "texture": "entity/player/wide/kai.png"
+    },
+    {
+      "id": "mc-makena",
+      "name": "Makena",
+      "variant": "slim",
+      "group": "mojang",
+      "source": "mojang",
+      "texture": "entity/player/slim/makena.png"
+    },
+    {
+      "id": "mc-noor",
+      "name": "Noor",
+      "variant": "slim",
+      "group": "mojang",
+      "source": "mojang",
+      "texture": "entity/player/slim/noor.png"
+    },
+    {
+      "id": "mc-sunny",
+      "name": "Sunny",
+      "variant": "classic",
+      "group": "mojang",
+      "source": "mojang",
+      "texture": "entity/player/wide/sunny.png"
+    },
+    {
+      "id": "mc-zuri",
+      "name": "Zuri",
+      "variant": "classic",
+      "group": "mojang",
+      "source": "mojang",
+      "texture": "entity/player/wide/zuri.png"
+    },
+    {
+      "id": "hy-custom",
+      "name": "Hydarium",
+      "file": "hydarium.png",
+      "variant": "classic",
+      "group": "hydarium"
+    }
+  ]
+}

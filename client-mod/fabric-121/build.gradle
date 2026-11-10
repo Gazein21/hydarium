@@ -1,0 +1,15 @@
+plugins { id 'fabric-loom' version '1.7-SNAPSHOT' }
+version = '1.1.0'
+base { archivesName = 'hydarium-fabric-1.21.1' }
+repositories { mavenCentral() }
+sourceSets { main { java { srcDirs = ['src/main/java', '../fabric-common/src', '../core/src'] } } }
+dependencies {
+  minecraft "com.mojang:minecraft:${project.minecraft_version}"
+  mappings loom.officialMojangMappings()
+  modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+  modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+}
+java { sourceCompatibility = JavaVersion.VERSION_21; targetCompatibility = JavaVersion.VERSION_21 }
+tasks.withType(JavaCompile).configureEach { it.options.release = 21; it.options.encoding = 'UTF-8' }
+processResources { inputs.property 'version', project.version; filesMatching('fabric.mod.json') { expand 'version': project.version } }
+remapJar { archiveFileName = 'hydarium-1.21.1.jar' }

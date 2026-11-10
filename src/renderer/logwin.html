@@ -1,0 +1,20 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<style>
+html,body{margin:0;height:100%;background:#0e1116;color:#d6dde8;font:12px/1.45 Consolas,'Cascadia Mono',monospace}
+header{display:flex;align-items:center;gap:10px;padding:8px 12px;background:#161b23;border-bottom:1px solid #263041;font-family:system-ui,sans-serif}
+header b{font-size:13px}header span{color:#7d8aa0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+button{background:#232c3a;color:#d6dde8;border:0;border-radius:7px;padding:5px 11px;cursor:pointer;font:12px system-ui,sans-serif}button:hover{background:#2f3b4e}
+label{font:12px system-ui,sans-serif;color:#9aa6ba;display:flex;gap:5px;align-items:center}
+#o{position:absolute;top:41px;bottom:0;left:0;right:0;overflow:auto;padding:8px 12px;white-space:pre-wrap;word-break:break-all}
+.e{color:#ff7b7b}.w{color:#ffcb6b}.l{color:#7fd1ff}
+</style></head><body>
+<header><b>Logs</b><span id="t"></span><label><input type="checkbox" id="a" checked>Défilement auto</label><button id="c">Copier</button><button id="x">Effacer</button></header>
+<div id="o"></div>
+<script>
+const o=document.getElementById('o'),a=document.getElementById('a');let n=0,all=[];
+function add(l){const d=document.createElement('div');if(l.k)d.className=l.k;d.textContent=l.t;o.appendChild(d);all.push(l.t);if(++n>3000){o.removeChild(o.firstChild);all.shift();n--}}
+lw.onBatch(ls=>{ls.forEach(add);if(a.checked)o.scrollTop=o.scrollHeight});
+lw.onClear(()=>{o.textContent='';all=[];n=0});lw.onTitle(t=>document.getElementById('t').textContent=t);
+document.getElementById('x').onclick=()=>{o.textContent='';all=[];n=0};
+document.getElementById('c').onclick=()=>navigator.clipboard.writeText(all.join('\n')).catch(()=>{});
+</script></body></html>
