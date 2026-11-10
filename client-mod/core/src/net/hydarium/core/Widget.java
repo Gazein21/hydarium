@@ -16,5 +16,6 @@ public final class Widget {
     public int sub = -1;               // >= 0 : à partir de cette ligne, texte plus petit et plus transparent (ex. l'artiste sous le titre de la musique)
     public java.util.List<Integer> lc = new ArrayList<Integer>(); // couleur RVB propre à chaque ligne (0 = couleur du widget) : armure selon l'usure
     public int colorOf(int k) { int c = k < lc.size() ? lc.get(k) : 0; return c == 0 ? color : c; }
+    public boolean ghost;               // contenu d'exemple montré par l'éditeur pour un module actif qui n'a rien à afficher pour l'instant
     public int keep = 0;               // nombre de caractères du début de cette ligne qui ne défilent pas
 }

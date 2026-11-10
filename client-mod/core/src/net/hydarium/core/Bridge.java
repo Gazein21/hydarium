@@ -90,7 +90,8 @@ public final class Bridge {
         b.append("],\"scr\":").append(Json.quote(s.screen == null ? "" : s.screen)).append(",\"tg\":{");
         boolean first = true;
         if (s.toggles != null) for (Map.Entry<String, Boolean> e : s.toggles.entrySet()) { b.append(first ? "" : ",").append(Json.quote(e.getKey())).append(':').append(e.getValue() ? "true" : "false"); first = false; }
-        return b.append("}}").toString();
+        b.append("},\"lay\":").append(s.layout == null || s.layout.isEmpty() ? "{}" : s.layout).append(",\"ed\":").append(s.editor ? 1 : 0);
+        return b.append('}').toString();
     }
 
     /** Hors d'un monde (menu principal…) il n'y a pas d'état de jeu : on ne signale que l'écran ouvert (« menu » : le launcher n'en fait pas un état de jeu). */

@@ -490,3 +490,9 @@ Symptômes de Gazein : l'agent s'active mais **aucune adresse** ne s'affiche ; i
 - Guide pas à pas pour publier : `docs/PUBLIER-SUR-GITHUB.md`.
 - **Reste à faire / à vérifier au premier passage** : (1) la CI Windows complète (les jars du mod ne sont jamais passés en CI), (2) installer avec le petit exe sur un Windows propre sans Java, (3) publier une 2ᵉ version et constater la mise à jour automatique, (4) LICENSE, (5) signature de l'exe (SmartScreen) : SignPath Foundation (open source) ou Azure Trusted Signing, à étudier.
 - Pièges : dépôt privé = les joueurs ne peuvent rien télécharger et la mise à jour automatique reste muette ; ne jamais committer `dist/`, `build-jre/`, `.node/`, `node_modules/` ni de clés (aucun secret en dur trouvé) ; un numéro de version ne se réutilise jamais.
+
+### Mode client entièrement dans le jeu (mise à jour reçue, appliquée en 0.10.52)
+- Les widgets sont dessinés par le mod (cœur `Painter`/`Canvas`, éditeur `Editor` ouvert avec **Maj droite** ou le bouton « Modifier en jeu » du launcher) ; réglages renvoyés au launcher (`lay`, `ed` dans l'état, `src/main/layoutsync.js`, canal `client:editor`). Détail complet, versions concernées et architecture : `docs/MODE-CLIENT-IN-GAME.md`.
+- Appliquée comme un patch (pas en écrasant les fichiers) pour garder les ajouts skins/mises à jour dans `main.js`, `preload.js` et `app.js`. Tests ajoutés à `npm test` : `layoutsync.test.js` (18), `preload.test.js` (183 : chaque canal appelé par l'interface est autorisé), et `CoreTest` (Java) passe.
+- **Jamais compilé contre Minecraft ni essayé en jeu** (comme l'indique la doc du mode) : les nouveaux `HudCanvas.java` / `HudScreen.java` (Fabric 1.20 / 1.21) et `HydariumForge.java` ne seront vraiment vérifiés qu'à la première CI (étapes « Mod Hydarium … », `continue-on-error`) puis en jeu. À essayer en premier : la liste de la fin de `MODE-CLIENT-IN-GAME.md`.
+

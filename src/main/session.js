@@ -69,9 +69,9 @@ exports.jvmArgs = async inst => {
   try { if (v && v.forge && findJar(v.jar)) { fs.mkdirSync(dir, { recursive: true }); fs.copyFileSync(findJar(v.jar), dst); dropOtherForgeJars(dir, path.basename(dst)); log.info('Mode Hydarium (Forge ' + inst.version + ') copié dans mods depuis', findJar(v.jar)); if (c.nativeHud === false) a.push('-Dhydarium.draw=0'); } else if (fs.existsSync(dst)) fs.unlinkSync(dst); } catch (e) { log.warn('mode Hydarium Forge', e.message); }
   const jar = agentJar(); if (jar) a.unshift('-javaagent:' + jar); return a;
 };
-exports.writeConfig = (inst, dir) => {
+exports.writeConfig = (inst, dir, extra) => {
   inst.client = inst.client || store.defaultClient(); inst.client.on = true;
-  try { fs.mkdirSync(path.join(dir, 'config'), { recursive: true }); fs.writeFileSync(path.join(dir, 'config', 'hydarium-client.json'), JSON.stringify({ version: 1, instance: inst.id, mc: inst.version, loader: inst.loader, lang: (store.get().settings.uiLang === 'en' || (!store.get().settings.uiLang && /^en/i.test(require('electron').app.getLocale()))) ? 'en' : 'fr', modules: inst.client.modules || {} }, null, 2)); } catch (e) { log.error('config client', e); }
+  try { fs.mkdirSync(path.join(dir, 'config'), { recursive: true }); fs.writeFileSync(path.join(dir, 'config', 'hydarium-client.json'), JSON.stringify({ ...(extra || {}), version: 1, instance: inst.id, mc: inst.version, loader: inst.loader, lang: (store.get().settings.uiLang === 'en' || (!store.get().settings.uiLang && /^en/i.test(require('electron').app.getLocale()))) ? 'en' : 'fr', modules: inst.client.modules || {} }, null, 2)); } catch (e) { log.error('config client', e); }
 };
 let wWatch = null, tWatch = null, tStart = 0; const seenW = new Set();
 exports.start = (inst, dir, opts) => {

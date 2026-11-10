@@ -28,6 +28,9 @@ public final class Features {
 
     public static boolean sprint(Config c) { return c.get("togglesprint").on; }
 
+    /** Touche qui ouvre l'éditeur en jeu (disposition et réglages des widgets). Réglable : module « hudedit », champ « key » du fichier de configuration. */
+    public static String editorKey(Config c) { return Features.key(c, "hudedit", "RSHIFT"); }
+
     /** Sneak permanent : « activé » = on reste accroupi (seulement géré là où le jeu n'a pas l'option native, donc Forge 1.8.9). */
     public static boolean sneak(Config c) { return c.get("togglesneak").on; }
 

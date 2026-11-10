@@ -195,10 +195,25 @@ app.whenReady().then(async () => {
     if (!ch) return; store.save(); try { session.writeConfig(i, game.dirOf(i.id)); } catch (e) {} try { require('./hud').refresh(i.id); } catch (e) {}
     send('client:synced', { id: i.id, client: i.client }); try { require('./overlay').send('client:synced', { id: i.id, client: i.client }); } catch (e) {}
   };
-  bridge.route('POST', '/v1/state', (q, b) => { require('./hud').setGame(b || {}); if (b && b.tg) { try { syncToggles(b.tg); } catch (e) { log.warn('synchro des modules', e.message); } } if (b && b.menu) return { ok: true }; /* simple signalement d’écran (hors monde) : pas de statistiques */ try { require('./stats').onState(b || {}); } catch (e) {} return { ok: true }; });
+  /* L'éditeur en jeu a déplacé ou réglé des widgets : même circuit que les bascules (enregistré pour l'instance, configuration réécrite, fenêtres prévenues). */
+  const HUD_IDS = ['fps', 'cps', 'keystrokes', 'coords', 'direction', 'armor', 'potions', 'ping', 'clock', 'memory', 'music', 'session'];
+  const syncLayout = lay => {
+    const c = session.current(); if (!c || !lay || typeof lay !== 'object') return; const i = store.get().instances.find(x => x.id === c.id); if (!i || !i.client) return;
+    if (!require('./layoutsync').apply((i.client.modules = i.client.modules || {}), lay, HUD_IDS)) return;
+    store.save(); try { session.writeConfig(i, game.dirOf(i.id)); } catch (e) {} try { require('./hud').refresh(i.id); } catch (e) {}
+    send('client:synced', { id: i.id, client: i.client }); try { require('./overlay').send('client:synced', { id: i.id, client: i.client }); } catch (e) {}
+  };
+  bridge.route('POST', '/v1/state', (q, b) => { require('./hud').setGame(b || {}); if (b && b.tg) { try { syncToggles(b.tg); } catch (e) { log.warn('synchro des modules', e.message); } } if (b && b.lay) { try { syncLayout(b.lay); } catch (e) { log.warn('synchro de la disposition', e.message); } } if (b && b.menu) return { ok: true }; /* simple signalement d’écran (hors monde) : pas de statistiques */ try { require('./stats').onState(b || {}); } catch (e) {} return { ok: true }; });
   bridge.route('GET', '/v1/music', async () => ({ track: await media.get() }));
   bridge.route('POST', '/v1/music', async (q, b) => ({ track: await media.act(String(b.cmd || '')) }));
   bridge.route('POST', '/v1/overlay', (q, b) => { const c = session.current(); overlay.open(['hub', 'skins', 'content', 'shots', 'music'].includes(b.page) ? b.page : 'hub', c && c.id); });
+  /* « Modifier en jeu » : demande au mod d'ouvrir son éditeur (champ cmd.editor du fichier de configuration, relu par le mod ~1 s plus tard) */
+  on('client:editor', () => {
+    const c = session.current(); if (!c) return { ok: false, reason: 'Aucun jeu n’est lancé : lance l’instance, puis reviens ici.' };
+    if (!require('./hud').gameDraws()) return { ok: false, reason: 'Le mode client de cette version n’a pas (encore) l’éditeur en jeu : utilise l’aperçu ci-dessous.' };
+    const i = store.get().instances.find(x => x.id === c.id); if (!i) return { ok: false, reason: 'Instance introuvable.' };
+    session.writeConfig(i, game.dirOf(i.id), { cmd: { editor: Date.now() } }); return { ok: true };
+  });
   on('media:get', () => media.get()); on('media:cmd', c => media.act(c));
   on('ovl:open', (page, id) => overlay.open(page, id)); on('ovl:close', () => { try { require('./hud').setEditing(false); } catch (e) {} overlay.close(); });
   on('srv:plan', a => joiner.plan(a, { soft: true })); on('srv:mkvanilla', async (addr, version, name) => { const n = await joiner.createVanilla(String(addr || ''), String(version || ''), String(name || '')); send('inst:changed', n.id); return n; }); on('srv:setreq', (id, r) => joiner.setReq(id, r));

@@ -1,7 +1,7 @@
 # Publier Hydarium sur GitHub (pas à pas, Windows)
 
 Dépôt : https://github.com/Gazein21/hydarium (vide et privé au départ).
-Résultat final : les joueurs téléchargent **un petit installeur** (`Hydarium-Setup-X.exe`) depuis la page « Releases » ; il récupère le reste sur GitHub, et le launcher se met ensuite à jour tout seul à chaque lancement.
+Résultat final : les joueurs téléchargent **un petit installeur** (`Hydarium-Installer.exe`) depuis la page « Releases » ; il récupère le reste sur GitHub, et le launcher se met ensuite à jour tout seul à chaque lancement.
 
 ## 0. Une seule fois : installer Git
 1. Installe **Git for Windows** : https://git-scm.com/download/win (laisse toutes les options par défaut).
@@ -29,29 +29,30 @@ Une fenêtre du navigateur s'ouvre pour te connecter à GitHub (c'est normal, c'
 
 > Si le dossier contient déjà un `.git` d'un ancien essai, supprime-le d'abord.
 
-## 2. Vérifier que la construction marche (dépôt encore privé)
+## 2. Construire et publier (dépôt encore privé : c'est le bon moment pour tester)
 1. Sur GitHub : onglet **Actions** → « Build Windows » → **Run workflow** (branche `main`).
-2. Attends 10 à 20 minutes. Une pastille verte = tout est construit ; en cas de rouge, ouvre l'étape en échec et copie-moi le message.
-3. Le fichier construit est téléchargeable dans l'exécution, rubrique **Artifacts**.
+2. Attends 10 à 20 minutes. Les étapes « Tests » et « Mod Hydarium … » peuvent afficher une erreur sans rien bloquer : elles sont volontairement tolérantes. Seule la construction de l'installeur compte.
+3. À la fin, une **Release** « Hydarium 0.10.52 » (tag `v0.10.52`, créé automatiquement) apparaît à droite de la page d'accueil du dépôt, rubrique **Releases**. Elle contient :
+   - **`Hydarium-Installer.exe`** : le fichier à donner aux joueurs (nom fixe, lien permanent `https://github.com/Gazein21/hydarium/releases/latest/download/Hydarium-Installer.exe`) ;
+   - `Hydarium-Setup-0.10.52.exe` : le même, au nom versionné (celui que lit la mise à jour automatique) ;
+   - `hydarium-launcher-0.10.52-x64.nsis.7z` : le programme complet, téléchargé par le petit installeur ;
+   - `Hydarium-Portable-0.10.52.exe` : version sans installation ;
+   - `latest.yml` : lu par la mise à jour automatique.
+4. Relancer pour la même version **remplace** les fichiers de cette Release : pratique pour corriger et réessayer.
 
-Cette première exécution est la vraie épreuve : la compilation des mods Hydarium et la construction de l'installeur n'ont jamais tourné sur GitHub. Prévois une ou deux corrections.
+Tant que le dépôt est privé, seuls les membres du dépôt voient la Release.
 
 ## 3. Passer le dépôt en public
 **Obligatoire** : sur un dépôt privé, un joueur sans compte ne peut rien télécharger et la mise à jour automatique ne trouve rien.
 Dépôt → **Settings** → tout en bas **Danger Zone** → **Change visibility** → Public.
 Avant : relis qu'aucune clé ni mot de passe ne traîne (rien trouvé dans le code) et choisis une licence (**Add file → Create new file → `LICENSE`**, GitHub propose des modèles).
 
-## 4. Publier la première version
-Le numéro est déjà 0.10.52 dans `package.json`, donc la première fois on pose le tag à la main :
+## 4. Poser un tag à la main (facultatif)
+Pousser un tag `vX.Y.Z` fait la même chose que « Run workflow » :
 ```
 git tag v0.10.52
 git push origin v0.10.52
 ```
-GitHub construit tout (onglet Actions) puis crée la **Release** « v0.10.52 » avec :
-- `Hydarium-Setup-0.10.52.exe` : **le fichier à donner aux joueurs** ;
-- `hydarium-launcher-0.10.52-x64.nsis.7z` : le programme complet, téléchargé par le petit installeur ;
-- `Hydarium-Portable-0.10.52.exe` : version sans installation (sans mise à jour automatique) ;
-- `latest.yml` : lu par la mise à jour automatique.
 
 ## 5. Les versions suivantes (une seule commande)
 1. Fais tes modifications, puis ajoute **à la fin** de `docs/FICHE-DE-REPRISE.md` une section `## 0.10.53 — ce que tu as changé` (les tests l'exigent).

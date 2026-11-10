@@ -156,7 +156,7 @@ const OPT = { exe: '/x/playitd', args: [], pollMs: 12, fastMs: 8, claimMs: 5000 
   let e8 = null; try { await P.check('pas une adresse !'); } catch (x) { e8 = x; } ok(e8 && /invalide/.test(e8.message), 'check : adresse invalide refusée');
 
   // 13) la carte de l'interface : tous les états s'affichent, rien de ce qui vient de playit ou de la personne n'est injecté tel quel
-  const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8'), m13 = src.match(/function pgCard[\s\S]*?\n}\n/); ok(m13, 'pgCard trouvée dans app.js');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8').replace(/\r\n/g, '\n'), m13 = src.match(/function pgCard[\s\S]*?\n}\n/); ok(m13, 'pgCard trouvée dans app.js');
   const esc = x => String(x).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])), pgCard = new Function('esc', m13[0] + '\nreturn pgCard;')(esc);
   const h = { port: 25565, name: 'Mon <b>serveur</b>', state: 'running', playitAddress: '' }, G = o => ({ state: 'off', claimUrl: '', error: '', note: '', tunnels: {}, list: [], creating: [], lines: [], installed: true, installing: false, hasAccount: false, ...o });
   const has = (html, re, m) => ok(re.test(html), m + ' : ' + html.slice(0, 90)), hasnt = (html, re, m) => ok(!re.test(html), m);

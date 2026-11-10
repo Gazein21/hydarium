@@ -11,6 +11,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
+import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.resources.I18n;
@@ -35,7 +36,10 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.hydarium.core.Bridge;
 import net.hydarium.core.Config;
 import net.hydarium.core.Cps;
+import net.hydarium.core.Canvas;
+import net.hydarium.core.Editor;
 import net.hydarium.core.Features;
+import net.hydarium.core.Painter;
 import net.hydarium.core.Hud;
 import net.hydarium.core.SneakDriver;
 import net.hydarium.core.State;
@@ -62,6 +66,7 @@ public class HydariumForge {
     private Boolean smoothBefore = null; // caméra cinématique : état d'avant le zoom
     private boolean walking = false, walkDown = false, zoomHeld = false, zoomDown = false, sprintForced = false;
     private int tick = 0;
+    private boolean editorDown = false; // touche de l'éditeur en jeu (Maj droite par défaut)
     private final SneakDriver sneakDriver = new SneakDriver();
     private final SneakDriver.Host sneakHost = new SneakDriver.Host() { // sneak permanent : ce que le jeu fournit au pilote
         public boolean toggleKeyDown() { return key(Features.key(cfg, "togglesneak", "V")); }
@@ -69,7 +74,6 @@ public class HydariumForge {
         public void setSneakKey(boolean down) { KeyBinding.setKeyBindState(Minecraft.getMinecraft().gameSettings.keyBindSneak.getKeyCode(), down); }
         public void say(String text) { Minecraft.getMinecraft().ingameGUI.setRecordPlaying(text, false); }
     };
-    private boolean rd = true; // cases à coins légèrement arrondis (réglage « Style des cases » du launcher)
 
     @Mod.EventHandler
     public void init(FMLInitializationEvent e) {
@@ -121,6 +125,7 @@ public class HydariumForge {
         s.lw = name(mc.gameSettings.keyBindForward, "W"); s.la = name(mc.gameSettings.keyBindLeft, "A"); s.ls = name(mc.gameSettings.keyBindBack, "S"); s.ld = name(mc.gameSettings.keyBindRight, "D");
         Runtime r = Runtime.getRuntime(); s.memUsedGb = (r.totalMemory() - r.freeMemory()) / 1073741824.0; s.memMaxGb = r.maxMemory() / 1073741824.0;
         s.clock = hhmm.format(new Date()); s.sessionSecs = (System.currentTimeMillis() - t0) / 1000; s.music = music; s.musicPlaying = musicPlaying;
+        s.layout = cfg.layoutJson(); s.editor = true; // réglages faits dans l'éditeur en jeu → le launcher les enregistre ; l'éditeur existe sur cette version
         json = Bridge.stateJson(s, Hud.ALL);
     }
 
@@ -163,7 +168,10 @@ public class HydariumForge {
             boolean real = spk > 0 && Keyboard.isKeyDown(spk); KeyBinding.setKeyBindState(spk, real); sprintForced = false;
             if (!real && !Features.sprint(cfg)) p.setSprinting(false);
         }
-        sneakDriver.tick(cfg, sneakHost, typing); // sneak permanent (1.8.9 n'a pas l'option native) : toute la logique est dans le cœur (SneakDriver, testée)
+        sneakDriver.tick(cfg, sneakHost, typing);
+        boolean edk = !typing && key(Features.editorKey(cfg)); // éditeur en jeu : touche, ou demande venue du launcher (« Modifier en jeu »)
+        if ((edk && !editorDown) || (!typing && cfg.editorRequested())) { cfg.ackEditor(); mc.displayGuiScreen(new HudScreen()); }
+        editorDown = edk; // sneak permanent (1.8.9 n'a pas l'option native) : toute la logique est dans le cœur (SneakDriver, testée)
     }
 
     /** Évènement clavier du jeu : la touche sneak vient d'être pressée à la main (même un appui plus court qu'un tick) → le sneak permanent s'arrêtera. */
@@ -220,37 +228,10 @@ public class HydariumForge {
         if (e.type != RenderGameOverlayEvent.ElementType.ALL) return;
         Minecraft mc = Minecraft.getMinecraft();
         if (mc.gameSettings.hideGUI || mc.gameSettings.showDebugInfo || mc.thePlayer == null) return;
+        if (mc.currentScreen instanceof HudScreen) return; // l'éditeur dessine lui-même les widgets (sinon les fonds seraient doublés)
         long now = System.currentTimeMillis();
         cps.feed(Mouse.isButtonDown(0), Mouse.isButtonDown(1), now); state.cpsL = cps.count(0, now); state.cpsR = cps.count(1, now);
-        List<Widget> ws = Hud.build(cfg, state); rd = cfg.round();
-        FontRenderer fr = mc.fontRendererObj; ScaledResolution sr = new ScaledResolution(mc); int W = sr.getScaledWidth(), H = sr.getScaledHeight();
-        for (Widget w : ws) {
-            int a = (int) Math.round(Math.max(.1, Math.min(1, w.opacity)) * 255) << 24, col = a | w.color, bg = (int) Math.round(w.opacity * 102) << 24, bw, bh; List<String> l = w.lines;
-            boolean ic = w.icons; int lh = ic ? 18 : 10, tx = ic ? 22 : 3; // icônes (armure / effets) : les vraies textures du jeu
-            boolean scr = false; if (w.maxWidth > 0 && !l.isEmpty() && fr.getStringWidth(l.get(0)) > w.maxWidth) { l.set(0, net.hydarium.core.Marquee.window(l.get(0), w.keep, w.maxWidth, MZ, now)); scr = true; } // titre trop long : il défile
-            int nm = w.sub < 0 ? l.size() : Math.min(w.sub, l.size()), ns = l.size() - nm, sh = lh * 3 / 4; // lignes « petites » (artiste) : 75 % de la taille
-            if (w.keys) { bw = 58; bh = 58; } else { int mw = 0; for (int k = 0; k < l.size(); k++) mw = Math.max(mw, k < nm ? fr.getStringWidth(l.get(k)) : (int) Math.ceil(fr.getStringWidth(l.get(k)) * .75)); if (scr) mw = Math.max(mw, w.maxWidth); bw = mw + tx + 3; bh = nm * lh + ns * sh + 3; }
-            double s = w.scale; int px = (int) Math.min(w.x * W, Math.max(0, W - bw * s - 1)), py = (int) Math.min(w.y * H, Math.max(0, H - bh * s - 1));
-            GlStateManager.pushMatrix(); GlStateManager.translate(px, py, 0); GlStateManager.scale(s, s, 1); GlStateManager.enableBlend();
-            if (w.keys) { cell(fr, 20, 0, state.lw, state.w, a); cell(fr, 0, 20, state.la, state.a, a); cell(fr, 20, 20, state.ls, state.s, a); cell(fr, 40, 20, state.ld, state.d, a); box(0, 40, 58, 18, (state.space ? 0x99FFFFFF : 0x66000000) & 0x00FFFFFF | (a >>> 1 & 0xFF000000)); Gui.drawRect(14, 48, 44, 50, state.space ? 0xFF000000 : 0xFFFFFFFF); }
-            else {
-                if (w.bg) box(0, 0, bw, bh, bg);
-                int inner = bw - tx - 3; // largeur du texte : chaque ligne y est centrée (sauf avec icônes)
-                java.util.List<ItemStack> armor = "armor".equals(w.id) && ic ? armorStacks(mc) : null;
-                java.util.List<PotionEffect> fx = "potions".equals(w.id) && ic ? activeEffects(mc) : null;
-                for (int k = 0; k < nm; k++) {
-                    int ty = ic ? 2 + k * lh + (lh - 9) / 2 - 1 : 3 + k * lh, lx = ic ? tx : tx + (inner - fr.getStringWidth(l.get(k))) / 2;
-                    if (armor != null && k < armor.size()) drawArmor(mc, armor.get(k), 3, 1 + k * lh);
-                    else if (fx != null && k < fx.size()) drawEffect(mc, fx.get(k), 2, k * lh);
-                    fr.drawStringWithShadow(l.get(k), lx, ty, a | w.colorOf(k));
-                }
-                for (int k = nm; k < l.size(); k++) { // artiste : plus petit et plus transparent, juste sous le titre
-                    int sc = ((int) ((col >>> 24 & 0xFF) * .6) << 24) | (col & 0xFFFFFF);
-                    GlStateManager.pushMatrix(); GlStateManager.translate(tx + (inner - (int) Math.ceil(fr.getStringWidth(l.get(k)) * .75)) / 2, 3 + nm * lh + (k - nm) * sh, 0); GlStateManager.scale(.75f, .75f, 1f); fr.drawStringWithShadow(l.get(k), 0, 0, sc); GlStateManager.popMatrix();
-                }
-            }
-            GlStateManager.popMatrix();
-        }
+        Painter.paintAll(Hud.build(cfg, state), new Cv(), state, cfg.round(), now); // dessin et mesures : cœur (Painter), identiques à l'éditeur en jeu
         GlStateManager.color(1f, 1f, 1f, 1f);
     }
 
@@ -290,10 +271,37 @@ public class HydariumForge {
     }
 
 
-    private void box(int x, int y, int w, int h, int c) { for (int[] r : net.hydarium.core.Round.rects(w, h, rd)) Gui.drawRect(x + r[0], y + r[1], x + r[0] + r[2], y + r[1] + r[3], c); }
+    /** Surface de dessin du cœur sur le rendu de Minecraft 1.8.9 (Painter pour le HUD en partie, Editor pour l'éditeur en jeu). */
+    static final class Cv implements Canvas {
+        private final Minecraft mc = Minecraft.getMinecraft(); private final FontRenderer fr = mc.fontRendererObj; private final int W, H;
+        Cv() { ScaledResolution sr = new ScaledResolution(mc); W = sr.getScaledWidth(); H = sr.getScaledHeight(); }
+        public int width() { return W; } public int height() { return H; }
+        public int textWidth(String s) { return fr.getStringWidth(s); } public int fontHeight() { return 9; }
+        public void fill(int x, int y, int w, int h, int c) { Gui.drawRect(x, y, x + w, y + h, c); }
+        public void text(String s, int x, int y, int c, boolean sh) { if (sh) fr.drawStringWithShadow(s, x, y, c); else fr.drawString(s, x, y, c); }
+        public void push(double tx, double ty, double s) { GlStateManager.pushMatrix(); GlStateManager.translate(tx, ty, 0); GlStateManager.scale(s, s, 1); GlStateManager.enableBlend(); }
+        public void pop() { GlStateManager.popMatrix(); }
+        public void icon(String kind, int k, int x, int y) {
+            if (mc.thePlayer == null) return;
+            if ("armor".equals(kind)) { java.util.List<ItemStack> a = armorStacks(mc); if (k < a.size()) drawArmor(mc, a.get(k), x, y); }
+            else if ("fx".equals(kind)) { java.util.List<PotionEffect> f = activeEffects(mc); if (k < f.size()) drawEffect(mc, f.get(k), x - 1, y - 1); } // la texture d'effet fait 18×18 : décalée d'un pixel pour être centrée comme l'icône 16×16
+        }
+    }
 
-    private void cell(FontRenderer fr, int x, int y, String t, boolean on, int a) {
-        box(x, y, 18, 18, (on ? 0x99FFFFFF : 0x66000000) & 0x00FFFFFF | (a >>> 1 & 0xFF000000));
-        fr.drawString(t, x + (18 - fr.getStringWidth(t)) / 2, y + 5, on ? 0xFF000000 : 0xFFFFFFFF);
+    /** Éditeur en jeu : les vrais widgets, déplaçables à la souris. Toute la logique est dans le cœur (Editor) ; ici seulement la souris et le clavier. */
+    final class HudScreen extends GuiScreen {
+        private final Editor ed = new Editor(cfg, state);
+        @Override public boolean doesGuiPauseGame() { return false; }
+        @Override public void drawScreen(int mx, int my, float pt) { ed.draw(new Cv(), mx, my, System.currentTimeMillis()); GlStateManager.color(1f, 1f, 1f, 1f); }
+        @Override protected void mouseClicked(int x, int y, int b) { ed.press(x, y, b); end(); }
+        @Override protected void mouseClickMove(int x, int y, int b, long t) { ed.drag(x, y); }
+        @Override protected void mouseReleased(int x, int y, int s) { ed.release(x, y); }
+        @Override protected void keyTyped(char c, int code) {
+            int k = code == Keyboard.KEY_ESCAPE ? Editor.K_ESC : code == Keyboard.KEY_LEFT ? Editor.K_LEFT : code == Keyboard.KEY_RIGHT ? Editor.K_RIGHT : code == Keyboard.KEY_UP ? Editor.K_UP : code == Keyboard.KEY_DOWN ? Editor.K_DOWN
+                : (c == '+' || code == Keyboard.KEY_ADD) ? Editor.K_PLUS : (c == '-' || code == Keyboard.KEY_SUBTRACT) ? Editor.K_MINUS : (c == 'r' || c == 'R') ? Editor.K_RESET : 0;
+            if (k != 0) { ed.key(k); end(); }
+        }
+        @Override public void onGuiClosed() { ed.release(0, 0); }
+        private void end() { if (ed.closeRequested) mc.displayGuiScreen(null); }
     }
 }

@@ -13,9 +13,14 @@ public final class Hud {
 
     private Hud() {}
 
-    public static List<Widget> build(Config cfg, State s) {
+    public static List<Widget> build(Config cfg, State s) { return build(cfg, s, false); }
+
+    /** Pour l'éditeur en jeu : tous les modules actifs, même sans rien à afficher (contenu d'exemple, widget « ghost »), et même si le HUD est masqué. */
+    public static List<Widget> buildEdit(Config cfg, State s) { return build(cfg, s, true); }
+
+    private static List<Widget> build(Config cfg, State s, boolean edit) {
         List<Widget> out = new ArrayList<Widget>();
-        if (s == null || !s.inWorld || cfg.hudHidden) return out;
+        if (s == null || (!edit && (!s.inWorld || cfg.hudHidden))) return out;
         boolean en = "en".equals(cfg.lang());
         for (String id : ALL) {
             Config.Mod m = cfg.get(id);
@@ -23,7 +28,10 @@ public final class Hud {
             Widget w = new Widget();
             w.id = id; w.x = m.x; w.y = m.y; w.scale = m.scale; w.opacity = m.opacity; w.color = m.color; w.bg = m.bg;
             if ("keystrokes".equals(id)) w.keys = true;
-            else if (!fill(w, id, m, s, en)) continue;
+            else if (!fill(w, id, m, s, en)) {
+                if (!edit) continue;
+                w.lines.clear(); w.lc.clear(); w.icons = false; w.sub = -1; w.maxWidth = 0; w.keep = 0; sample(w, id, m, en); w.ghost = true;
+            }
             out.add(w);
         }
         return out;
@@ -63,6 +71,19 @@ public final class Hud {
             w.icons = m.has("icon");
         } else return false;
         return true;
+    }
+
+    /** Contenu d'exemple d'un module actif qui n'a rien à montrer pour l'instant (pas de musique, pas d'armure, pas d'effet…) : l'éditeur peut le placer. */
+    private static void sample(Widget w, String id, Config.Mod m, boolean en) {
+        List<String> l = w.lines;
+        if ("clock".equals(id)) l.add("12:34");
+        else if ("music".equals(id)) { l.add("> " + (en ? "Song title" : "Titre du morceau")); l.add(en ? "Artist" : "Artiste"); w.sub = 1; w.maxWidth = 120; w.keep = 2; }
+        else if ("armor".equals(id)) {
+            String[] names = en ? ARM_EN : ARM_FR; boolean nm = m.has("name"), pc = m.has("pct") && m.durability;
+            for (int k = 0; k < 4; k++) { String t = (nm ? names[k] : "") + (pc ? (nm ? " " : "") + "100 %" : ""); l.add(t.isEmpty() ? names[k] : t); w.lc.add(durColor(100)); }
+        }
+        else if ("potions".equals(id)) l.add((en ? "Speed II" : "Vitesse II") + " · 1:30");
+        else l.add(id);
     }
 
     /** Couleur (RVB) d'une pièce d'armure selon sa durabilité restante : blanc à 100 %, puis vert, jaune, orange, rouge. */

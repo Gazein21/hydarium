@@ -55,7 +55,10 @@ exports.setGame = b => {
   gameSt = { fps: Math.round(n(b.fps)), x: n(b.x), y: n(b.y), z: n(b.z), yaw: n(b.yaw), pitch: n(b.pitch), dim: t(b.dim), hp: n(b.hp), food: n(b.food),
     armor: (Array.isArray(b.armor) ? b.armor : []).slice(0, 4).map(a => a && typeof a === 'object' ? { id: t(a.id), max: n(a.max), dmg: n(a.dmg) } : null),
     fx: (Array.isArray(b.fx) ? b.fx : []).slice(0, 12).map(e => ({ id: t(e.id), k: t(e.k), t: n(e.t), a: n(e.a) })),
-    drawn: (Array.isArray(b.drawn) ? b.drawn : []).slice(0, 24).map(t) }; gameT = Date.now();
+    drawn: (Array.isArray(b.drawn) ? b.drawn : []).slice(0, 24).map(t), ed: !!b.ed }; gameT = Date.now();
   gameSt.icons = {}; for (const a of gameSt.armor) if (a && a.id && inst) { const u = require('./icons').get(inst.version, a.id); if (u) gameSt.icons[a.id] = u; }
   for (const e of gameSt.fx) { const key = e.k || e.id.toLowerCase().replace(/\s+/g, '_'); if (key && inst && !gameSt.icons['fx:' + key]) { const u = require('./icons').fx(inst.version, key); if (u) gameSt.icons['fx:' + key] = u; } } // effets : textures du jeu aussi // vraies textures Minecraft (jar du jeu) // drawn : modules que le mod dessine lui-même en jeu
 };
+
+/* Le jeu en cours a-t-il un mod qui dessine lui-même les widgets ET possède l'éditeur en jeu ? (état reçu il y a moins de 5 s) */
+exports.gameDraws = () => !!(gameSt && gameSt.ed && gameSt.drawn && gameSt.drawn.length && Date.now() - gameT < 5000);

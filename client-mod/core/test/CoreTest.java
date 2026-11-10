@@ -15,6 +15,21 @@ public class CoreTest {
         return crouched;
     }
 
+    static void ok(boolean c, String what) { eq(c, true, what); }
+    static void eq(int[] a, int[] b, String what) { eq(java.util.Arrays.toString(a), java.util.Arrays.toString(b), what); }
+
+    /** Surface de dessin simulée : écran 320×180, 6 pixels par lettre ; note chaque geste pour pouvoir le vérifier. */
+    static final class FC implements Canvas {
+        java.util.List<String> log = new java.util.ArrayList<String>();
+        public int width() { return 320; } public int height() { return 180; } public int textWidth(String s) { return s.length() * 6; } public int fontHeight() { return 9; }
+        public void fill(int x, int y, int w, int h, int a) { log.add("F" + x + "," + y + "," + w + "," + h); }
+        public void text(String s, int x, int y, int a, boolean sh) { log.add("T" + s + "@" + x + "," + y); }
+        public void push(double tx, double ty, double s) { log.add("P" + tx + "," + ty + "," + s); } public void pop() { log.add("p"); }
+        public void icon(String k, int i, int x, int y) { log.add("I" + k + i + "@" + x + "," + y); }
+    }
+    static Config cfgOf(String modules) throws Exception { java.io.File f = java.io.File.createTempFile("hydui", ".json"); Files.write(f.toPath(), ("{\"version\":1,\"modules\":" + modules + "}").getBytes("UTF-8")); Config c = new Config(f.getPath()); c.poll(); return c; }
+    static void rewrite(Config c, String path, String json, long bump) throws Exception { java.io.File f = new java.io.File(path); Files.write(f.toPath(), json.getBytes("UTF-8")); f.setLastModified(f.lastModified() + bump); c.poll(); }
+
     static void eq(Object a, Object b, String what) { if (!String.valueOf(a).equals(String.valueOf(b))) { fails++; System.out.println("ÉCHEC " + what + " : attendu " + b + ", obtenu " + a); } else System.out.println("ok   " + what); }
 
     public static void main(String[] x) throws Exception {
@@ -81,6 +96,51 @@ public class CoreTest {
             simSneak(d, sc, mc, ph, was, false, false, false, false); simSneak(d, sc, mc, ph, was, true, false, false, false); simSneak(d, sc, mc, ph, was, true, false, false, false); /* le joueur tient la touche sneak (module éteint) */ simSneak(d, sc, mc, ph, was, true, true, false, false); eq(Features.sneak(sc), true, "sneak : touche déjà tenue à l'activation : le module reste actif");
             simSneak(d, sc, mc, ph, was, false, false, false, false); eq(simSneak(d, sc, mc, ph, was, false, false, false, false), true, "sneak : tenue puis relâchée, il reste accroupi (module actif)");
             d.reset(); eq(d.active(), false, "sneak : quitter le monde remet à zéro");
+        }
+        { // dessin commun (Painter) : mêmes chiffres que le dessin d'origine de chaque version
+            State ps = new State(); ps.inWorld = true; ps.fps = 60; Config pc = cfgOf("{\"fps\":{\"on\":true},\"keystrokes\":{\"on\":true},\"armor\":{\"on\":true},\"music\":{\"on\":true}}");
+            java.util.List<Widget> ws = Hud.build(pc, ps); eq(ws.size(), 2, "sans armure ni musique : seuls fps et touches existent en partie");
+            FC fc = new FC(); java.util.List<Painter.Placed> pl = Painter.paintAll(ws, fc, ps, true, 0);
+            Painter.Placed f0 = pl.get(0); eq(new int[] {f0.bw, f0.bh, f0.px, f0.py}, new int[] {42, 13, 3, 3}, "cadre de « 60 FPS » : 42×13 en (3,3)");
+            String log = String.join(" ", fc.log); ok(log.startsWith("P3.0,3.0,1.0 F2,0,38,1 F2,12,38,1 F1,1,40,1 F1,11,40,1 F0,2,42,9 T60 FPS@3,3 p"), "dessin de « 60 FPS » : fond arrondi puis texte : " + log.substring(0, 80));
+            Painter.Placed k0 = pl.get(1); eq(new int[] {k0.bw, k0.bh, k0.px, k0.py}, new int[] {58, 58, 3, 75}, "grille de touches 58×58");
+            ps.armor[0] = new State.Armor(); ps.armor[0].name = "iron_helmet"; ps.armor[0].pct = 100; fc = new FC(); Painter.Placed a0 = Painter.paintAll(Hud.build(pc, ps), fc, ps, false, 0).get(2);
+            eq(new int[] {a0.bw, a0.bh}, new int[] {97, 21}, "armure avec icône : 97×21"); ok(fc.log.contains("Iarmor0@3,1") && fc.log.contains("TCasque 100 %@22,5"), "icône d'armure en (3,1), texte en (22,5)");
+            Widget mw = new Widget(); mw.id = "music"; mw.lines.add("> A very long title that scrolls by"); mw.maxWidth = 60; mw.keep = 2; mw.x = .5; mw.y = .5; Painter.Placed mp = Painter.place(mw, new FC(), 1234);
+            eq(mp.bw, 66, "titre long : largeur maximale + marges"); ok(mp.lines.get(0).length() * 6 <= 60, "le titre défile dans la fenêtre"); eq(mw.lines.get(0), "> A very long title that scrolls by", "le widget d'origine n'est pas modifié");
+            Widget edge = new Widget(); edge.id = "fps"; edge.lines.add("x"); edge.x = 1; edge.y = 1; Painter.Placed ep = Painter.place(edge, new FC(), 0); ok(ep.px + ep.width() <= 319 && ep.py + ep.height() <= 179, "un widget collé au bord reste dans l'écran");
+            Config mc2 = cfgOf("{\"music\":{\"on\":true},\"clock\":{\"on\":true}}"); State s2 = new State(); s2.inWorld = true; eq(Hud.build(mc2, s2).size(), 0, "partie : pas de musique ni d'heure, rien à dessiner"); eq(Hud.buildEdit(mc2, s2).size(), 2, "éditeur : les modules actifs vides ont un contenu d'exemple"); ok(Hud.buildEdit(mc2, s2).get(0).ghost, "…marqués « ghost »");
+            Config hid = cfgOf("{\"fps\":{\"on\":true}}"); hid.hudHidden = true; eq(Hud.build(hid, ps).size(), 0, "HUD masqué : rien en partie"); eq(Hud.buildEdit(hid, ps).size(), 1, "…mais l'éditeur montre quand même les widgets");
+        }
+        { // éditeur en jeu : vrais widgets déplaçables, aimantation, réglages, réconciliation avec le launcher
+            State ps = new State(); ps.inWorld = true; ps.fps = 60; java.io.File pf = java.io.File.createTempFile("hydui", ".json"); String base = "{\"version\":1,\"modules\":{\"fps\":{\"on\":true},\"keystrokes\":{\"on\":true},\"clock\":{\"on\":true},\"armor\":{\"on\":true}}}";
+            Files.write(pf.toPath(), base.getBytes("UTF-8")); Config pc = new Config(pf.getPath()); pc.poll(); Editor ed = new Editor(pc, ps); FC fc = new FC(); ed.draw(fc, 0, 0, 0);
+            ed.press(5, 5, 0); eq(ed.selected(), "fps", "clic sur le widget : sélectionné"); ed.drag(205, 95); eq(pc.layoutJson(), "{}", "pendant le glisser, rien n'est signalé");
+            ok(Math.abs(pc.get("fps").x - .6352) < .00005 && Math.abs(pc.get("fps").y - .5181) < .00005, "déplacé sans aimantation : " + pc.get("fps").x + "," + pc.get("fps").y);
+            ed.release(205, 95); ok(pc.layoutJson().contains("\"fps\":{\"pos\":{\"x\":0.6352,\"y\":0.5181}}"), "relâché : position signalée au launcher : " + pc.layoutJson());
+            Widget w0 = Hud.build(pc, ps).get(0); Painter.Placed p0 = Painter.place(w0, new FC(), 0); eq(new int[] {p0.px, p0.py}, new int[] {203, 93}, "le widget est exactement au pixel choisi");
+            ed.draw(fc, 0, 0, 0); ed.press(205, 95, 0); ed.drag(143, 95); ed.release(143, 95); p0 = Painter.place(Hud.build(pc, ps).get(0), new FC(), 0); eq(p0.px, 139, "aimanté au centre de l'écran");
+            ed.draw(fc, 0, 0, 0); ed.press(141, 95, 0); ed.drag(-50, -50); ed.release(0, 0); p0 = Painter.place(Hud.build(pc, ps).get(0), new FC(), 0); eq(new int[] {p0.px, p0.py}, new int[] {0, 0}, "tiré hors de l'écran : bloqué au bord");
+            ed.key(Editor.K_RIGHT); ed.key(Editor.K_RIGHT); ed.key(Editor.K_DOWN); p0 = Painter.place(Hud.build(pc, ps).get(0), new FC(), 0); eq(new int[] {p0.px, p0.py}, new int[] {2, 1}, "flèches : 1 pixel");
+            ed.key(Editor.K_PLUS); eq(pc.get("fps").scale, 1.1, "+ : taille +0,1"); ed.key(Editor.K_MINUS); ed.key(Editor.K_MINUS); eq(pc.get("fps").scale, .9, "- : taille -0,1"); ed.key(Editor.K_RESET); ok(pc.get("fps").scale == 1.0 && Math.abs(pc.get("fps").x - .01) < .0001, "R : réinitialisé");
+            ed.act("bg"); eq(pc.get("fps").bg, false, "fond retiré"); ed.act("col"); eq(pc.get("fps").color, 0xFFFF55, "couleur suivante"); ed.act("op-"); eq(pc.get("fps").opacity, .9, "opacité -10 %");
+            ok(pc.layoutJson().contains("\"color\":\"#ffff55\"") && pc.layoutJson().contains("\"bg\":false") && pc.layoutJson().contains("\"opacity\":0.9"), "réglages signalés : " + pc.layoutJson());
+            ed.draw(fc, 0, 0, 0); ed.press(10, 114, 0); eq(pc.get("clock").on, false, "case à cocher : module éteint"); eq(pc.overrides().get("clock"), Boolean.FALSE, "…signalé comme une bascule faite en jeu");
+            ed.act("sel:armor"); ed.act("show:icon"); eq(pc.get("armor").show, "name,pct", "armure : sans icône"); ed.act("show:name"); ed.act("show:pct"); eq(pc.get("armor").show, "pct", "on ne retire jamais le dernier élément");
+            ed.act("show:icon"); ed.act("show:name"); eq(pc.get("armor").show, "", "tout remis : liste vide = tout"); ed.act("sel:potions"); ed.act("show:time"); eq(pc.get("potions").show, "icon,name,lvl", "effets : sans durée");
+            ed.key(Editor.K_ESC); ok(ed.closeRequested, "Échap ferme l'éditeur");
+            // le launcher reprend un réglage : on garde sa valeur et on oublie la nôtre
+            Config rc = new Config(pf.getPath()); rc.poll(); rc.edit("fps", "x", .4); rc.edit("fps", "y", .3);
+            rewrite(rc, pf.getPath(), "{\"version\":1,\"modules\":{\"fps\":{\"on\":true,\"pos\":{\"x\":0.4,\"y\":0.3}}}}", 5000); eq(rc.layoutJson(), "{}", "réglage repris par le launcher : plus rien à signaler"); eq(rc.get("fps").x, .4, "…la valeur reste");
+            Config lc = new Config(pf.getPath()); lc.poll(); lc.edit("fps", "x", .7); rewrite(lc, pf.getPath(), "{\"version\":1,\"modules\":{\"fps\":{\"on\":true,\"pos\":{\"x\":0.9,\"y\":0.3}}}}", 10000); eq(lc.get("fps").x, .9, "le launcher a changé le module autrement : c'est lui qui gagne");
+            Config kc = new Config(pf.getPath()); kc.poll(); kc.edit("fps", "scale", 1.5); rewrite(kc, pf.getPath(), "{\"version\":1,\"modules\":{\"fps\":{\"on\":true,\"pos\":{\"x\":0.9,\"y\":0.3}},\"ping\":{\"on\":true}}}", 15000); eq(kc.get("fps").scale, 1.5, "un autre module a changé dans le fichier : notre réglage reste");
+            // demande d'ouverture venue du launcher
+            Config qc = cfgOf("{}"); ok(!qc.editorRequested(), "pas de demande au départ");
+            java.io.File qf = java.io.File.createTempFile("hydcmd", ".json"); Files.write(qf.toPath(), "{\"modules\":{},\"cmd\":{\"editor\":1700000000000}}".getBytes("UTF-8")); Config q2 = new Config(qf.getPath()); q2.poll(); ok(!q2.editorRequested(), "une demande déjà dans le fichier au démarrage date d'une partie précédente");
+            rewrite(q2, qf.getPath(), "{\"modules\":{},\"cmd\":{\"editor\":1700000005000}}", 5000); ok(q2.editorRequested(), "nouvelle demande : l'éditeur doit s'ouvrir"); q2.ackEditor(); ok(!q2.editorRequested(), "demande prise en compte");
+            // l'état envoyé au launcher
+            State bs = new State(); bs.layout = "{\"fps\":{\"scale\":1.5}}"; bs.editor = true; String bj = Bridge.stateJson(bs, new String[] {"fps"}); java.util.Map<String, Object> bm = Json.map(Json.parse(bj));
+            eq(bm.get("ed"), 1.0, "état : éditeur disponible"); eq(Json.map(Json.map(bm.get("lay")).get("fps")).get("scale"), 1.5, "état : réglages de l'éditeur"); ok(Json.map(bm.get("tg")).isEmpty(), "…et les bascules existantes sont toujours là");
         }
         eq(Hud.compass(0, false), "S", "yaw 0 = sud"); eq(Hud.compass(90, false), "O", "yaw 90 = ouest"); eq(Hud.compass(180, true), "N", "yaw 180 = nord"); eq(Hud.compass(-90, false), "E", "yaw -90 = est");
 

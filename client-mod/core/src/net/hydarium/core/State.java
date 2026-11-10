@@ -25,5 +25,7 @@ public final class State {
     public String music = ""; // « titre \n artiste » (artiste facultatif), vide si rien
     public boolean musicPlaying;
     public java.util.Map<String, Boolean> toggles = new java.util.HashMap<String, Boolean>(); // interrupteurs actionnés en jeu (voir Config.overrides)
+    public String layout = "{}"; // réglages faits dans l'éditeur en jeu, à signaler au launcher (voir Config.layoutJson)
+    public boolean editor;        // l'éditeur en jeu existe sur cette version (le launcher peut proposer « Modifier en jeu »)
     public String screen = ""; // écran ouvert qui intéresse le launcher : « resourcepacks » (Options › Packs de ressources), sinon vide
 }

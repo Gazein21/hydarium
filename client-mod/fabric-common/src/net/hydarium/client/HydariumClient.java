@@ -37,6 +37,9 @@ public class HydariumClient implements ClientModInitializer {
     public static final Cps cps = new Cps();
     public static final Toggles toggles = new Toggles(cfg);
     public static volatile boolean drawing = false;
+    /** HudScreen.open() si cette version a l'éditeur en jeu (cherché par réflexion, comme Draw), sinon null. */
+    private static java.lang.reflect.Method openEditor = null;
+    private static boolean editorDown = false;
     private static final long t0 = System.currentTimeMillis();
     private static final SimpleDateFormat HHMM = new SimpleDateFormat("HH:mm");
     private static volatile String music = "";
@@ -64,6 +67,8 @@ public class HydariumClient implements ClientModInitializer {
         cfg.poll();
         Minecraft mc = Minecraft.getInstance();
         try { drawing = "1".equals(System.getProperty("hydarium.draw", "1")) && Class.forName("net.hydarium.client.Draw").getMethod("install").invoke(null) != null; } catch (Throwable t) { drawing = false; }
+        try { openEditor = drawing ? Class.forName("net.hydarium.client.HudScreen").getMethod("open") : null; } catch (Throwable t) { openEditor = null; }
+        state.editor = openEditor != null; // le launcher propose « Modifier en jeu » seulement si l'éditeur existe ici
         ClientTickEvents.END_CLIENT_TICK.register(HydariumClient::onTick);
         ClientLifecycleEvents.CLIENT_STOPPING.register(c -> restore(c)); // les réglages temporaires ne doivent pas finir dans options.txt
         Bridge b = new Bridge(System.getProperty("hydarium.bridge", ""), System.getProperty("hydarium.token", ""));
@@ -112,6 +117,7 @@ public class HydariumClient implements ClientModInitializer {
         s.lmb = Compat.mouseDown(mc, 0); s.rmb = Compat.mouseDown(mc, 1);
         Runtime r = Runtime.getRuntime(); s.memUsedGb = (r.totalMemory() - r.freeMemory()) / 1073741824.0; s.memMaxGb = r.maxMemory() / 1073741824.0;
         s.clock = HHMM.format(new Date()); s.sessionSecs = (System.currentTimeMillis() - t0) / 1000; s.music = music; s.musicPlaying = musicPlaying;
+        s.layout = cfg.layoutJson();
         json = Bridge.stateJson(s, drawing ? Hud.ALL : new String[0]);
     }
 
@@ -120,6 +126,10 @@ public class HydariumClient implements ClientModInitializer {
            (Avant : on écrivait un gamma > 1 dans les options ; le jeu l'écrasait.) */
         Compat.nightVision(p, Features.nightVision(cfg));
         final Minecraft m = mc; final boolean typing = Compat.hasScreen(mc);
+        // éditeur en jeu : touche (Maj droite par défaut) ou demande du launcher (« Modifier en jeu »)
+        boolean edk = !typing && openEditor != null && Compat.keyDown(mc, Features.editorKey(cfg));
+        if (openEditor != null && ((edk && !editorDown) || (!typing && cfg.editorRequested()))) { cfg.ackEditor(); try { openEditor.invoke(null); } catch (Throwable t) { } }
+        editorDown = edk;
         // touches de bascule réglées dans le launcher (un module, ou tout le HUD)
         if (!typing) for (String msg : toggles.poll(new Toggles.Keys() { public boolean down(String k) { return Compat.keyDown(m, k); } })) say(p, msg);
         /* zoom : tant que le module est actif, le champ de vision reste réduit ; la touche sert seulement à l'activer / le désactiver (comme la marche auto).
