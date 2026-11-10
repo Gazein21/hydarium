@@ -16,6 +16,11 @@ jobs:
       # (il utilisera alors le HUD externe pour cette version). Les jars n’ont jamais été compilés contre Minecraft avant la première exécution de cette CI : lire les journaux.
       - run: New-Item -ItemType Directory -Force build-client | Out-Null
       - name: Test du cœur commun du mod (Java 8)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 8
+      - name: Compiler et tester le cœur
         run: |
           New-Item -ItemType Directory -Force build-core | Out-Null
           $src = Get-ChildItem client-mod/core/src -Recurse -Filter *.java | ForEach-Object { $_.FullName }
