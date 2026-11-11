@@ -1,6 +1,6 @@
 {
   "name": "hydarium-launcher",
-  "version": "0.10.52",
+  "version": "0.10.55",
   "description": "Hydarium – le launcher Minecraft simple, beau et communautaire",
   "author": "Hydarium",
   "homepage": "https://github.com/Gazein21/hydarium#readme",
@@ -18,7 +18,7 @@
     "dist:mac": "node scripts/fetch-jre.js && electron-builder --mac --publish never",
     "dist:linux": "node scripts/fetch-jre.js && electron-builder --linux --publish never",
     "build:mods": "node scripts/build-mods.js",
-    "test": "node test/version.test.js && node test/modplan.test.js && node test/clientfirst.test.js && node test/modbuild.test.js && node test/crash.test.js && node test/playit.test.js && node test/p2p.test.js && node test/legacyports.test.js && node test/jre.test.js && node test/core-compile.test.js && node --test test/forgegen.test.js && node test/worldexport.test.js && node test/skins.test.js && node test/updater.test.js && node test/layoutsync.test.js && node test/preload.test.js",
+    "test": "node test/version.test.js && node test/modplan.test.js && node test/clientfirst.test.js && node test/modbuild.test.js && node test/crash.test.js && node test/playit.test.js && node test/p2p.test.js && node test/legacyports.test.js && node test/jre.test.js && node test/core-compile.test.js && node --test test/forgegen.test.js && node test/worldexport.test.js && node test/skins.test.js && node test/updater.test.js && node test/layoutsync.test.js && node test/preload.test.js && node test/p2pbridge.test.js && node test/hudstate.test.js",
     "release": "node scripts/release.js"
   },
   "dependencies": {

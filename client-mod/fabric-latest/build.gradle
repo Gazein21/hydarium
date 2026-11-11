@@ -1,8 +1,15 @@
 plugins { id 'net.fabricmc.fabric-loom' }
-version = '1.1.0'
+version = '1.2.0'
 base { archivesName = 'hydarium-fabric-latest' }
 repositories { mavenCentral() }
 sourceSets { main { java { srcDirs = ['src/main/java', '../fabric-common/src', '../core/src'] } } }
+/* Le dessin DANS le jeu (Draw, HudCanvas, HudScreen, MenuScreen, Gx) est compilé à part : si une API de cette version a changé, ces classes manquent dans le jar
+   (le mod se charge quand même, luminosité / zoom / sprint marchent, et le HUD du launcher prend le relais) au lieu de faire échouer toute la construction.
+   Les erreurs de compilation restent affichées dans le journal : c'est là qu'on voit quoi corriger. */
+sourceSets { draw { java { srcDirs = ['src/draw/java'] } } }
+sourceSets.draw.compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+sourceSets.draw.runtimeClasspath += sourceSets.main.output + sourceSets.main.runtimeClasspath
+tasks.named('compileDrawJava') { options.failOnError = false }
 dependencies {
   minecraft "com.mojang:minecraft:${project.minecraft_version}"
   implementation "net.fabricmc:fabric-loader:${project.loader_version}"
@@ -11,4 +18,4 @@ dependencies {
 java { sourceCompatibility = JavaVersion.VERSION_25; targetCompatibility = JavaVersion.VERSION_25 }
 tasks.withType(JavaCompile).configureEach { it.options.release = 25; it.options.encoding = 'UTF-8' }
 processResources { inputs.property 'version', project.version; filesMatching('fabric.mod.json') { expand 'version': project.version } }
-jar { archiveFileName = 'hydarium-latest.jar' }
+jar { archiveFileName = 'hydarium-latest.jar'; from sourceSets.draw.output }

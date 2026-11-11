@@ -71,7 +71,7 @@ exports.jvmArgs = async inst => {
 };
 exports.writeConfig = (inst, dir, extra) => {
   inst.client = inst.client || store.defaultClient(); inst.client.on = true;
-  try { fs.mkdirSync(path.join(dir, 'config'), { recursive: true }); fs.writeFileSync(path.join(dir, 'config', 'hydarium-client.json'), JSON.stringify({ ...(extra || {}), version: 1, instance: inst.id, mc: inst.version, loader: inst.loader, lang: (store.get().settings.uiLang === 'en' || (!store.get().settings.uiLang && /^en/i.test(require('electron').app.getLocale()))) ? 'en' : 'fr', modules: inst.client.modules || {} }, null, 2)); } catch (e) { log.error('config client', e); }
+  try { fs.mkdirSync(path.join(dir, 'config'), { recursive: true }); fs.writeFileSync(path.join(dir, 'config', 'hydarium-client.json'), JSON.stringify({ ...(extra || {}), version: 1, instance: inst.id, mc: inst.version, loader: inst.loader, menuKey: store.get().settings.overlayKey === undefined ? 'Alt+H' : store.get().settings.overlayKey, lang: (store.get().settings.uiLang === 'en' || (!store.get().settings.uiLang && /^en/i.test(require('electron').app.getLocale()))) ? 'en' : 'fr', modules: inst.client.modules || {} }, null, 2)); } catch (e) { log.error('config client', e); }
 };
 let wWatch = null, tWatch = null, tStart = 0; const seenW = new Set();
 exports.start = (inst, dir, opts) => {
@@ -99,6 +99,8 @@ exports.start = (inst, dir, opts) => {
   const k = store.get().settings.overlayKey; key = k === undefined ? 'Alt+H' : k;
   if (key && key !== 'off') { try { if (!globalShortcut.register(key, () => overlay.toggle('hub', inst.id))) log.warn('Raccourci déjà pris :', key); } catch (e) { log.warn('raccourci', e.message); } }
 };
+/* Le mod annonce que son menu Alt+H existe DANS le jeu : le raccourci global du launcher doit disparaître (il avalerait la touche avant le jeu et rouvrirait la fenêtre par-dessus). */
+exports.releaseOverlayKey = () => { if (!key) return false; try { globalShortcut.unregister(key); } catch (e) {} log.info('Menu Hydarium en jeu : raccourci global « ' + key + ' » libéré'); key = ''; return true; };
 let dpIv = null;
 exports.stop = soft => {
   if (dpIv) { clearInterval(dpIv); dpIv = null; }

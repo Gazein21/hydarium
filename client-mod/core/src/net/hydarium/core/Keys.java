@@ -29,6 +29,7 @@ public final class Keys {
         def("PERIOD", 46, "key.keyboard.period", "PERIOD"); def("SLASH", 47, "key.keyboard.slash", "SLASH"); def("SEMICOLON", 59, "key.keyboard.semicolon", "SEMICOLON"); def("APOSTROPHE", 39, "key.keyboard.apostrophe", "APOSTROPHE");
         def("LBRACKET", 91, "key.keyboard.left.bracket", "LBRACKET"); def("RBRACKET", 93, "key.keyboard.right.bracket", "RBRACKET"); def("BACKSLASH", 92, "key.keyboard.backslash", "BACKSLASH");
         for (int i = 0; i <= 9; i++) { def("NUM" + i, 320 + i, "key.keyboard.keypad." + i, "NUMPAD" + i); }
+        def("NUMADD", 334, "key.keyboard.keypad.add", "ADD"); def("NUMSUB", 333, "key.keyboard.keypad.subtract", "SUBTRACT");
     }
 
     /** Nom canonique (majuscules, alias ALT/CTRL/SHIFT résolus), ou « » si vide. */

@@ -2,8 +2,12 @@
    touches, CPS, heure, mémoire, ping, musique, temps de session. (FPS, coordonnées, armure… demandent l’agent en jeu.) */
 const { BrowserWindow, screen } = require('electron'); const path = require('path'), os = require('os'), net = require('net');
 const fg = require('./fg'), input = require('./input'), media = require('./media'), store = require('./store');
-let scr = null, dpOn = false, topT = null, gameSt = null, gameT = 0, mrect = null, editing = false, lastClick = 0, curBounds = null, w = null, timer = null, music = null, mT = null, pT = null, inst = null, t0 = 0, ping = null, server = '', vis = true, st = { keys: {}, cps: [0, 0] };
+let shown = true, scr = null, dpOn = false, topT = null, gameSt = null, gameT = 0, mrect = null, editing = false, lastClick = 0, curBounds = null, w = null, timer = null, music = null, mT = null, pT = null, inst = null, t0 = 0, ping = null, server = '', vis = true, st = { keys: {}, cps: [0, 0] };
 const alive = () => w && !w.isDestroyed();
+/* La fenêtre transparente posée par-dessus le jeu n'est nécessaire QUE si le mod ne dessine pas lui-même les widgets (anciens jeux, mod absent), ou le temps d'afficher les boutons
+   « télécharger des packs » (écrans de création de monde / packs de ressources). Sinon elle reste cachée : plus de surcouche, plus de doublons avec le HUD du jeu. */
+const needsWindow = () => !exports.gameDraws() || dpOn || rpOn();
+exports.needsWindow = needsWindow;
 const cfgOf = () => ({ modules: (inst && inst.client && inst.client.modules) || {} });
 const sendCfg = () => { if (alive()) { w.webContents.send('hud:cfg', cfgOf()); const k = (cfgOf().modules.keystrokes || {}); input.setKeys(null, k.scan); } };
 function doPing() {
@@ -32,20 +36,21 @@ exports.start = (i, srv) => {
   const b = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).bounds;
   w = new BrowserWindow({ x: b.x, y: b.y, width: b.width, height: b.height, frame: false, transparent: true, hasShadow: false, resizable: false, focusable: false, skipTaskbar: true, alwaysOnTop: true, show: false, backgroundColor: '#00000000', webPreferences: { preload: path.join(__dirname, '../preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
   w.setIgnoreMouseEvents(true); w.setAlwaysOnTop(true, 'screen-saver'); w.loadFile(path.join(__dirname, '../renderer/hud.html'));
-  w.once('ready-to-show', () => { sendCfg(); if (vis) w.showInactive(); });
+  w.once('ready-to-show', () => { sendCfg(); if (vis && shown) w.showInactive(); });
   // plein écran : on remonte la fenêtre du HUD au-dessus du jeu régulièrement (le jeu peut reprendre le dessus quand il change de mode d'affichage)
-  topT = setInterval(() => { if (alive() && vis && !editing) { try { w.setAlwaysOnTop(true, 'screen-saver'); w.moveTop(); } catch (e) {} } }, 1500);
-  fg.start(({ mc, rect }) => { vis = mc; if (alive()) { if (mc && rect) fit(rect); if (mc && !editing) { w.showInactive(); try { w.setAlwaysOnTop(true, 'screen-saver'); } catch (e) {} } else w.hide(); } });
+  topT = setInterval(() => { if (alive() && vis && shown && !editing) { try { w.setAlwaysOnTop(true, 'screen-saver'); w.moveTop(); } catch (e) {} } }, 1500);
+  fg.start(({ mc, rect }) => { vis = mc; if (alive()) { if (mc && rect) fit(rect); if (mc && !editing && shown) { w.showInactive(); try { w.setAlwaysOnTop(true, 'screen-saver'); } catch (e) {} } else w.hide(); } });
   input.start(s => { st = s; }, onMouse); const k0 = (inst.client.modules || {}).keystrokes || {}; input.setKeys(null, k0.scan);
   const poll = async () => { try { music = await media.get(); } catch (e) { music = null; } };
   poll(); mT = setInterval(poll, 5000); doPing(); pT = setInterval(doPing, 6000);
   timer = setInterval(() => {
-    if (!alive() || !vis) return; const m = cfgOf().modules, now = new Date(), sec = Math.floor((Date.now() - t0) / 1000);
+    if (alive() && !editing) { const need = needsWindow(); if (need !== shown) { shown = need; if (need && vis) { w.showInactive(); try { w.setAlwaysOnTop(true, 'screen-saver'); } catch (e) {} } else w.hide(); } }
+    if (!alive() || !vis || !shown) return; const m = cfgOf().modules, now = new Date(), sec = Math.floor((Date.now() - t0) / 1000);
     w.webContents.send('hud:state', { keys: st.keys, cps: st.cps, clock: now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }), mem: [(os.totalmem() - os.freemem()) / 1073741824, os.totalmem() / 1073741824], ping, music: m.music && m.music.on ? music : null, session: sec, dpw: dpOn, rpw: rpOn(), game: gameSt && Date.now() - gameT < 3000 ? gameSt : null });
   }, 200);
 };
 exports.refresh = id => { if (inst && inst.id === id) { const fresh = store.get().instances.find(x => x.id === id); if (fresh) { inst = fresh; if (!fresh.client || !fresh.client.on || fresh.client.disabled) exports.stop(); else sendCfg(); } } };
-exports.stop = () => { dpOn = false; scr = null; if (topT) { clearInterval(topT); topT = null; } mrect = null; editing = false; curBounds = null; [timer, mT, pT].forEach(t => t && clearInterval(t)); timer = mT = pT = null; fg.stop(); input.stop(); if (alive()) w.close(); w = null; inst = null; };
+exports.stop = () => { shown = true; dpOn = false; scr = null; if (topT) { clearInterval(topT); topT = null; } mrect = null; editing = false; curBounds = null; [timer, mT, pT].forEach(t => t && clearInterval(t)); timer = mT = pT = null; fg.stop(); input.stop(); if (alive()) w.close(); w = null; inst = null; };
 
 /* état envoyé par le mod client (POST /v1/state) : nombres et courtes chaînes seulement */
 const n = (v, d = 0) => (typeof v === 'number' && isFinite(v) ? v : d), t = v => String(v == null ? '' : v).slice(0, 60);
@@ -62,3 +67,6 @@ exports.setGame = b => {
 
 /* Le jeu en cours a-t-il un mod qui dessine lui-même les widgets ET possède l'éditeur en jeu ? (état reçu il y a moins de 5 s) */
 exports.gameDraws = () => !!(gameSt && gameSt.ed && gameSt.drawn && gameSt.drawn.length && Date.now() - gameT < 5000);
+
+/* dernier état de jeu reçu (moins de 5 s), ou null */
+exports.gameState = () => (gameSt && Date.now() - gameT < 5000 ? gameSt : null);

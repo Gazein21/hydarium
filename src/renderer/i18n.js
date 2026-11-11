@@ -246,6 +246,13 @@ Skins par défaut restaurés|Default skins restored
 Téléchargement des skins par défaut de Minecraft… (une seule fois, quelques secondes)|Downloading Minecraft's default skins… (one time only, a few seconds)
 Skins par défaut de Minecraft indisponibles :|Minecraft default skins unavailable:
 Réessayer|Retry
+Avec le mode Hydarium (Fabric 1.20.1, 1.21 et 26.x), ils peuvent aussi coller ce code directement à la place de l’adresse d’un serveur, dans le jeu.|With the Hydarium mod (Fabric 1.20.1, 1.21 and 26.x), they can also paste this code straight into a server address field in-game.
+Adresse du serveur ou invitation privée (HYD-…)|Server address or private invitation (HYD-…)
+Entre une adresse ou une invitation|Enter an address or an invitation
+Une invitation privée, c’est comme un mot de passe.|A private invitation is like a password.
+Elle donne un accès direct à l’ordinateur de l’hôte : ne la publie pas (Discord public, vidéo, stream) et attention, elle s’affiche en clair dans la liste des serveurs du jeu.|It gives direct access to the host's computer: don't publish it (public Discord, videos, streams), and note that it shows in plain text in the game's server list.
+Ce code est comme un mot de passe.|This code is like a password.
+Qui l’a peut se connecter à ton serveur et voit ton adresse IP. Ne le publie pas (Discord public, vidéo, stream, capture d’écran) : donne-le seulement à des amis, et si ça fuite clique sur « Nouveau code ».|Anyone who has it can connect to your server and sees your IP address. Don't publish it (public Discord, videos, streams, screenshots): give it to friends only, and if it leaks click “New code”.
 Mises à jour automatiques|Automatic updates
 Redémarrer et installer|Restart and install
 Rechercher une mise à jour|Check for updates

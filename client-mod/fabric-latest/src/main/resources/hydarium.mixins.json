@@ -1,0 +1,8 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "net.hydarium.client.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": ["ServerAddressMixin"],
+  "injectors": { "defaultRequire": 0 }
+}

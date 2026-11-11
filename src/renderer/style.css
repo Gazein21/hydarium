@@ -208,3 +208,4 @@ body.cfmode .ovmain{overflow:hidden!important}
 .ml.sel{outline:1.5px solid var(--ac);outline-offset:-1.5px}
 .p2pcode{font:600 13.5px/1.2 Consolas,ui-monospace,monospace;letter-spacing:.04em;user-select:all;padding:5px 9px;border:1px solid var(--ln);border-radius:8px}
 a.lk{color:inherit;text-decoration:underline dotted;cursor:pointer}a.lk:hover{color:var(--ac)}
+.keywarn{background:rgba(229,169,59,.09);border-left:4px solid #e5a93b;border-radius:0 10px 10px 0;padding:9px 13px;font-size:12.5px;line-height:1.45}

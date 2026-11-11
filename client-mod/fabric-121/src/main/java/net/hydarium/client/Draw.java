@@ -22,6 +22,7 @@ public final class Draw {
 
     private static void render(GuiGraphics g, net.minecraft.client.DeltaTracker delta) {
         Minecraft mc = Minecraft.getInstance();
+        { long t0 = System.currentTimeMillis(); int fr = HydariumClient.frames.frame(t0); if (!HydariumClient.fpsNative) HydariumClient.state.fps = fr; } // FPS : images réellement dessinées
         if (mc.options.hideGui || mc.player == null || mc.screen instanceof HudScreen) return; // l'éditeur dessine lui-même les widgets (sinon les fonds seraient doublés)
         HydariumClient.cps.feed(HydariumClient.state.lmb, HydariumClient.state.rmb, System.currentTimeMillis());
         HydariumClient.state.cpsL = HydariumClient.cps.count(0, System.currentTimeMillis());

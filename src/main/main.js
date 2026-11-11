@@ -203,7 +203,8 @@ app.whenReady().then(async () => {
     store.save(); try { session.writeConfig(i, game.dirOf(i.id)); } catch (e) {} try { require('./hud').refresh(i.id); } catch (e) {}
     send('client:synced', { id: i.id, client: i.client }); try { require('./overlay').send('client:synced', { id: i.id, client: i.client }); } catch (e) {}
   };
-  bridge.route('POST', '/v1/state', (q, b) => { require('./hud').setGame(b || {}); if (b && b.tg) { try { syncToggles(b.tg); } catch (e) { log.warn('synchro des modules', e.message); } } if (b && b.lay) { try { syncLayout(b.lay); } catch (e) { log.warn('synchro de la disposition', e.message); } } if (b && b.menu) return { ok: true }; /* simple signalement d’écran (hors monde) : pas de statistiques */ try { require('./stats').onState(b || {}); } catch (e) {} return { ok: true }; });
+  bridge.route('POST', '/v1/state', (q, b) => { require('./hud').setGame(b || {}); if (b && b.gmenu) { try { require('./session').releaseOverlayKey(); } catch (e) { log.warn('raccourci du menu', e.message); } } if (b && b.tg) { try { syncToggles(b.tg); } catch (e) { log.warn('synchro des modules', e.message); } } if (b && b.lay) { try { syncLayout(b.lay); } catch (e) { log.warn('synchro de la disposition', e.message); } } if (b && b.menu) return { ok: true }; /* simple signalement d’écran (hors monde) : pas de statistiques */ try { require('./stats').onState(b || {}); } catch (e) {} return { ok: true }; });
+  bridge.route('POST', '/v1/p2p/open', (q, b) => require('./p2pbridge').open(b && b.code)); // code d'invitation tapé dans le champ d'adresse du jeu
   bridge.route('GET', '/v1/music', async () => ({ track: await media.get() }));
   bridge.route('POST', '/v1/music', async (q, b) => ({ track: await media.act(String(b.cmd || '')) }));
   bridge.route('POST', '/v1/overlay', (q, b) => { const c = session.current(); overlay.open(['hub', 'skins', 'content', 'shots', 'music'].includes(b.page) ? b.page : 'hub', c && c.id); });

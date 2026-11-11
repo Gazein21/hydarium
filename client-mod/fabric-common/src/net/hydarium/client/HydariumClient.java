@@ -19,7 +19,9 @@ import net.hydarium.core.Bridge;
 import net.hydarium.core.Config;
 import net.hydarium.core.Cps;
 import net.hydarium.core.Features;
+import net.hydarium.core.Fps;
 import net.hydarium.core.Hud;
+import net.hydarium.core.P2pAddress;
 import net.hydarium.core.State;
 import net.hydarium.core.Toggles;
 import net.hydarium.core.Zoom;
@@ -40,6 +42,12 @@ public class HydariumClient implements ClientModInitializer {
     /** HudScreen.open() si cette version a l'éditeur en jeu (cherché par réflexion, comme Draw), sinon null. */
     private static java.lang.reflect.Method openEditor = null;
     private static boolean editorDown = false;
+    /** Images par seconde comptées par le dessin du HUD (Draw), utilisées tant que le compteur du jeu n'est pas lisible (jeu obfusqué 1.20 / 1.21 : réflexion par noms Mojang impossible). */
+    public static final Fps frames = new Fps();
+    static volatile boolean fpsNative = false;
+    /** MenuScreen.open() si cette version a le menu Hydarium en jeu (cherché par réflexion, comme Draw), sinon null : le launcher garde alors sa fenêtre Alt+H. */
+    private static java.lang.reflect.Method openMenu = null;
+    private static boolean menuDown = false;
     private static final long t0 = System.currentTimeMillis();
     private static final SimpleDateFormat HHMM = new SimpleDateFormat("HH:mm");
     private static volatile String music = "";
@@ -59,6 +67,23 @@ public class HydariumClient implements ClientModInitializer {
             return true;
         }
     };
+    /** Ouvre une page du menu du launcher (skins, content, shots, music, hub) : utilisé par le menu en jeu pour ce qu'il ne fait pas encore. */
+    public static void openLauncher(String page) { Bridge b = bridgeRef; if (b != null) b.overlay(page); }
+
+    /** Pont avec le launcher, gardé pour les Mixin (code peer-to-peer dans le champ d'adresse). */
+    private static volatile Bridge bridgeRef = null;
+
+    /**
+     * Appelé par ServerAddressMixin à chaque lecture d'une adresse de serveur : si le texte tapé est un code d'invitation peer-to-peer (HYD-XXXX-…),
+     * le launcher ouvre le tunnel et on renvoie « 127.0.0.1:port » ; sinon null et le jeu garde l'adresse telle quelle. Ne lève jamais d'exception.
+     */
+    public static String p2p(String typed) {
+        try {
+            final Bridge b = bridgeRef; if (b == null || !b.enabled() || !P2pAddress.isCode(typed)) return null;
+            return P2pAddress.resolve(typed, new P2pAddress.Opener() { public int open(String code) throws Exception { return b.openP2p(code); } });
+        } catch (Throwable t) { return null; }
+    }
+
     private static boolean zoomDown = false, walkDown = false, walking = false, sprintHeld = false;
     private static int tick = 0;
 
@@ -69,9 +94,12 @@ public class HydariumClient implements ClientModInitializer {
         try { drawing = "1".equals(System.getProperty("hydarium.draw", "1")) && Class.forName("net.hydarium.client.Draw").getMethod("install").invoke(null) != null; } catch (Throwable t) { drawing = false; }
         try { openEditor = drawing ? Class.forName("net.hydarium.client.HudScreen").getMethod("open") : null; } catch (Throwable t) { openEditor = null; }
         state.editor = openEditor != null; // le launcher propose « Modifier en jeu » seulement si l'éditeur existe ici
+        try { openMenu = drawing ? Class.forName("net.hydarium.client.MenuScreen").getMethod("open") : null; } catch (Throwable t) { openMenu = null; }
+        state.menu = openMenu != null; // le launcher libère alors son raccourci global : Alt+H ouvre le menu DANS le jeu
         ClientTickEvents.END_CLIENT_TICK.register(HydariumClient::onTick);
         ClientLifecycleEvents.CLIENT_STOPPING.register(c -> restore(c)); // les réglages temporaires ne doivent pas finir dans options.txt
         Bridge b = new Bridge(System.getProperty("hydarium.bridge", ""), System.getProperty("hydarium.token", ""));
+        bridgeRef = b;
         b.start(new Bridge.Source() {
             public String stateJson() { return json; }
             public boolean wantMusic() { return cfg.get("music").on; }
@@ -93,7 +121,8 @@ public class HydariumClient implements ClientModInitializer {
 
     static void sample(Minecraft mc, Player p) {
         State s = state;
-        s.inWorld = true; s.fps = fps(mc);
+        s.inWorld = true;
+        int nf = fps(mc); if (nf > 0) { s.fps = nf; fpsNative = true; }   // compteur du jeu quand on sait le lire ; sinon Draw compte les images (voir Fps)
         s.x = p.getX(); s.y = p.getY(); s.z = p.getZ(); s.yaw = p.getYRot(); s.pitch = p.getXRot();
         String d = mc.level.dimension().toString(); s.dim = d.substring(d.lastIndexOf(' ') + 1).replace("]", "");
         s.hp = p.getHealth(); s.food = p.getFoodData().getFoodLevel();
@@ -130,6 +159,12 @@ public class HydariumClient implements ClientModInitializer {
         boolean edk = !typing && openEditor != null && Compat.keyDown(mc, Features.editorKey(cfg));
         if (openEditor != null && ((edk && !editorDown) || (!typing && cfg.editorRequested()))) { cfg.ackEditor(); try { openEditor.invoke(null); } catch (Throwable t) { } }
         editorDown = edk;
+        if (openMenu != null) {
+            String[] chord = Features.menuChord(cfg); boolean md = chord.length > 0;
+            for (int i = 0; md && i < chord.length; i++) if (!Compat.keyDown(mc, chord[i])) md = false;
+            if (!typing && md && !menuDown) { try { openMenu.invoke(null); } catch (Throwable t) { } }
+            menuDown = md;
+        }
         // touches de bascule réglées dans le launcher (un module, ou tout le HUD)
         if (!typing) for (String msg : toggles.poll(new Toggles.Keys() { public boolean down(String k) { return Compat.keyDown(m, k); } })) say(p, msg);
         /* zoom : tant que le module est actif, le champ de vision reste réduit ; la touche sert seulement à l'activer / le désactiver (comme la marche auto).

@@ -4,6 +4,6 @@
   "package": "net.hydarium.client.mixin",
   "compatibilityLevel": "JAVA_21",
   "refmap": "hydarium-fabric-1.21.1-refmap.json",
-  "client": ["OptionInstanceAccessor", "OptionsAccessor"],
+  "client": ["OptionInstanceAccessor", "OptionsAccessor", "ServerAddressMixin"],
   "injectors": { "defaultRequire": 0 }
 }

@@ -57,6 +57,35 @@ public final class Bridge {
         c.getResponseCode(); c.disconnect();
     }
 
+    /**
+     * Demande au launcher d'ouvrir le tunnel peer-to-peer d'un code d'invitation ; renvoie le port local (127.0.0.1) à utiliser.
+     * Plus patient que le reste du pont (premier appel : le réseau pair-à-pair démarre), et lève une exception avec le message du launcher en cas de refus.
+     */
+    public int openP2p(String code) throws Exception {
+        if (!enabled()) throw new Exception("launcher absent");
+        HttpURLConnection c = (HttpURLConnection) new URL(base + "/v1/p2p/open").openConnection();
+        c.setRequestMethod("POST"); c.setConnectTimeout(1500); c.setReadTimeout(20000);
+        c.setRequestProperty("Authorization", "Bearer " + token); c.setRequestProperty("Content-Type", "application/json"); c.setDoOutput(true);
+        OutputStream o = c.getOutputStream();
+        try { o.write(("{\"code\":" + Json.quote(code) + "}").getBytes(UTF8)); } finally { o.close(); }
+        int status = c.getResponseCode();
+        InputStream in = status >= 400 ? c.getErrorStream() : c.getInputStream();
+        ByteArrayOutputStream b = new ByteArrayOutputStream();
+        if (in != null) try { byte[] buf = new byte[2048]; int n; while ((n = in.read(buf)) > 0 && b.size() < 16384) b.write(buf, 0, n); } finally { in.close(); }
+        c.disconnect();
+        Map<String, Object> m = Json.map(Json.parse(new String(b.toByteArray(), UTF8)));
+        if (status >= 400 || m.get("error") != null) throw new Exception(m.get("error") instanceof String ? (String) m.get("error") : "refusé (" + status + ")");
+        if (!(m.get("port") instanceof Number)) throw new Exception("réponse inattendue");
+        return ((Number) m.get("port")).intValue();
+    }
+
+    /** Demande au launcher d'ouvrir une page de son menu (« skins », « content », « shots », « music », « hub ») : pour ce que le menu en jeu ne fait pas encore. Silencieux en cas d'échec. */
+    public void overlay(final String page) {
+        if (!enabled()) return;
+        Thread t = new Thread(new Runnable() { public void run() { try { post("/v1/overlay", "{\"page\":" + Json.quote(page) + "}"); } catch (Throwable ignored) { } } }, "hydarium-overlay");
+        t.setDaemon(true); t.start();
+    }
+
     private void readMusic(Source src) throws Exception {
         HttpURLConnection c = open("/v1/music", "GET");
         InputStream in = c.getInputStream();
@@ -90,11 +119,11 @@ public final class Bridge {
         b.append("],\"scr\":").append(Json.quote(s.screen == null ? "" : s.screen)).append(",\"tg\":{");
         boolean first = true;
         if (s.toggles != null) for (Map.Entry<String, Boolean> e : s.toggles.entrySet()) { b.append(first ? "" : ",").append(Json.quote(e.getKey())).append(':').append(e.getValue() ? "true" : "false"); first = false; }
-        b.append("},\"lay\":").append(s.layout == null || s.layout.isEmpty() ? "{}" : s.layout).append(",\"ed\":").append(s.editor ? 1 : 0);
+        b.append("},\"lay\":").append(s.layout == null || s.layout.isEmpty() ? "{}" : s.layout).append(",\"ed\":").append(s.editor ? 1 : 0).append(",\"gmenu\":").append(s.menu ? 1 : 0);
         return b.append('}').toString();
     }
 
-    /** Hors d'un monde (menu principal…) il n'y a pas d'état de jeu : on ne signale que l'écran ouvert (« menu » : le launcher n'en fait pas un état de jeu). */
+    /** Hors d'un monde (menu principal…) il n'y a pas d'état de jeu : on ne signale que l'écran ouvert (« menu » : le launcher n'en fait pas un état de jeu ; à ne pas confondre avec « gmenu » = le menu Hydarium en jeu existe). */
     public static String menuJson(String screen) { return "{\"menu\":1,\"scr\":" + Json.quote(screen == null ? "" : screen) + "}"; }
 
     private static String n(double d) { return String.format(Locale.ROOT, "%.2f", d); }

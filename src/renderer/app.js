@@ -313,6 +313,8 @@ const updText = u => !u ? 'Vérification en cours…' : ({
   downloading: 'Téléchargement de la version ' + u.latest + '… ' + (u.percent || 0) + ' %', ready: 'La version ' + u.latest + ' est prête : elle s’installera à la fermeture du launcher.',
   available: 'La version ' + u.latest + ' est disponible (installation manuelle).', error: u.error || 'Impossible de vérifier.' })[u.status] || '';
 const updCard = () => `<div class="card" id="updc"><div style="flex:1"><b>Mises à jour</b><small>${esc(updText(UPS))}</small></div><div class="row">${UPS && UPS.status === 'ready' ? '<button class="btn" data-a="updInstall">Redémarrer et installer</button>' : ''}${UPS && UPS.status === 'available' ? '<button class="btn" data-a="updOpen">Télécharger</button>' : ''}<button class="btn g" data-a="updCheck" ${UPS && ['checking', 'downloading', 'dev'].includes(UPS.status) ? 'disabled' : ''}>Rechercher une mise à jour</button></div></div>`;
+/* « HYD-XXXX-… » (casse, espaces, tirets et soulignés libres) : reconnaît une invitation privée dans le champ d'adresse. La vraie validation est faite côté principal (p2p.normalize). */
+const looksLikeInvite = t => /^HYD[0-9A-Z]{12,}$/.test(String(t || '').toUpperCase().replace(/[\s_-]/g, ''));
 /* état de la récupération des skins Mojang (extraits du jeu au premier usage) */
 const skDefNote = x => x.defaultsState === 'loading' ? '<p class="mu">Téléchargement des skins par défaut de Minecraft… (une seule fois, quelques secondes)</p>'
   : x.defaultsState === 'error' ? `<p class="mu">Skins par défaut de Minecraft indisponibles : ${esc(x.defaultsError || 'erreur inconnue')} <a style="color:var(--ac);cursor:pointer" data-a="skRetry">Réessayer</a></p>` : '';
@@ -398,8 +400,8 @@ async function srvView() {
   const cats = [...new Set(l.map(x => x.cat).filter(Boolean))]; if (srvCat && !cats.includes(srvCat)) srvCat = '';
   const order = new Map(l.map((x, n) => [x.id, n]));
   l = l.filter(x => !srvCat || x.cat === srvCat).sort((a, b) => (b.fav ? 1 : 0) - (a.fav ? 1 : 0) || (srvSort === 'name' ? a.name.localeCompare(b.name) : srvSort === 'players' ? (b.players || 0) - (a.players || 0) : srvSort === 'online' ? (b.online ? 1 : 0) - (a.online ? 1 : 0) : order.get(a.id) - order.get(b.id)));
-  return `<div class="row" style="margin-bottom:12px"><input id="sn2" placeholder="Nom"><input id="sa" placeholder="adresse.exemple.fr:25565"><button class="btn" data-a="sadd">Ajouter</button></div>
-  <div class="row" style="margin-bottom:12px"><input id="sp2pn" placeholder="Nom (facultatif)"><input id="sp2p" placeholder="Invitation privée : HYD-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"><button class="btn" data-a="sp2p">Rejoindre avec une invitation</button></div>
+  return `<div class="row" style="margin-bottom:8px"><input id="sn2" placeholder="Nom (facultatif)"><input id="sa" placeholder="Adresse du serveur ou invitation privée (HYD-…)"><button class="btn" data-a="sadd">Ajouter</button></div>
+  <div class="keywarn" style="margin-bottom:12px">🔑 <b>Une invitation privée, c’est comme un mot de passe.</b> Elle donne un accès direct à l’ordinateur de l’hôte : ne la publie pas (Discord public, vidéo, stream) et attention, elle s’affiche en clair dans la liste des serveurs du jeu.</div>
   <div class="row between" style="margin-bottom:10px"><div class="chips" style="margin:0"><span class="chip ${srvCat ? '' : 'a'}" data-a="scat" data-v="">Tous</span>${cats.map(c => `<span class="chip ${srvCat === c ? 'a' : ''}" data-a="scat" data-v="${esc(c)}">${esc(c)}</span>`).join('')}</div><div class="row"><span class="mu">Trier :</span><select data-srvsort="1"><option value="manual" ${srvSort === 'manual' ? 'selected' : ''}>Mon ordre</option><option value="name" ${srvSort === 'name' ? 'selected' : ''}>Nom</option><option value="players" ${srvSort === 'players' ? 'selected' : ''}>Joueurs</option><option value="online" ${srvSort === 'online' ? 'selected' : ''}>En ligne d’abord</option></select></div></div>
   <p class="mu" style="margin-top:0">« Rejoindre » lance l’instance que tu as choisie pour le serveur (liste « Instance »), sinon une instance compatible détectée (version, loader, mods). Les favoris ★ restent en haut.</p>
   ${l.length ? selBar(l.filter(x => SELS.has(x.id)).length, l.length, 's') : ''}
@@ -632,7 +634,7 @@ const p2pCard = (h, I) => {
   const head = '<div class="card col" style="margin-top:10px"><b>Invitation privée (sans port ouvert)</b>';
   if (!I.on) return head + '<small>Tes amis qui ont Hydarium rejoignent ton serveur avec un code, en connexion directe de PC à PC : rien à ouvrir sur ta box, et seuls ceux qui ont le code peuvent entrer. Bien plus sûr qu’ouvrir un port.</small><div class="row" style="margin-top:8px"><button class="btn sm" data-a="p2pon">Activer les invitations privées</button></div></div>';
   const n = I.peers || 0, st = h.state === 'running' ? (I.sharing ? `<span class="bd ok">Partagé · ${n} ami${n > 1 ? 's' : ''} connecté${n > 1 ? 's' : ''}</span>` : '<span class="bd wa">Ouverture du partage…</span>') : '<span class="bd">Le partage démarre avec le serveur</span>';
-  return head + `<div class="row" style="margin-top:8px"><b class="p2pcode">${esc(I.code)}</b><button class="btn g sm" data-a="p2pcopy" data-v="${esc(I.code)}">Copier</button>${st}</div><div class="row" style="margin-top:8px"><button class="btn g sm" data-a="p2pnew">Nouveau code</button><button class="btn g sm" data-a="p2poff">Désactiver</button></div><small>Tes amis : <b>Mes serveurs › Rejoindre avec une invitation</b>, puis ce code. Connexion directe : ton adresse IP est visible par ceux qui rejoignent, ne donne le code qu’à des gens de confiance (« Nouveau code » annule l’ancien). Sans relais, ça ne marche pas sur tous les réseaux (certains opérateurs, 4G/5G) : utilise alors playit.gg ci-dessus.</small></div>`;
+  return head + `<div class="keywarn" style="margin-top:8px">🔑 <b>Ce code est comme un mot de passe.</b> Qui l’a peut se connecter à ton serveur et voit ton adresse IP. Ne le publie pas (Discord public, vidéo, stream, capture d’écran) : donne-le seulement à des amis, et si ça fuite clique sur « Nouveau code ».</div><div class="row" style="margin-top:8px"><b class="p2pcode">${esc(I.code)}</b><button class="btn g sm" data-a="p2pcopy" data-v="${esc(I.code)}">Copier</button>${st}</div><div class="row" style="margin-top:8px"><button class="btn g sm" data-a="p2pnew">Nouveau code</button><button class="btn g sm" data-a="p2poff">Désactiver</button></div><small>Tes amis : <b>Mes serveurs</b>, ils collent ce code dans le champ d’adresse puis « Ajouter ». Avec le mode Hydarium (Fabric 1.20.1, 1.21 et 26.x), ils peuvent aussi le coller directement à la place de l’adresse d’un serveur, dans le jeu. « Nouveau code » annule l’ancien. Sans relais, ça ne marche pas sur tous les réseaux (certains opérateurs, 4G/5G) : utilise alors playit.gg ci-dessus.</small></div>`;
 };
 async function hostDetail() {
   const l = await call('host:list'), h = l.find(x => x.id === HID); if (!h) { page = 'host'; return hostView(); }
@@ -1128,11 +1130,6 @@ const ACT = {
   p2pnew: () => openModal('<h3>Générer un nouveau code ?</h3><p>L’ancien code ne marchera plus : tes amis devront ajouter le nouveau dans Mes serveurs.</p><div class="row end" style="margin-top:14px"><button class="btn sec" data-a="mclose">Annuler</button><button class="btn" data-a="p2pnewgo">Nouveau code</button></div>'),
   p2pnewgo: async () => { closeModal(); await call('p2p:set', HID, { renew: true }); flash('Nouveau code créé ✓'); render(); },
   p2pcopy: async d => { await navigator.clipboard.writeText(d.v); flash('Code copié ✓'); },
-  sp2p: async () => {
-    const code = ($('#sp2p') || {}).value || ''; if (!code.trim()) return flash('Colle d’abord un code d’invitation');
-    flash('Recherche de l’hôte…'); const r = await call('srv:addp2p', { name: ($('#sp2pn') || {}).value, code }); saved = await call('srv:saved'); render();
-    r.reachable ? toast('Invitation ajoutée : l’hôte répond ✓') : toast('Invitation ajoutée. ' + r.error, 'er');
-  },
   hcopy: async d => { await navigator.clipboard.writeText(d.v); flash('Adresse copiée ✓'); },
   hicon: async () => { if (await call('host:icon', HID)) { flash('Icône enregistrée'); render(); } },
   hiconrm: async () => { await call('host:iconrm', HID); render(); },
@@ -1253,7 +1250,15 @@ const ACT = {
   javaadd: async () => { const j = await call('java:add'); if (j) note('Java ' + j.major + ' ajouté'); jl = null; render(); },
   javarm: async d => { await call('java:remove', d.v); if (cfg.java === d.v) cfg.java = ''; jl = null; render(); },
   javare: async () => { await javas(true); render(); },
-  sadd: async () => { await call('srv:add', { name: $('#sn2').value, addr: $('#sa').value }); saved = await call('srv:saved'); render(); },
+  sadd: async () => {
+    const a = ($('#sa').value || '').trim(), n = ($('#sn2').value || '').trim();
+    if (!a) return flash('Entre une adresse ou une invitation');
+    if (looksLikeInvite(a)) { // le même champ sert aux deux : un code HYD-… ouvre le tunnel privé, tout le reste est une adresse de serveur
+      flash('Recherche de l’hôte…'); const r = await call('srv:addp2p', { name: n, code: a }); saved = await call('srv:saved'); render();
+      return r.reachable ? toast('Invitation ajoutée : l’hôte répond ✓') : toast('Invitation ajoutée. ' + r.error, 'er');
+    }
+    await call('srv:add', { name: n || a, addr: a }); saved = await call('srv:saved'); render();
+  },
   sdel: d => { const x = saved.find(y => y.id === d.id); if (!x) return; openModal(`<h3>Retirer « ${esc(x.name)} » ?</h3><p>Il disparaît de la liste d’Hydarium. S’il est aussi enregistré dans la liste de serveurs d’une instance, tu peux le retirer de là aussi (sinon il ne reviendra pas dans Hydarium pour autant).</p><div class="row end" style="flex-wrap:wrap"><button class="btn sec" data-a="mclose">Annuler</button><button class="btn g" data-a="sdelgo" data-id="${esc(x.id)}" data-game="">Retirer d’Hydarium</button><button class="btn" data-a="sdelgo" data-id="${esc(x.id)}" data-game="1">Retirer aussi du jeu</button></div>`); },
   sdelgo: async d => { await call('srv:del', d.id, !!d.game); saved = await call('srv:saved'); closeModal(); render(); flash('Serveur retiré'); },
   jyes: () => call('join:answer', { vanilla: true, version: ($('#jver') || {}).value }), jno: () => call('join:answer', { vanilla: false }), jcancel: () => call('join:cancel'),

@@ -11,7 +11,7 @@ import java.util.List;
 public final class Editor {
     public static final int K_ESC = 1, K_LEFT = 2, K_RIGHT = 3, K_UP = 4, K_DOWN = 5, K_PLUS = 6, K_MINUS = 7, K_RESET = 8;
     private static final int[] PALETTE = {0xFFFFFF, 0xFFFF55, 0x55FF55, 0x55FFFF, 0xFF5555, 0xFF55FF, 0xFFAA00};
-    private static final String[][] NAMES = {{"fps", "FPS", "FPS"}, {"cps", "CPS", "CPS"}, {"keystrokes", "Touches", "Keys"}, {"coords", "Coordonnées", "Coordinates"}, {"direction", "Direction", "Direction"},
+    static final String[][] NAMES = {{"fps", "FPS", "FPS"}, {"cps", "CPS", "CPS"}, {"keystrokes", "Touches", "Keys"}, {"coords", "Coordonnées", "Coordinates"}, {"direction", "Direction", "Direction"},
         {"armor", "Armure", "Armor"}, {"potions", "Effets", "Effects"}, {"ping", "Ping", "Ping"}, {"clock", "Heure", "Clock"}, {"memory", "Mémoire", "Memory"}, {"music", "Musique", "Music"}, {"session", "Session", "Session"}};
     private static final int SNAP = 4;
 

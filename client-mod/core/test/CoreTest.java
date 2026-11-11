@@ -27,6 +27,12 @@ public class CoreTest {
         public void push(double tx, double ty, double s) { log.add("P" + tx + "," + ty + "," + s); } public void pop() { log.add("p"); }
         public void icon(String k, int i, int x, int y) { log.add("I" + k + i + "@" + x + "," + y); }
     }
+    /** Coordonnées d'écran d'un point à l'intérieur de l'élément dont le texte est « label » (retrouvé dans le journal de dessin, avec la mise à l'échelle du panneau). */
+    static int[] menuAt(Menu m, FC cv, String label) {
+        double[] f = m.frame();
+        for (String l : cv.log) if (l.startsWith("T" + label + "@")) { String[] xy = l.substring(l.indexOf('@') + 1).split(","); double lx = Integer.parseInt(xy[0]) + 2, ly = Integer.parseInt(xy[1]) + 2; return new int[] {(int) Math.round(f[0] + lx * f[2]), (int) Math.round(f[1] + ly * f[2])}; }
+        throw new IllegalStateException("texte introuvable : " + label);
+    }
     static Config cfgOf(String modules) throws Exception { java.io.File f = java.io.File.createTempFile("hydui", ".json"); Files.write(f.toPath(), ("{\"version\":1,\"modules\":" + modules + "}").getBytes("UTF-8")); Config c = new Config(f.getPath()); c.poll(); return c; }
     static void rewrite(Config c, String path, String json, long bump) throws Exception { java.io.File f = new java.io.File(path); Files.write(f.toPath(), json.getBytes("UTF-8")); f.setLastModified(f.lastModified() + bump); c.poll(); }
 
@@ -190,6 +196,61 @@ public class CoreTest {
           ms.music = "Seul"; mw = null; for (Widget q : Hud.build(mc, ms)) if ("music".equals(q.id)) mw = q; eq(mw.lines.size() + "/" + mw.sub, "1/-1", "musique : sans artiste, une seule ligne"); }
         eq(Round.rects(58, 13, false).size(), 1, "cases carrées : un rectangle"); int ar = 0; for (int[] q : Round.rects(58, 13, true)) ar += q[2] * q[3]; eq(ar, 58 * 13 - 2 * (2 + 1) * 2, "cases arrondies : seuls les coins manquent");
         eq(Round.rects(20, 6, true).size(), 1, "petite case : pas d'arrondi"); eq(new Config(null).round(), true, "arrondi par défaut");
+        // ---- code peer-to-peer dans le champ d'adresse ----
+        { String code = "HYD-0123-4567-89AB-CDEF-GHJK-MNPQ";
+          ok(P2pAddress.isCode(code), "p2p : code reconnu"); ok(P2pAddress.isCode("  hyd 0123_4567-89ab cdef ghjk mnpq "), "p2p : casse, espaces et soulignés libres");
+          ok(P2pAddress.isCode("hyd-oiLO-4567-89AB-CDEF-GHJK-MNPQ"), "p2p : O lu 0, I et L lus 1 (comme le launcher)");
+          ok(P2pAddress.isCode("HYD01234567" + "89ABCDEFGHJKMNPQ"), "p2p : sans tirets");
+          ok(!P2pAddress.isCode("play.hypixel.net"), "p2p : adresse ordinaire ignorée"); ok(!P2pAddress.isCode("127.0.0.1:25565"), "p2p : IP ignorée"); ok(!P2pAddress.isCode(""), "p2p : vide ignoré"); ok(!P2pAddress.isCode(null), "p2p : null ignoré");
+          ok(!P2pAddress.isCode("HYD-0123-4567-89AB-CDEF-GHJK"), "p2p : trop court"); ok(!P2pAddress.isCode(code + "-AAAA"), "p2p : trop long");
+          ok(!P2pAddress.isCode("0123-4567-89AB-CDEF-GHJK-MNPQ-RSTV"), "p2p : sans HYD, jamais pris pour un code"); ok(!P2pAddress.isCode("HYD-0123-4567-89AB-CDEF-GHJK-MNPU"), "p2p : U n'existe pas dans l'alphabet");
+          eq(P2pAddress.pretty(P2pAddress.key("hyd 0123 4567 89ab cdef ghjk mnpq")), code, "p2p : forme canonique envoyée au launcher");
+          final int[] calls = {0}; final String[] got = {null};
+          P2pAddress.Opener ok1 = new P2pAddress.Opener() { public int open(String c2) { calls[0]++; got[0] = c2; return 40123; } };
+          P2pAddress.reset();
+          eq(P2pAddress.resolve("mc.exemple.fr", ok1), null, "p2p : adresse ordinaire rendue telle quelle (null = ne rien changer)"); eq(calls[0], 0, "p2p : launcher non appelé pour une adresse ordinaire");
+          eq(P2pAddress.resolve("hyd 0123 4567 89ab cdef ghjk mnpq", ok1), "127.0.0.1:40123", "p2p : code → adresse locale"); eq(got[0], code, "p2p : le launcher reçoit la forme canonique");
+          eq(P2pAddress.resolve(code, ok1), "127.0.0.1:40123", "p2p : deuxième demande servie par le cache"); eq(calls[0], 1, "p2p : un seul appel au launcher (liste + clic ne le harcèlent pas)");
+          P2pAddress.reset(); calls[0] = 0;
+          P2pAddress.Opener ko = new P2pAddress.Opener() { public int open(String c2) throws Exception { calls[0]++; throw new Exception("Code d'invitation invalide."); } };
+          eq(P2pAddress.resolve(code, ko), null, "p2p : refus du launcher → null (le jeu affichera son erreur habituelle)"); eq(P2pAddress.lastError, "Code d'invitation invalide.", "p2p : message conservé");
+          eq(P2pAddress.resolve(code, ko), null, "p2p : échec récent mémorisé"); eq(calls[0], 1, "p2p : pas de nouvel appel juste après un échec");
+          P2pAddress.reset(); eq(P2pAddress.resolve(code, new P2pAddress.Opener() { public int open(String c2) { return 0; } }), null, "p2p : port invalide refusé");
+          P2pAddress.reset(); eq(P2pAddress.resolve(code, null), null, "p2p : pas de launcher → null"); P2pAddress.reset(); }
+        // ---- raccourci du menu en jeu ----
+        eq(java.util.Arrays.toString(Features.chord("Alt+H")), "[LALT, H]", "menu : Alt+H"); eq(java.util.Arrays.toString(Features.chord("Ctrl+Shift+M")), "[LCTRL, LSHIFT, M]", "menu : Ctrl+Shift+M");
+        eq(java.util.Arrays.toString(Features.chord("CommandOrControl+K")), "[LCTRL, K]", "menu : CommandOrControl"); eq(java.util.Arrays.toString(Features.chord("F9")), "[F9]", "menu : F9 seul");
+        eq(Features.chord("off").length, 0, "menu : off"); eq(Features.chord("").length, 0, "menu : vide"); eq(Features.chord(null).length, 0, "menu : null"); eq(Features.chord("Super+H").length, 0, "menu : Super non lisible → aucun raccourci");
+        eq(Features.chord("Alt").length, 0, "menu : un modificateur seul n'ouvre jamais le menu"); eq(Features.chord("Alt+§§").length, 0, "menu : touche inconnue → aucun raccourci"); eq(Features.chord("Alt+Escape").length, 0, "menu : Échap réservé");
+        // ---- menu Hydarium en jeu ----
+        { final int[] calls = {0}; final String[] page = {null};
+          Menu.Host host = new Menu.Host() { public void editor() { calls[0]++; } public void launcher(String p2) { page[0] = p2; } };
+          Config mc = cfgOf("{\"zoom\":{\"on\":false},\"gamma\":{\"on\":true},\"fps\":{\"on\":true},\"keystrokes\":{\"on\":false}}");
+          Menu m = new Menu(mc, host); FC cv = new FC(); m.draw(cv, 0, 0); String log = cv.log.toString();
+          ok(log.contains("THydarium@") && log.contains("TLuminosité@") && log.contains("TAfficher le HUD@") && log.contains("TTouches@") && log.contains("TPlacer et régler les widgets en jeu@") && log.contains("TCaptures@"), "menu : titre, fonctions, widgets et boutons dessinés");
+          ok(m.frame()[2] < 1.0, "menu : fenêtre basse (180) → le panneau rétrécit au lieu de déborder");
+          boolean okRects = true; for (String l : cv.log) if (l.startsWith("F")) { String[] fr = l.substring(1).split(","); if (Integer.parseInt(fr[2]) < 0 || Integer.parseInt(fr[3]) < 0) okRects = false; } ok(okRects, "menu : aucun rectangle de taille négative");
+          int[] z = menuAt(m, cv, "Zoom"); m.press(z[0], z[1], 0); ok(mc.get("zoom").on, "menu : clic sur « Zoom » → activé"); ok(mc.overrides().containsKey("zoom"), "menu : le choix est remonté au launcher");
+          m.draw(cv = new FC(), 0, 0); z = menuAt(m, cv, "Zoom"); m.press(z[0], z[1], 0); ok(!mc.get("zoom").on, "menu : deuxième clic → désactivé");
+          m.draw(cv = new FC(), 0, 0); int[] g = menuAt(m, cv, "Luminosité"); m.press(g[0], g[1], 0); ok(!mc.get("gamma").on, "menu : « Luminosité » coupée");
+          m.draw(cv = new FC(), 0, 0); int[] tk = menuAt(m, cv, "Touches"); m.press(tk[0], tk[1], 0); ok(mc.get("keystrokes").on, "menu : widget « Touches » activé");
+          m.draw(cv = new FC(), 0, 0); int[] hu = menuAt(m, cv, "Afficher le HUD"); ok(!mc.hudHidden, "menu : HUD visible au départ"); m.press(hu[0], hu[1], 0); ok(mc.hudHidden, "menu : « Afficher le HUD » masque tout");
+          m.draw(cv = new FC(), 0, 0); int[] ed = menuAt(m, cv, "Placer et régler les widgets en jeu"); m.press(ed[0], ed[1], 0); eq(calls[0], 1, "menu : bouton de placement → éditeur ouvert"); ok(!m.closeRequested, "menu : l'éditeur remplace l'écran, le menu ne se ferme pas lui-même");
+          m.draw(cv = new FC(), 0, 0); int[] sh = menuAt(m, cv, "Captures"); m.press(sh[0], sh[1], 0); eq(page[0], "shots", "menu : bouton « Captures » → page du launcher"); ok(m.closeRequested, "menu : se ferme après avoir passé la main au launcher");
+          Menu m2 = new Menu(mc, host); m2.draw(new FC(), 0, 0); m2.press(0, 0, 0); ok(m2.closeRequested, "menu : clic hors du panneau → fermé");
+          Menu m3 = new Menu(mc, host); FC c3 = new FC(); m3.draw(c3, 0, 0); int[] z3 = menuAt(m3, c3, "Zoom"); m3.press(z3[0], z3[1], 1); ok(!mc.get("zoom").on && !m3.closeRequested, "menu : clic droit ignoré"); }
+        // ---- FPS mesurés (le compteur interne du jeu n'est pas lisible dans le jeu obfusqué) ----
+        { Fps fa = new Fps(); int lastA = 0; long ta = 1000000; for (int i = 0; i < 60 * 3; i++) { ta += (i % 3 == 0) ? 16 : 17; lastA = fa.frame(ta); }
+          ok(lastA >= 57 && lastA <= 61, "fps : ~60 images par seconde mesurées, reçu " + lastA);
+          Fps fb = new Fps(); int lastB = 0; long tb = 5000; for (int i = 0; i < 144 * 3; i++) { tb += (i % 9 == 0) ? 6 : 7; lastB = fb.frame(tb); }
+          ok(lastB >= 140 && lastB <= 150, "fps : ~144 mesurées, reçu " + lastB);
+          ok(new Fps().frame(10) == 0, "fps : 0 avant la première seconde complète");
+          Fps fz = new Fps(); long tz = 100; for (int i = 0; i < 70; i++) { tz += 16; fz.frame(tz); } tz += 16; int before = fz.frame(tz); tz += 8000; int afterPause = fz.frame(tz);   // jeu figé 8 s
+          ok(afterPause == before, "fps : une longue pause ne fausse pas la valeur affichée"); }
+        // ---- état envoyé au launcher : « gmenu » (menu Hydarium en jeu) ≠ « menu » (le joueur est dans un menu, pas dans un monde) ----
+        { State st = new State(); st.inWorld = true; st.menu = true; String j = Bridge.stateJson(st, Hud.ALL);
+          ok(j.contains("\"gmenu\":1"), "état : gmenu annoncé"); ok(!j.contains("\"menu\":"), "état : aucune clé « menu » en jeu (le launcher jetterait tout l'état de jeu)");
+          st.menu = false; ok(Bridge.stateJson(st, Hud.ALL).contains("\"gmenu\":0"), "état : gmenu = 0 quand le menu n'existe pas"); ok(Bridge.menuJson("x").startsWith("{\"menu\":1"), "état : hors monde, « menu » garde son sens d'origine"); }
         c.poll(); System.out.println(fails == 0 ? "TOUT PASSE" : fails + " ÉCHEC(S)"); System.exit(fails == 0 ? 0 : 1);
     }
 }

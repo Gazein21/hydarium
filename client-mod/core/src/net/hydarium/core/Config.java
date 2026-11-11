@@ -32,6 +32,7 @@ public final class Config {
     private long stamp = -1;
     private Map<String, Object> mods = Json.map(null);
     private volatile String lang = "fr";
+    private volatile String menuKey = "Alt+H";   // raccourci du menu en jeu, au format du launcher (« Alt+H », « Ctrl+Shift+M », « F9 »…) ; « off » = aucun
     private final java.util.Map<String, Boolean> over = new java.util.concurrent.ConcurrentHashMap<String, Boolean>(); // interrupteurs actionnés en jeu
     private final java.util.Map<String, Boolean> reported = new java.util.concurrent.ConcurrentHashMap<String, Boolean>(); // dernière valeur signalée au launcher pour chaque interrupteur
     /** Réglages modifiés dans l'éditeur en jeu (position, taille, opacité, fond, couleur, éléments affichés) et pas encore repris par le launcher : visibles tout de suite, signalés dans l'état (champ « lay »). */
@@ -45,6 +46,9 @@ public final class Config {
     public Config(String path) { this.file = path == null || path.isEmpty() ? null : new File(path); }
 
     public String lang() { return lang; }
+
+    /** Raccourci du menu Hydarium en jeu (champ « menuKey » du fichier de configuration, repris du réglage « Raccourci du menu » du launcher). */
+    public String menuKey() { return menuKey; }
 
     /** Style des cases du HUD (module spécial « hud », champ « round ») : coins légèrement arrondis par défaut, carrés (comme en 1.8.9) si « round » vaut false. */
     public boolean round() { return !Boolean.FALSE.equals(Json.map(mods.get("hud")).get("round")); }
@@ -75,6 +79,7 @@ public final class Config {
             if (first) editorSeen = editorStamp; // une demande déjà dans le fichier au démarrage date d'une partie précédente
             Object l = root.get("lang");
             if ("en".equals(l) || "fr".equals(l)) lang = (String) l;
+            Object mk = root.get("menuKey"); if (mk instanceof String) menuKey = ((String) mk).trim();
         } catch (IOException e) { /* fichier absent : on garde l'ancienne configuration */
         } catch (RuntimeException e) { /* JSON invalide : idem */ }
     }
