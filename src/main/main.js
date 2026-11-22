@@ -444,5 +444,6 @@ app.whenReady().then(async () => {
   setTimeout(() => { host.closeLegacyPorts().catch(e => log.warn('closeLegacyPorts', e.message)); }, 4000); // anciennes versions : ports ouverts sur la box (UPnP) refermés une fois
   app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
 });
-app.on('before-quit', () => { host.stopAll(); playit.stop(); require('./p2p').stopAll().catch(() => {}); if (chat) chat.flush(); if (friends) friends.stop().catch(() => {}); });
+app.on('before-quit', () => { setTimeout(() => app.exit(0), 5000);   /* filet de sécurité : si une fermeture traîne (réseau P2P, serveur…), le processus ne reste jamais en arrière-plan et ne bloque plus l'installeur */
+  host.stopAll(); playit.stop(); require('./p2p').stopAll().catch(() => {}); if (chat) chat.flush(); if (friends) friends.stop().catch(() => {}); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
