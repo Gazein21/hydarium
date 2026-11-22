@@ -81,7 +81,7 @@ exports.FORGE_GEN = FORGE_GEN;
 exports.forgeVersions = () => ['1.8.9', ...Object.keys(FORGE_GEN)];
 
 const TIERS = ['full', 'core'];
-const mk = (adapter, tier, env) => ({ id: adapter + '/' + tier, adapter, tier, draw: tier !== 'core' && adapter !== 'fabric-latest', ...env });
+const mk = (adapter, tier, env) => ({ id: adapter + '/' + tier, adapter, tier, draw: tier !== 'core', ...env });
 
 /** { ok, plans: [...] } ou { ok: false, reason }. Un plan : { id, adapter, tier, draw, jdk, gradle, loom, release, plugin }. */
 exports.plansFor = (family, version) => {
@@ -95,7 +95,11 @@ exports.plansFor = (family, version) => {
   }
   if (family !== 'fabric') return { ok: false, reason: 'Loader inconnu : ' + family };
   if (!fabricOk(version)) return { ok: false, reason: 'Fabric ne gère pas Minecraft ' + version };
-  if (p.era === 'new') return { ok: true, plans: [mk('fabric-latest', 'core', { jdk: 25, gradle: 'current', loom: 'latest', release: 25, plugin: 'net.fabricmc.fabric-loom', unobfuscated: true })] };
+  /* 26.x (non obfusqué) : UN seul passage Gradle « adaptatif » (le HUD et les écrans sont compilés à part, sans faire échouer le reste : voir writeFabricProject),
+     puis le repli « core » (sans dessin) seulement si même le mod de base ne compile pas. Le niveau réellement obtenu (full / draw / core) est lu dans le jar après coup.
+     Avant 0.10.62 : trois essais successifs full → draw → core, donc jusqu'à trois constructions complètes d'affilée quand un niveau ne compilait pas (très lent).
+     Avant 0.10.57 : « core » seul (draw: false) : aucun code de dessin dans le mod. */
+  if (p.era === 'new') return { ok: true, plans: [mk('fabric-latest', 'auto', { adaptive: true, jdk: 25, gradle: 'current', loom: 'latest', release: 25, plugin: 'net.fabricmc.fabric-loom', unobfuscated: true }), mk('fabric-latest', 'core', { jdk: 25, gradle: 'current', loom: 'latest', release: 25, plugin: 'net.fabricmc.fabric-loom', unobfuscated: true })] };
   if (cmp(version, '1.19.3') < 0) return { ok: false, reason: 'Le mod Hydarium demande Minecraft 1.19.3 ou plus récent (Fabric) ; avant, seul le HUD du launcher est utilisé.' };
   let env, order;
   if (cmp(version, '1.20') < 0) { env = { jdk: 17, gradle: '8.8', loom: '1.6-SNAPSHOT', release: 17 }; order = [['fabric-120', ['core']]]; }                                  // 1.19.3 – 1.19.4 : pas de GuiGraphics → l'essentiel seulement

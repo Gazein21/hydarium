@@ -120,6 +120,7 @@ public final class Bridge {
         boolean first = true;
         if (s.toggles != null) for (Map.Entry<String, Boolean> e : s.toggles.entrySet()) { b.append(first ? "" : ",").append(Json.quote(e.getKey())).append(':').append(e.getValue() ? "true" : "false"); first = false; }
         b.append("},\"lay\":").append(s.layout == null || s.layout.isEmpty() ? "{}" : s.layout).append(",\"ed\":").append(s.editor ? 1 : 0).append(",\"gmenu\":").append(s.menu ? 1 : 0);
+        if (s.derr != null && s.derr.length() > 0) b.append(",\"derr\":").append(Json.quote(s.derr));
         return b.append('}').toString();
     }
 

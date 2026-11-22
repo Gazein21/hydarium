@@ -1,0 +1,1 @@
+package net.fabricmc.fabric.api.client.rendering.v1.hud; public class VanillaHudElements { public static final net.minecraft.resources.Identifier CHAT = net.minecraft.resources.Identifier.fromNamespaceAndPath("minecraft","chat"); }

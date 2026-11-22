@@ -127,7 +127,7 @@ footer{display:flex;align-items:center}#np{margin-left:auto;display:flex;align-i
 .ovn{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;color:var(--mu);cursor:pointer;font-size:13.5px;border-left:3px solid transparent}.ovn:hover{background:#171c26;color:var(--tx)}.ovn.a{background:#1c2230;color:var(--tx);border-left-color:var(--ac);font-weight:600}
 .ovedit{justify-content:flex-start;width:100%}.ovmain{flex:1;overflow:auto;padding:18px 20px}.ovmain h2{font-size:19px}
 .mgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}@media(max-width:700px){.mgrid{grid-template-columns:repeat(2,1fr)}}
-.mcard{display:flex;flex-direction:column;align-items:center;gap:7px;background:#12161e;border:1px solid #232b3a;border-radius:12px;padding:16px 10px 14px;text-align:center}.mcard.on{border-color:rgba(61,220,132,.35)}.mcard b{font-size:14px}.mcard small{color:var(--mu);font-size:10.5px;margin-top:-4px}.mi{color:var(--ac)}
+.mgrid .mcard{display:flex;flex-direction:column;align-items:center;gap:7px;background:#12161e;border:1px solid #232b3a;border-radius:12px;padding:16px 10px 14px;text-align:center}.mgrid .mcard.on{border-color:rgba(61,220,132,.35)}.mgrid .mcard b{font-size:14px}.mgrid .mcard small{color:var(--mu);font-size:10.5px;margin-top:-4px}.mi{color:var(--ac)}
 .swt{flex:none}
 /* v0.8 */
 .seg.segl{display:flex;flex-wrap:wrap;width:100%}.seg.segl button{flex:1;padding:7px 8px;font-size:12.5px;white-space:nowrap}
@@ -209,3 +209,102 @@ body.cfmode .ovmain{overflow:hidden!important}
 .p2pcode{font:600 13.5px/1.2 Consolas,ui-monospace,monospace;letter-spacing:.04em;user-select:all;padding:5px 9px;border:1px solid var(--ln);border-radius:8px}
 a.lk{color:inherit;text-decoration:underline dotted;cursor:pointer}a.lk:hover{color:var(--ac)}
 .keywarn{background:rgba(229,169,59,.09);border-left:4px solid #e5a93b;border-radius:0 10px 10px 0;padding:9px 13px;font-size:12.5px;line-height:1.45}
+.updbar{position:fixed;right:16px;bottom:16px;z-index:9999;display:flex;gap:14px;align-items:center;background:#161a22;border:1px solid #5b8cff;border-radius:12px;padding:10px 14px;box-shadow:0 8px 28px rgba(0,0,0,.45);font-size:13px}
+.priv{filter:blur(6px);transition:filter .15s;user-select:none;-webkit-user-select:none}
+.priv.show{filter:none;user-select:text;-webkit-user-select:text}
+.eye{background:none;border:0;color:var(--mu,#8a94a6);cursor:pointer;padding:0 4px;margin-left:2px;vertical-align:middle;display:inline-flex}
+.eye:hover{color:var(--ac,#5b8cff)}
+input.privin{-webkit-text-security:disc}
+input.privin:focus{-webkit-text-security:none}
+.tos{position:fixed;inset:0;z-index:20000;background:rgba(8,10,14,.93);display:flex;align-items:center;justify-content:center;padding:20px}
+.tosb{max-width:660px;width:100%;max-height:92vh;overflow:auto;background:var(--card,#161a22);border:1px solid #2e3644;border-radius:14px;padding:22px 26px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.tosb h2{margin:0 0 12px}.tosb h3{margin:16px 0 6px}
+.tosprv{border-left:4px solid #4ade80;background:rgba(74,222,128,.08);border-radius:0 10px 10px 0;padding:10px 14px;line-height:1.45}
+.tosprv p{margin:6px 0}.tosprv small{display:block;opacity:.8;line-height:1.45}
+.tosl{padding-left:20px;line-height:1.5;margin:6px 0}.tosl li{margin:8px 0}
+.tosck{display:flex;gap:9px;align-items:center;margin:16px 0 12px;cursor:pointer;font-weight:600}
+.modf{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
+.modf input{flex:1;min-width:0;width:auto}
+.modf.sm{flex:0 1 320px}.modf.sm input{padding:6px 10px;font-size:12.5px}
+.modf .mu{white-space:nowrap;font-size:12px}
+.selbar:has(.modf){padding-top:6px;padding-bottom:6px}
+
+/* ----- liste des mods d'une instance : carte en ligne (icône à gauche, texte aligné à gauche, actions à droite).
+   Avant, la règle « .mcard » (faite pour la grille des modules en jeu) s'appliquait aussi ici et centrait tout en colonne. ----- */
+.card.mcard{padding:10px 14px;margin-bottom:6px}
+.card.mcard .ic b{font-size:14px}
+.card.mcard .ic small{display:block;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card.mcard .row{flex:none;gap:8px}
+
+/* ----- amis ----- */
+.fdot{width:9px;height:9px;border-radius:50%;background:#59627a;flex:none;display:inline-block}.fdot.on{background:#4ade80}.fdot.play{background:#60a5fa}
+.frcode{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;word-break:break-all;user-select:all;flex:1}
+#frmodal .ml{align-items:center;gap:10px}
+
+/* ----- choix de la version d'un mod ----- */
+.vlist{max-height:46vh;overflow:auto;margin:10px 0}
+
+/* ----- objet de Minecraft sur la couverture d'une instance (icône générée) ----- */
+.cobj{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
+.cobj img{height:60%;aspect-ratio:1;image-rendering:pixelated;filter:drop-shadow(0 3px 0 rgba(0,0,0,.35))}
+.hero .cobj{place-items:center end;padding-right:44px}.hero .cobj img{height:66%}
+.itms{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.itm{min-width:38px;height:38px;padding:3px;display:grid;place-items:center;border:2px solid transparent;border-radius:8px;background:var(--p2);color:var(--mu);font-size:11px;cursor:pointer}
+.itm img{width:28px;height:28px;image-rendering:pixelated}.itm.a{border-color:var(--ac)}.itm:hover{border-color:#43506a}
+
+/* ----- glisser-déposer : voile pendant qu'on survole la fenêtre avec des fichiers ----- */
+#dropz{position:fixed;inset:0;z-index:9999;display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;pointer-events:none;background:rgba(11,13,17,.82);color:#fff}
+#dropz.on{display:flex}
+#dropz::before{content:"";position:absolute;inset:14px;border:2px dashed var(--ac);border-radius:18px}
+#dropz b{font-size:22px}#dropz span{font-size:13px;opacity:.8}#dropz .dzn{font-size:15px;opacity:1;color:var(--ac)}
+
+/* ----- images d'instance : photo perso (plein cadre) ou logo officiel d'un modpack (flou en fond + logo net) ----- */
+.cphoto,.cbg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.cbg{filter:blur(16px) brightness(.55) saturate(1.2);transform:scale(1.25)}
+.clogo{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
+.clogo img{height:76%;aspect-ratio:1;max-width:60%;object-fit:cover;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.45)}
+.hero .clogo{place-items:center end;padding-right:26px}.hero .clogo img{height:74%}
+.wps.small .cover .cphoto,.wps.small .cover .cbg{height:100%}
+.imgbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px}
+.imgprev{width:132px;height:62px;border-radius:10px;overflow:hidden;position:relative;border:1px solid var(--ln);flex:none;background:#222}
+
+/* ----- sections repliables de la vue serveur (« Options avancées », « Autres adresses ») ----- */
+.adv{margin-top:10px}
+.adv>summary{cursor:pointer;display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline;padding:8px 2px;font-weight:600;list-style:none;user-select:none}
+.adv>summary::-webkit-details-marker{display:none}
+.adv>summary::before{content:"›";display:inline-block;width:12px;transition:transform .15s}
+.adv[open]>summary::before{transform:rotate(90deg)}
+.adv>summary small{font-weight:400}
+.adv.in{margin-top:8px;border-top:1px solid var(--ln)}
+.adv.in>summary{font-weight:500;font-size:13px;padding:8px 0 2px}
+.arow{display:flex;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap}.arow>span{min-width:190px;font-size:12px}
+
+/* ===== Chat entre amis ===== */
+.nb{margin-left:auto;min-width:18px;height:18px;padding:0 5px;border-radius:99px;background:var(--ac);color:#06210f;font:700 11px/18px inherit;font-style:normal;text-align:center;flex:none}
+.chat{display:grid;grid-template-columns:270px 1fr;height:calc(100vh - 152px);min-height:360px;border:1px solid var(--ln);border-radius:12px;overflow:hidden;background:rgba(19,22,28,.86)}
+.chl{display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--ln);background:rgba(16,19,26,.6)}
+.chh{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--ln)}
+.chs{flex:1;overflow-y:auto;padding:6px}
+.chi{display:flex;align-items:center;gap:10px;padding:8px 9px;border-radius:9px;cursor:pointer}.chi:hover{background:var(--p2)}.chi.a{background:var(--p3);box-shadow:inset 3px 0 0 var(--ac)}
+.cha{position:relative;width:34px;height:34px;border-radius:10px;background:var(--p3);display:grid;place-items:center;font-weight:700;color:var(--ac);flex:none}.cha.g svg{fill:none;stroke:currentColor;stroke-width:1.7}
+.cha .fdot{position:absolute;right:-3px;bottom:-3px;border:2px solid var(--p1)}
+.chn{min-width:0;flex:1}.chn b,.chn small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chm{display:flex;flex-direction:column;min-width:0;min-height:0}
+.chhd{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--ln)}.chhd small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chms{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:3px}
+.chr{display:flex;flex-direction:column;align-items:flex-start;max-width:78%}.chr.me{align-self:flex-end;align-items:flex-end}
+.chw{font-size:11.5px;color:var(--ac);margin:6px 0 2px 4px}
+.chb{background:var(--p3);border-radius:4px 14px 14px 14px;padding:7px 11px;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere}
+.chr.me .chb{background:rgba(61,220,132,.18);border:1px solid rgba(61,220,132,.3);border-radius:14px 4px 14px 14px}
+.chb.cd{padding:8px;white-space:normal}
+.cht{display:inline-block;margin-left:8px;font-size:10.5px;opacity:.7;white-space:nowrap}.cht .er{color:var(--er)}
+.chsys{align-self:center;font-size:11.5px;color:var(--mu);padding:4px 0}
+.chday{align-self:center;font-size:11px;color:var(--mu);margin:10px 0 4px;text-transform:capitalize}
+.chcard{display:flex;gap:12px;align-items:center;min-width:240px;max-width:360px;white-space:normal;background:var(--p2);border:1px solid var(--ln);border-radius:12px;padding:10px}
+.chct{position:relative;width:64px;height:64px;flex:none;border-radius:10px;overflow:hidden}.chct .mt{width:100%;height:100%;border-radius:10px}.chct img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.chci{min-width:0}.chci b{display:block;overflow:hidden;text-overflow:ellipsis}
+.chbar{display:flex;align-items:flex-end;gap:8px;padding:10px 12px;border-top:1px solid var(--ln)}
+.chbar textarea{flex:1;resize:none;max-height:120px;background:var(--p2);color:var(--tx);border:1px solid var(--ln);border-radius:10px;padding:8px 11px;font:inherit}.chbar textarea:focus{outline:0;border-color:var(--ac)}
+.chempty{margin:auto;text-align:center;max-width:300px}.chempty b{display:block;font-size:15px;margin-bottom:4px}
+.chpick{max-height:220px;overflow-y:auto}
+:root[data-theme=light] .chat{background:rgba(255,255,255,.9)}:root[data-theme=light] .chl{background:rgba(240,242,247,.8)}

@@ -217,6 +217,8 @@ public class CoreTest {
           eq(P2pAddress.resolve(code, ko), null, "p2p : échec récent mémorisé"); eq(calls[0], 1, "p2p : pas de nouvel appel juste après un échec");
           P2pAddress.reset(); eq(P2pAddress.resolve(code, new P2pAddress.Opener() { public int open(String c2) { return 0; } }), null, "p2p : port invalide refusé");
           P2pAddress.reset(); eq(P2pAddress.resolve(code, null), null, "p2p : pas de launcher → null"); P2pAddress.reset(); }
+        // ---- touche de l'éditeur en jeu : aucune par défaut (Maj droite l'ouvrait sans le vouloir) ----
+        eq(Features.editorKey(cfgOf("{\"fps\":{\"on\":true}}")), "", "éditeur : aucune touche par défaut"); eq(Features.editorKey(cfgOf("{\"hudedit\":{\"key\":\"F8\"}}")), "F8", "éditeur : touche réglable (module hudedit)");
         // ---- raccourci du menu en jeu ----
         eq(java.util.Arrays.toString(Features.chord("Alt+H")), "[LALT, H]", "menu : Alt+H"); eq(java.util.Arrays.toString(Features.chord("Ctrl+Shift+M")), "[LCTRL, LSHIFT, M]", "menu : Ctrl+Shift+M");
         eq(java.util.Arrays.toString(Features.chord("CommandOrControl+K")), "[LCTRL, K]", "menu : CommandOrControl"); eq(java.util.Arrays.toString(Features.chord("F9")), "[F9]", "menu : F9 seul");

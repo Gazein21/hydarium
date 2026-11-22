@@ -19,7 +19,6 @@ Tout voir|See all
 Nouvelle instance|New instance
 Version, loader, mods ou code|Version, loader, mods or code
 Mes serveurs|My servers
-Quêtes du mois|Monthly quests
 Amis en ligne|Friends online
 Bientôt disponible|Coming soon
 Bienvenue sur Hydarium|Welcome to Hydarium
@@ -63,7 +62,6 @@ joué|played
 au total|total
 mod(s)|mod(s)
 sur ce PC|on this PC
-jamais joué|never played
 Ajouter des mods|Add mods
 Mises à jour|Updates
 Importer un .jar|Import a .jar
@@ -91,6 +89,23 @@ Version de Minecraft|Minecraft version
 Loader|Loader
 Optimisation des mods|Mod optimization
 Couverture|Cover
+Dépose tes fichiers ici|Drop your files here
+Mods (.jar), packs de ressources, shaders, data packs, mondes|Mods (.jar), resource packs, shaders, data packs, worlds
+Dépose un modpack ici|Drop a modpack here
+.mrpack Modrinth, .zip CurseForge ou export Prism → nouvelle instance|Modrinth .mrpack, CurseForge .zip or Prism export → new instance
+Importer ce modpack ?|Import this modpack?
+Dépose des fichiers depuis ton explorateur de fichiers.|Drop files from your file explorer.
+Glisser-déposer|Drag and drop
+Lecture du pack…|Reading the pack…
+Choisir une image…|Choose an image…
+Image officielle du modpack|Official modpack image
+Retirer l’image|Remove image
+Image enregistrée|Image saved
+Image officielle du modpack appliquée|Official modpack image applied
+Image retirée|Image removed
+Image du modpack|Modpack image
+PNG ou JPG. Ton image remplace le décor ci-dessus.|PNG or JPG. Your image replaces the scenery above.
+PNG ou JPG. Ton image remplace le décor ci-dessus ; un modpack téléchargé depuis le catalogue reprend automatiquement son image officielle.|PNG or JPG. Your image replaces the scenery above; a modpack downloaded from the catalog automatically uses its official image.
 Créer l’instance|Create instance
 Annuler|Cancel
 Fermer|Close
@@ -197,7 +212,6 @@ Dégâts infligés|Damage dealt
 Temps en monde solo|Singleplayer time
 Collection|Collection
 Mods installés|Installed mods
-Captures d’écran|Screenshots
 Nettoyer|Clean up
 Réinitialisation|Reset
 Réinitialiser|Reset
@@ -253,6 +267,42 @@ Une invitation privée, c’est comme un mot de passe.|A private invitation is l
 Elle donne un accès direct à l’ordinateur de l’hôte : ne la publie pas (Discord public, vidéo, stream) et attention, elle s’affiche en clair dans la liste des serveurs du jeu.|It gives direct access to the host's computer: don't publish it (public Discord, videos, streams), and note that it shows in plain text in the game's server list.
 Ce code est comme un mot de passe.|This code is like a password.
 Qui l’a peut se connecter à ton serveur et voit ton adresse IP. Ne le publie pas (Discord public, vidéo, stream, capture d’écran) : donne-le seulement à des amis, et si ça fuite clique sur « Nouveau code ».|Anyone who has it can connect to your server and sees your IP address. Don't publish it (public Discord, videos, streams, screenshots): give it to friends only, and if it leaks click “New code”.
+Le HUD en jeu n’a pas pu démarrer|The in-game HUD could not start
+Installer automatiquement|Install automatically
+Quand une mise à jour est téléchargée et que rien ne tourne (ni partie, ni serveur hébergé), Hydarium redémarre tout seul pour l’installer. Bouton « Plus tard » pendant le compte à rebours.|When an update has been downloaded and nothing is running (no game, no hosted server), Hydarium restarts by itself to install it. “Later” button during the countdown.
+Plus tard|Later
+Mise à jour repoussée : elle s’installera à la fermeture du launcher.|Update postponed: it will install when the launcher is closed.
+Menu Alt+H dans le jeu (expérimental)|Alt+H menu inside the game (experimental)
+Remplace la fenêtre du launcher par un écran du jeu pour Alt+H (Fabric 26.x). Instable pour l’instant : désactivé par défaut, Alt+H ouvre le menu normal du launcher. Redémarre le jeu après changement.|Replaces the launcher window with an in-game screen for Alt+H (Fabric 26.x). Unstable for now: off by default, Alt+H opens the normal launcher menu. Restart the game after changing it.
+Ouvre l’éditeur dans le jeu (aucune touche). L’aperçu ci-dessous n’est qu’une maquette.|Opens the in-game editor (no key). The preview below is only a mock-up.
+Mode confidentialité (stream)|Privacy mode (stream)
+Floute à l’écran les adresses IP des serveurs et les codes d’invitation, pour éviter de les montrer par erreur en direct ou sur une capture. Un bouton œil les affiche 8 secondes ; « Copier » fonctionne sans rien montrer. Activé par défaut.|Blurs server IP addresses and invitation codes on screen, so you don't show them by mistake live or in a screenshot. An eye button reveals them for 8 seconds; “Copy” works without showing anything. On by default.
+Afficher un instant|Show for a moment
+Règles d’utilisation et vie privée|Rules of use and privacy
+Vie privée : Hydarium ne collecte aucune donnée personnelle et n’en vend jamais.|Privacy: Hydarium collects no personal data and never sells any.
+Il n’existe aucun serveur Hydarium qui reçoive tes informations : ton compte, tes instances, tes mondes et tes réglages restent sur ton ordinateur.|There is no Hydarium server that receives your information: your account, instances, worlds and settings stay on your computer.
+Pour fonctionner, le launcher parle directement à des services tiers : Microsoft et Mojang pour te connecter à Minecraft, Modrinth et CurseForge pour les mods, GitHub pour les mises à jour, et en option playit.gg ou d’autres joueurs pour la connexion directe. Ces services voient ton adresse IP, comme avec n’importe quel logiciel, et ont leurs propres règles.|To work, the launcher talks directly to third-party services: Microsoft and Mojang to sign you in to Minecraft, Modrinth and CurseForge for mods, GitHub for updates, and optionally playit.gg or other players for direct connections. These services see your IP address, like with any software, and have their own rules.
+Règles d’utilisation|Rules of use
+Liens officiels uniquement.|Official links only.
+Hydarium se télécharge seulement depuis sa page officielle (github.com/Gazein21/hydarium). Ne le copie pas et ne le republie pas ailleurs : sites de téléchargement, archives, versions modifiées présentées comme Hydarium.|Hydarium is only downloaded from its official page (github.com/Gazein21/hydarium). Don't copy or republish it elsewhere: download sites, archives, modified versions presented as Hydarium.
+Contenu légal et respectueux.|Legal and respectful content.
+N’utilise pas Hydarium pour du contenu illégal (piratage, fichiers dont tu n’as pas les droits…) ni pour diffuser du contenu choquant, haineux ou dangereux, par exemple dans les serveurs, mondes, mods ou skins que tu héberges ou partages.|Don't use Hydarium for illegal content (piracy, files you don't have the rights to…) or to spread shocking, hateful or dangerous content, for example in the servers, worlds, mods or skins you host or share.
+Tu es responsable de ce que tu fais.|You are responsible for what you do.
+Les serveurs que tu héberges, les codes d’invitation que tu partages et les contenus que tu installes ou diffuses relèvent de ta responsabilité. L’auteur d’Hydarium n’est pas responsable des contenus de tiers ni de l’usage que chacun fait du launcher.|The servers you host, the invitation codes you share and the content you install or distribute are your responsibility. Hydarium's author is not responsible for third-party content or for how anyone uses the launcher.
+Minecraft appartient à Mojang.|Minecraft belongs to Mojang.
+Hydarium n’est affilié ni à Mojang ni à Microsoft. Il faut posséder une copie légale de Minecraft pour jouer.|Hydarium is not affiliated with Mojang or Microsoft. You need a legal copy of Minecraft to play.
+Aucune garantie.|No warranty.
+Hydarium est gratuit et fourni tel quel : pense à sauvegarder tes mondes importants.|Hydarium is free and provided as is: remember to back up your important worlds.
+J’ai lu et j’accepte ces règles|I have read and accept these rules
+Accepter et continuer|Accept and continue
+Quitter|Quit
+Relire|Read again
+Ce que fait (et ne fait pas) Hydarium avec tes données, et les règles à respecter.|What Hydarium does (and doesn't do) with your data, and the rules to follow.
+Filtrer les mods installés par nom…|Filter installed mods by name…
+Tout sélectionner|Select all
+Tout désélectionner|Deselect all
+Chercher dans le catalogue|Search the catalog
+Aucun mod installé ne correspond à|No installed mod matches
 Mises à jour automatiques|Automatic updates
 Redémarrer et installer|Restart and install
 Rechercher une mise à jour|Check for updates
@@ -392,7 +442,6 @@ Gestion|Management
 Rejoindre avec Minecraft|Join with Minecraft
 Description (MOTD)|Description (MOTD)
 Icône du serveur|Server icon
-Choisir une image…|Choose an image…
 Mémoire :|Memory:
 Message du jour|Message of the day
 Taille|Size
@@ -410,9 +459,7 @@ Appliquer mes réglages par défaut|Apply my default settings
 Options du jeu|Game options
 Lancement|Launch
 Dossiers|Folders
-Statistiques|Statistics
 Java et mémoire|Java and memory
-Général|General
 Notes|Notes
 Catégorie|Category
 Ajouter un Java…|Add a Java…
@@ -423,9 +470,7 @@ Afficher les logs du jeu|Show game logs
 Site CurseForge épuré|Streamlined CurseForge site
 Icône de l’instance|Instance icon
 Icône|Icon
-Skin et cape|Skin and cape
 Skin actuel|Current skin
-Sans cape|No cape
 Cliquer pour équiper|Click to equip
 Équipé|Equipped
 Équipée|Equipped
@@ -463,12 +508,8 @@ Impossible d’ouvrir cette image.|Unable to open this image.
 Image copiée|Image copied
 Annotation enregistrée|Annotation saved
 Sélection multiple|Multiple selection
-Tout sélectionner|Select all
-Tout désélectionner|Deselect all
 Ajouter un tag…|Add a tag…
 Ajouter des tags|Add tags
-Nouveau tag…|New tag…
-Appliquer|Apply
 Aucun tag choisi|No tag chosen
 Instance : auto|Instance: auto
 Automatique (instance compatible)|Automatic (compatible instance)
@@ -482,14 +523,119 @@ Rejoindre avec une invitation|Join with an invite
 Invitation privée|Private invite
 Nom (facultatif)|Name (optional)
 Le partage démarre avec le serveur|Sharing starts with the server
-Code copié|Code copied`;
+Code copié|Code copied
+Retrouve tes amis|Find your friends
+Amis|Friends
+Mon code ami|My friend code
+Ajouter un ami|Add a friend
+Envoyer la demande|Send request
+Demandes reçues|Requests received
+Demandes envoyées|Requests sent
+Mes amis|My friends
+Accepter|Accept
+Refuser|Decline
+Bloquer|Block
+Apparaître hors ligne|Appear offline
+Désactiver les amis|Turn off friends
+Activer les amis|Turn on friends
+Inviter cet ami|Invite this friend
+en jeu|in game
+Aucun ami en ligne pour le moment.|No friends online right now.
+Installer les mods et rejoindre|Install the mods and join
+Synchronisation des mods…|Syncing mods…
+Certains mods n’ont pas pu être installés|Some mods could not be installed
+Jouer quand même|Play anyway
+Le serveur risque de refuser la connexion ou de planter sans eux.|The server may refuse the connection or crash without them.
+Le serveur s’est arrêté de façon inattendue|The server stopped unexpectedly
+Diagnostiquer|Diagnose
+Ignorer|Dismiss
+Un des mods du serveur en a besoin pour démarrer.|One of the server’s mods needs it to start.
+Data packs du serveur|Server data packs
+Ajouter depuis le catalogue|Add from the catalog
+Activé au démarrage|Enabled at startup
+Retirer ce data pack ?|Remove this data pack?
+Aucun data pack.|No data packs.
+Tu peux aussi glisser des .zip sur la fenêtre.|You can also drag .zip files onto the window.
+Arrête le serveur pour modifier les data packs.|Stop the server to change data packs.
+Dépose tes data packs ici|Drop your data packs here
+Fichiers .zip de data packs|Data pack .zip files
+Objet affiché sur la couverture|Item shown on the cover
+Aucun objet|No item
+Choisir la version|Choose version
+Version du mod|Mod version
+Version figée|Pinned version
+Version choisie par toi : « Mises à jour » ne la change pas|Version chosen by you: “Updates” won’t change it
+Utiliser cette version|Use this version
+Installée|Installed
+Dernière|Latest
+bêta|beta
+Version installée et figée ✓|Version installed and pinned ✓
+Dernière version installée ✓|Latest version installed ✓
+Aucune version compatible trouvée.|No compatible version found.
+Une version qui n’est pas la dernière est figée : « Mises à jour » ne la remplacera pas. Certains mods exigent une version précise de leurs dépendances (ex. Iris et Sodium) : si le jeu ne démarre plus, reviens à la version précédente.|A version that isn’t the latest is pinned: “Updates” won’t replace it. Some mods require a specific version of their dependencies (e.g. Iris and Sodium): if the game stops starting, go back to the previous version.
+Reconnexion…|Reconnecting…
+Ta connexion Microsoft a expiré ou a été refusée : reconnecte-toi (Profil › Se connecter).|Your Microsoft sign-in expired or was refused: sign in again (Profile › Sign in).
+Adresse du serveur|Server address
+Autres adresses|Other addresses
+Réseau local (même Wi-Fi)|Local network (same Wi-Fi)
+Ces adresses montrent ton IP ou ton tunnel : ne les donne qu’à des amis.|These addresses show your IP or your tunnel: only give them to friends.
+Options avancées : accès Internet (playit.gg)|Advanced options: Internet access (playit.gg)
+si l’invitation privée ne passe pas sur ton réseau|if the private invite doesn’t work on your network
+utilise alors playit.gg (« Options avancées », juste en dessous).|use playit.gg instead (“Advanced options”, just below).
+Amis|Friends
+Discussions|Chats
+Nouveau groupe|New group
+Gérer mes amis|Manage my friends
+Gérer le groupe|Manage group
+Discute avec tes amis|Chat with your friends
+Activer les amis|Turn on friends
+Choisis une discussion|Pick a conversation
+Dis bonjour|Say hello
+Écrire un message…|Write a message…
+Envoyer à un ami|Send to a friend
+À un ami|To a friend
+Envoyer|Send
+Envoyé ✓|Sent ✓
+Envoyé|Sent
+Télécharger|Download
+Téléchargement…|Downloading…
+Rejoindre|Join
+Refuser|Decline
+Ouvrir|Open
+✔ Ajouté|✔ Added
+Instance ajoutée ✓|Instance added ✓
+Invitation envoyée|Invitation sent
+Invitation à un serveur|Server invitation
+Invitation à accepter|Invitation to accept
+Partager une instance|Share an instance
+Quitter le groupe|Leave group
+Dissoudre le groupe|Disband group
+Créer le groupe|Create group
+Nom du groupe|Group name
+Retirer|Remove
+Ajouter un ami|Add a friend
+Ajouter|Add
+Membres|Members
+Aucun fichier ne part de ton PC|No file leaves your PC
+a rejoint le groupe.|joined the group.
+a quitté le groupe.|left the group.
+a été retiré.|was removed.
+t’invite dans ce groupe.|invites you to this group.
+Groupe créé.|Group created.
+Tu as rejoint le groupe.|You joined the group.
+Message non pris en charge : mets Hydarium à jour.|Unsupported message: update Hydarium.
+hors ligne · il recevra tes messages à sa connexion|offline · he will get your messages when he connects
+Choisis au moins un destinataire|Pick at least one recipient
+Choisis au moins un ami|Pick at least one friend
+Envoyé à un ami|Sent to a friend
+`;
 const I18N = I18N_RAW.split('\n').map(l => l.split('|')).filter(p => p.length === 2 && p[0] && p[0] !== p[1]).sort((a, b) => b[0].length - a[0].length);
 const i18nOn = () => window.UILANG === 'en';
 function trStr(s) { if (!i18nOn() || !s || !/[A-Za-zÀ-ÿ]/.test(s)) return s; let out = s; for (const [fr, en] of I18N) if (out.includes(fr)) out = out.split(fr).join(en); return out; }
 function trNode(root) {
   if (!i18nOn() || !root) return;
   const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); let n; const list = []; while ((n = w.nextNode())) list.push(n);
-  for (const t of list) { const p = t.parentNode && t.parentNode.nodeName; if (p === 'SCRIPT' || p === 'STYLE' || p === 'TEXTAREA') continue; const v = trStr(t.nodeValue); if (v !== t.nodeValue) t.nodeValue = v; }
+  for (const t of list) { const p = t.parentNode && t.parentNode.nodeName; if (p === 'SCRIPT' || p === 'STYLE' || p === 'TEXTAREA') continue; if (t.parentNode.closest && t.parentNode.closest('[data-notr]')) continue; /* texte d'un ami, nom d'instance : jamais traduit */ const v = trStr(t.nodeValue); if (v !== t.nodeValue) t.nodeValue = v; }
   const els = root.nodeType === 1 ? [root, ...root.querySelectorAll('[placeholder],[title]')] : [];
   for (const e of els) for (const a of ['placeholder', 'title']) if (e.hasAttribute && e.hasAttribute(a)) { const v = trStr(e.getAttribute(a)); if (v !== e.getAttribute(a)) e.setAttribute(a, v); }
 }

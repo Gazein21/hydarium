@@ -157,7 +157,7 @@ const OPT = { exe: '/x/playitd', args: [], pollMs: 12, fastMs: 8, claimMs: 5000 
 
   // 13) la carte de l'interface : tous les états s'affichent, rien de ce qui vient de playit ou de la personne n'est injecté tel quel
   const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8').replace(/\r\n/g, '\n'), m13 = src.match(/function pgCard[\s\S]*?\n}\n/); ok(m13, 'pgCard trouvée dans app.js');
-  const esc = x => String(x).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])), pgCard = new Function('esc', m13[0] + '\nreturn pgCard;')(esc);
+  const esc = x => String(x).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])), pgCard = new Function('esc', 'priv', m13[0] + '\nreturn pgCard;')(esc, x => x);
   const h = { port: 25565, name: 'Mon <b>serveur</b>', state: 'running', playitAddress: '' }, G = o => ({ state: 'off', claimUrl: '', error: '', note: '', tunnels: {}, list: [], creating: [], lines: [], installed: true, installing: false, hasAccount: false, ...o });
   const has = (html, re, m) => ok(re.test(html), m + ' : ' + html.slice(0, 90)), hasnt = (html, re, m) => ok(!re.test(html), m);
   has(pgCard(h, null), /Indisponible/, 'statut absent'); has(pgCard(h, G({ installed: false })), /pginstall/, 'démon absent → installer'); has(pgCard(h, G({ installed: false })), /pgdl/, 'et page de téléchargement'); has(pgCard(h, G({ installing: true, installed: false })), /Téléchargement/, 'installation en cours');
@@ -177,8 +177,8 @@ const OPT = { exe: '/x/playitd', args: [], pollMs: 12, fastMs: 8, claimMs: 5000 
   has(pgCard(h, G({ state: 'running', list: [{ id: 'p', name: 'P', pending: true, localPort: 0, type: 'minecraft-java' }] })), /1 tunnel\(s\) en préparation/, 'tunnel en préparation signalé'); has(pgCard(h, G({ state: 'running', note: 'Connexion <x> impossible' })), /Connexion &lt;x&gt; impossible/, 'note réseau échappée');
   has(pgCard({ ...h, playitAddress: 'saved.ply.gg:9' }, G({ state: 'running' })), /value="saved\.ply\.gg:9"/, 'adresse enregistrée dans le champ'); has(pgCard({ ...h, playitAddress: 'saved.ply.gg:9' }, G()), /n’est pas lancé/, 'adresse enregistrée mais agent arrêté : prévenu');
   has(pgCard(h, G({ state: 'running', lines: ['<b>x</b>'] })), /&lt;b&gt;x&lt;\/b&gt;/, 'journal échappé');
-  // la carte « Adresses » montre aussi l'adresse DÉTECTÉE (pas seulement celle enregistrée à la main)
-  ok(/PG\.tunnels\[h\.port\]\) \|\| h\.playitAddress \? '· Internet \(playit\.gg\)/.test(src), 'la carte Adresses affiche l’adresse détectée');
+  // la carte « Adresse du serveur » montre aussi l'adresse DÉTECTÉE (pas seulement celle enregistrée à la main), rangée dans « Autres adresses »
+  ok(src.includes('const net = (G && G.tunnels && G.tunnels[h.port]) || h.playitAddress') && src.includes("l: 'Internet (playit.gg)'"), 'la carte Adresse affiche l’adresse détectée');
   for (const act of ['pgnew', 'pgassign', 'pgreset', 'pgresetgo', 'pgdl', 'pgsite', 'pgclaim', 'pgstart', 'pgstop', 'pginstall', 'pgcopy', 'pguse', 'pgsave', 'pgcheck']) ok(new RegExp('\\b' + act + ':').test(src), 'action définie dans l’interface : ' + act);
 
   fs.rmSync(data, { recursive: true, force: true });

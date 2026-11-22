@@ -38,6 +38,10 @@ let DHTLib = null; const lib = () => DHTLib || (DHTLib = require('hyperdht'));
 const hm = (key, ...parts) => crypto.createHmac('sha256', key).update(Buffer.concat(parts.map(p => Buffer.isBuffer(p) ? p : Buffer.from(String(p))))).digest();
 const keysOf = secret => ({ kp: lib().keyPair(hm(secret, NAME + '/key')), auth: hm(secret, NAME + '/auth') });
 const proof = (auth, nonce, guestPk, hostPk) => hm(auth, 'proof', nonce, guestPk, hostPk);
+/* preuve distincte pour demander la LISTE DES MODS du serveur au lieu de jouer : même secret (le code), mais l'hôte sait ce qu'on lui demande. Un ancien hôte ne la reconnaît pas et coupe : sans conséquence. */
+const proofMods = (auth, nonce, guestPk, hostPk) => hm(auth, 'mods-proof', nonce, guestPk, hostPk);
+const MAX_MANIFEST = 256 * 1024; let manifestProvider = null;
+exports.setManifest = f => { manifestProvider = typeof f === 'function' ? f : null; };   // f(hostId) → liste des mods à envoyer aux invités (modsync.build)
 exports._keys = secret => { const k = keysOf(secret); return { publicKey: k.kp.publicKey }; };
 
 /* ---------- réseau HyperDHT partagé (démarré à la demande, éteint quand plus rien ne sert) ---------- */
@@ -83,7 +87,14 @@ function onHostConn(S, sock) {
   (async () => {
     const nonce = crypto.randomBytes(32); sock.write(nonce);
     const { head, rest } = await readN(sock, 32, AUTH_MS);
-    if (!crypto.timingSafeEqual(head, proof(S.keys.auth, nonce, sock.remotePublicKey, sock.publicKey))) throw new Error('preuve refusée');
+    const okGame = crypto.timingSafeEqual(head, proof(S.keys.auth, nonce, sock.remotePublicKey, sock.publicKey));
+    if (!okGame) {
+      if (!crypto.timingSafeEqual(head, proofMods(S.keys.auth, nonce, sock.remotePublicKey, sock.publicKey))) throw new Error('preuve refusée');
+      // l'invité demande la liste des mods : on la lui envoie (type 2 + longueur + JSON), puis on ferme. Rien n'atteint le serveur Minecraft.
+      const man = manifestProvider ? await withTimeout(Promise.resolve(manifestProvider(S.id)), 15000, 'liste des mods trop longue') : null;
+      const body = Buffer.from(JSON.stringify(man || null)); if (body.length > MAX_MANIFEST) throw new Error('liste trop grande');
+      const h = Buffer.alloc(5); h[0] = 2; h.writeUInt32BE(body.length, 1); done(); sock.end(Buffer.concat([h, body])); return;
+    }
     const local = net.connect({ host: '127.0.0.1', port: S.port }); local.on('error', () => {}); // jamais autre chose que CE serveur
     await withTimeout(new Promise((res, rej) => { local.once('connect', res); local.once('error', rej); local.once('close', () => rej(new Error('fermé'))); }), 5000, 'serveur local injoignable');
     if (!shares.has(S.id) || shares.get(S.id) !== S) { local.destroy(); throw new Error('partage arrêté'); }
@@ -180,6 +191,23 @@ exports.leave = key => {
 exports.leaveCode = code => { const s = exports.parseCode(code); return s ? exports.leave(hm(s, 'id').toString('hex').slice(0, 16)) : false; };
 exports.isOpen = code => { const s = exports.parseCode(code); return !!(s && joins.has(hm(s, 'id').toString('hex').slice(0, 16))); };
 /* l'hôte répond-il, et ce code est-il le bon ? (n'envoie rien au serveur Minecraft) */
+/* invité : demande à l'hôte la liste exacte de ses mods (null si l'hôte n'en envoie pas : ancien Hydarium, serveur sans mods…). Jette une erreur si l'hôte est injoignable ou le code incorrect. */
+exports.fetchMods = async code => {
+  const secret = exports.parseCode(code); if (!secret) throw new Error('Code d’invitation invalide.');
+  const keys = keysOf(secret), d = await getDHT(), sock = d.connect(keys.kp.publicKey); sock.on('error', () => {});
+  try {
+    return await withTimeout((async () => {
+      try { await withTimeout(new Promise((res, rej) => { sock.once('open', res); sock.once('close', () => rej(new Error('fermée'))); sock.once('error', rej); }), CONNECT_MS, 'délai'); }
+      catch (e) { throw new Error(NOT_FOUND); }
+      const { head: nonce } = await readN(sock, 32, AUTH_MS); sock.write(proofMods(keys.auth, nonce, sock.publicKey, sock.remotePublicKey));
+      let first; try { first = await readN(sock, 5, 8000); } catch (e) { return null; }   // coupé : l'hôte ne sait pas (encore) envoyer sa liste
+      if (first.head[0] !== 2) return null;
+      const len = first.head.readUInt32BE(1); if (len > MAX_MANIFEST) throw new Error('Liste des mods trop grande.');
+      let body = first.rest; if (body.length < len) body = Buffer.concat([body, (await readN(sock, len - body.length, 10000)).head]);
+      return JSON.parse(body.subarray(0, len).toString('utf8'));
+    })(), CONNECT_MS + AUTH_MS + 20000, 'délai dépassé');
+  } finally { try { sock.destroy(); } catch (e) { /* déjà fermée */ } maybeIdle(); }
+};
 exports.test = async code => {
   const secret = exports.parseCode(code); if (!secret) return { ok: false, error: 'Code d’invitation invalide.' };
   try { const { sock } = await withTimeout(dial(keysOf(secret)), TEST_MS + AUTH_MS + 4000, NOT_FOUND); sock.destroy(); return { ok: true }; }
@@ -194,4 +222,4 @@ exports.ensureFor = async addr => {
 };
 
 exports.stopAll = async () => { for (const id of [...shares.keys()]) exports.unshare(id); for (const k of [...joins.keys()]) exports.leave(k); clearTimeout(idleT); await dropDHT(); };
-exports._test = { setBootstrap: b => { bootstrap = b; }, reset: async () => { await exports.stopAll(); bootstrap = null; listener = null; }, readN, bridge, proof, keysOf };
+exports._test = { proofMods, setBootstrap: b => { bootstrap = b; }, reset: async () => { await exports.stopAll(); bootstrap = null; listener = null; }, readN, bridge, proof, keysOf };

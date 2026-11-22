@@ -1,0 +1,1 @@
+package net.minecraft.resources; public class Identifier { public final String s; Identifier(String s){this.s=s;} public static Identifier fromNamespaceAndPath(String a,String b){return new Identifier(a+":"+b);} }

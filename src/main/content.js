@@ -46,6 +46,7 @@ async function searchOne(ctx, type, q, offset, source, sort) {
   return { total: r.total_hits, hits: r.hits.map(h => ({ pid: h.project_id, slug: h.slug, title: h.title, desc: h.description, icon: icon(h.icon_url), author: h.author, downloads: h.downloads, ok: VERIFIED.has(h.slug), installed: have.has(h.project_id) })) };
 }
 exports.install = async (id, type, pid, world, source) => {
+  if (type === 'datapack' && (store.get().hosts || []).some(h => h.id === id)) return require('./hostdp').install(id, pid, source);   // serveur hébergé : dans le monde du serveur
   if (type === 'modpack' || type === 'map') return require('./packs').install(type, pid, source, id);
   if (source === 'curseforge' || /^cf\d+$/.test(String(pid))) return cfInstall(id, type, String(pid).replace(/^cf/, ''), world);
   if (type === 'mod') return mods.add(id, pid);

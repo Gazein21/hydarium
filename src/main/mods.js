@@ -10,12 +10,27 @@ const dirOf = id => path.join(plat.dataDir(), isHost(id) ? 'servers' : 'instance
 const find = id => { const d = store.get(), i = d.instances.find(x => x.id === id) || (d.hosts || []).find(x => x.id === id); if (!i) throw new Error('Instance introuvable.'); if (!i.mods) { i.mods = []; i.loader = i.type === 'fabric' ? 'fabric' : 'vanilla'; } return i; };
 
 const DL_OK = ['modrinth.com', 'forgecdn.net'];
-async function download(url, dest, sha1, hosts = DL_OK) {
+/* Téléchargement d'un fichier : source vérifiée, DÉLAI (un serveur qui n'envoie plus rien ne fige plus l'installation), jusqu'à 3 essais sur les pannes passagères
+   (réseau coupé, délai dépassé, erreur 429 / 5xx, fichier incomplet), écriture « atomique » (fichier .part renommé à la fin : jamais de jar tronqué dans mods/). */
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function download(url, dest, sha1, hosts = DL_OK, opts = {}) {
   const h = new URL(url).hostname; if (!/^https:/.test(url) || !hosts.some(x => h === x || h.endsWith('.' + x))) throw new Error('Source de téléchargement refusée : ' + h);
-  const r = await fetch(url, { headers: UA }); if (!r.ok) throw new Error('Téléchargement impossible.');
-  const b = Buffer.from(await r.arrayBuffer());
-  if (sha1 && crypto.createHash('sha1').update(b).digest('hex') !== sha1) throw new Error('Fichier corrompu : vérification d’intégrité échouée.');
-  fs.mkdirSync(path.dirname(dest), { recursive: true }); fs.writeFileSync(dest, b);
+  const tries = opts.tries || 3; let last;
+  for (let a = 1; a <= tries; a++) {
+    try {
+      const r = await fetch(url, { headers: UA, signal: AbortSignal.timeout(opts.timeout || 90000) });
+      if (!r.ok) { const e = new Error('Téléchargement impossible (' + r.status + ')'); e.retry = r.status === 429 || r.status >= 500; e.wait = (+r.headers.get('retry-after') || 0) * 1000; throw e; }
+      const b = Buffer.from(await r.arrayBuffer());
+      if (sha1 && crypto.createHash('sha1').update(b).digest('hex') !== sha1) { const e = new Error('Fichier corrompu : vérification d’intégrité échouée'); e.retry = a < 2; throw e; } // une seconde chance seulement
+      fs.mkdirSync(path.dirname(dest), { recursive: true }); const tmp = dest + '.part'; fs.writeFileSync(tmp, b); fs.renameSync(tmp, dest); return;
+    } catch (e) {
+      last = e; try { fs.rmSync(dest + '.part', { force: true }); } catch (x) {}
+      const transient = e.retry || e.name === 'TimeoutError' || e.name === 'AbortError' || /fetch failed|ECONN|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|ENETUNREACH|terminated|socket|network/i.test(String(e.message) + ' ' + String(e.cause && e.cause.code));
+      if (a >= tries || !transient) break;
+      await sleep(Math.max(e.wait || 0, (opts.pause === undefined ? 800 : opts.pause) * a * a));
+    }
+  }
+  throw new Error(String(last && last.message || 'Téléchargement impossible').replace(/\.$/, '') + ' — ' + h);
 }
 /* installe le profil du loader dans le dossier partagé et renvoie l’identifiant de version à lancer */
 exports.loader = async (inst, send) => {
@@ -41,7 +56,7 @@ async function addMod(inst, pid, auto, depth = 0) {
   if (isHost(inst.id) && p.server_side === 'unsupported') { if (auto) return; throw new Error('« ' + p.title + ' » est un mod réservé au client : il ferait planter le serveur.'); }
   for (const d of v.dependencies) if (d.dependency_type === 'required' && d.project_id) await addMod(inst, d.project_id, true, depth + 1);
   await download(file.url, path.join(dirOf(inst.id), 'mods', path.basename(file.filename)), file.hashes && file.hashes.sha1);
-  inst.mods.push({ pid, slug: p.slug, title: p.title, file: path.basename(file.filename), incompat: inc, deps: v.dependencies.filter(d => d.dependency_type === 'required' && d.project_id).map(d => d.project_id), auto: !!auto, icon: (p.icon_url || '').startsWith('https://cdn.modrinth.com/') ? p.icon_url : '' });
+  inst.mods.push({ pid, slug: p.slug, title: p.title, file: path.basename(file.filename), vid: v.id, incompat: inc, deps: v.dependencies.filter(d => d.dependency_type === 'required' && d.project_id).map(d => d.project_id), auto: !!auto, icon: (p.icon_url || '').startsWith('https://cdn.modrinth.com/') ? p.icon_url : '' });
   store.save();
 }
 exports.add = async (id, pid) => {
@@ -83,7 +98,7 @@ exports.toggle = async (id, pid, dry) => {
 const post = async (u, body) => { const r = await fetch(u, { method: 'POST', headers: { ...UA, 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(20000) }); if (!r.ok) throw new Error('Service indisponible (' + r.status + ').'); return r.json(); };
 /* mises à jour : Modrinth compare l’empreinte de chaque fichier avec la dernière version compatible */
 exports.checkUpdates = async id => {
-  const i = find(id), cand = i.mods.filter(m => !/^imp/.test(m.pid) && fs.existsSync(fileOf(id, m))); if (!cand.length) return [];
+  const i = find(id), cand = i.mods.filter(m => !/^imp/.test(m.pid) && !m.pin && fs.existsSync(fileOf(id, m))); if (!cand.length) return [];   // « figé » : la personne a choisi une version précise, on ne la remplace pas
   const h = Object.fromEntries(cand.map(m => [sha1(fileOf(id, m)), m]));
   const r = await post(`${MR}/version_files/update`, { hashes: Object.keys(h), algorithm: 'sha1', loaders: [i.loader], game_versions: [i.version] }), out = [];
   for (const [hash, v] of Object.entries(r || {})) { const f = v.files.find(x => x.primary) || v.files[0]; if (f && f.hashes.sha1 !== hash) out.push({ pid: h[hash].pid, title: h[hash].title, from: h[hash].file, to: f.filename, version: v.version_number }); }
@@ -95,9 +110,41 @@ exports.updateMod = async (id, pid) => {
   if (!vs.length) throw new Error('Aucune version compatible.'); const v = vs[0], f = v.files.find(x => x.primary) || v.files[0], name = path.basename(f.filename);
   await download(f.url, path.join(dirOf(id), 'mods', name + (m.disabled ? '.disabled' : '')), f.hashes && f.hashes.sha1);
   if (name !== m.file) { fs.rmSync(fileOf(id, m), { force: true }); m.file = name; }
-  m.deps = v.dependencies.filter(d => d.dependency_type === 'required' && d.project_id).map(d => d.project_id);
+  m.deps = v.dependencies.filter(d => d.dependency_type === 'required' && d.project_id).map(d => d.project_id); m.vid = v.id; delete m.pin;
   for (const d of m.deps) if (!i.mods.some(x => x.pid === d)) { try { await addMod(i, d, true, 1); } catch (e) {} }
   store.save();
+};
+/* ----- choisir la version d'un mod (ex. un bug dans la dernière version d'Iris Shaders : revenir à la précédente) -----
+   Seulement les mods Modrinth (identifiant de 8 caractères, pas CurseForge ni .jar importé). On ne propose que les versions COMPATIBLES avec Minecraft et le loader de l'instance.
+   Une version qui n'est pas la dernière est « figée » (m.pin) : « Mises à jour » ne la remplace plus. Choisir la dernière retire le figement. */
+const verOk = m => !!m && /^[A-Za-z0-9]{8}$/.test(String(m.pid)) && m.src !== 'cf';
+const verQuery = i => `game_versions=${encodeURIComponent(JSON.stringify([i.version]))}&loaders=${encodeURIComponent(JSON.stringify([i.loader]))}`;
+const mainFile = v => (v.files || []).find(f => f.primary) || (v.files || [])[0];
+exports.versions = async (id, pid) => {
+  const i = find(id), m = i.mods.find(x => x.pid === pid); if (!m) throw new Error('Mod introuvable.');
+  if (!verOk(m)) throw new Error('Le choix de la version n’est disponible que pour les mods installés depuis Modrinth.');
+  const vs = await j(`${MR}/project/${pid}/version?${verQuery(i)}`);
+  const list = vs.slice(0, 60).map((v, k) => { const f = mainFile(v) || {}; return { vid: v.id, number: String(v.version_number || ''), name: String(v.name || ''), type: ['release', 'beta', 'alpha'].includes(v.version_type) ? v.version_type : 'release', date: v.date_published || '', file: path.basename(f.filename || ''), latest: k === 0, current: m.vid ? v.id === m.vid : !!f.filename && path.basename(f.filename) === m.file }; });
+  return { title: m.title, mc: i.version, loader: i.loader, pinned: !!m.pin, versions: list };
+};
+exports.setVersion = async (id, pid, vid) => {
+  if (!/^[A-Za-z0-9]{8}$/.test(String(vid || ''))) throw new Error('Version invalide.');
+  const i = find(id), m = i.mods.find(x => x.pid === pid); if (!m) throw new Error('Mod introuvable.');
+  if (!verOk(m)) throw new Error('Le choix de la version n’est disponible que pour les mods installés depuis Modrinth.');
+  const v = await j(`${MR}/version/${vid}`);   // on ne fait pas confiance à l'identifiant reçu : la version doit être CE mod, pour CETTE version de Minecraft et CE loader
+  if (v.project_id !== pid || !(v.game_versions || []).includes(i.version) || !(v.loaders || []).includes(i.loader)) throw new Error('Cette version ne correspond pas à ce mod, à cette version de Minecraft ou à ce loader.');
+  const f = mainFile(v); if (!f || !/\.jar$/i.test(f.filename || '')) throw new Error('Cette version n’a pas de fichier utilisable.');
+  const inc = (v.dependencies || []).filter(d => d.dependency_type === 'incompatible' && d.project_id).map(d => d.project_id);
+  const clash = i.mods.find(x => x.pid !== pid && (inc.includes(x.pid) || (x.incompat || []).includes(pid))); if (clash) throw new Error('Cette version est incompatible avec « ' + clash.title + ' » : changement refusé.');
+  const name = path.basename(f.filename);
+  await download(f.url, path.join(dirOf(id), 'mods', name + (m.disabled ? '.disabled' : '')), f.hashes && f.hashes.sha1);   // d'abord le nouveau fichier : en cas d'échec, l'ancien reste en place
+  if (name !== m.file) fs.rmSync(fileOf(id, m), { force: true });
+  m.file = name; m.vid = v.id; m.incompat = inc;
+  m.deps = (v.dependencies || []).filter(d => d.dependency_type === 'required' && d.project_id).map(d => d.project_id);
+  for (const d of m.deps) if (!i.mods.some(x => x.pid === d)) { try { await addMod(i, d, true, 1); } catch (e) { /* dépendance introuvable : signalée par le statut du mod */ } }
+  let newest = ''; try { newest = ((await j(`${MR}/project/${pid}/version?${verQuery(i)}`))[0] || {}).id || ''; } catch (e) { /* hors ligne : on fige par prudence */ }
+  if (newest && newest === v.id) delete m.pin; else m.pin = true;
+  store.save(); return { vid: v.id, pinned: !!m.pin };
 };
 exports.enableAll = id => { const i = find(id); i.mods.forEach(m => { if (m.disabled) setOff(i, m, false); }); store.save(); };
 exports.disableAll = id => { const i = find(id); i.mods.forEach(m => { if (!m.disabled) setOff(i, m, true); }); store.save(); };
@@ -172,6 +219,12 @@ exports.status = id => {
 exports.trust = (id, pid, on) => { const i = find(id), m = i.mods.find(x => x.pid === pid); if (!m) throw new Error('Mod introuvable.'); if (on) m.trusted = true; else delete m.trusted; store.save(); };
 /* code de partage : pas de fichier, seulement version + loader + liste de mods (code court = serveur, plus tard) */
 exports.code = id => { const i = find(id); return 'HYD1.' + zlib.deflateSync(JSON.stringify({ v: i.version, t: i.type, l: i.loader, m: i.mods.filter(m => !m.auto).map(m => m.pid) })).toString('base64url'); };
+/** recette partageable d'une instance pour une carte de chat : { code, count, skipped }. Seuls les mods Modrinth peuvent être refaits par l'ami ; skipped = ceux qui ne le seront pas. */
+exports.share = id => {
+  const i = find(id); if (!['vanilla', 'fabric', 'quilt'].includes(i.loader)) throw new Error('Les instances Forge et NeoForge ne se partagent pas encore par code. Un modpack du catalogue, lui, se partage.');
+  const list = i.mods.filter(m => !m.auto), ok = list.filter(m => /^[A-Za-z0-9]{8}$/.test(String(m.pid)));
+  return { code: 'HYD1.' + zlib.deflateSync(JSON.stringify({ v: i.version, t: i.type, l: i.loader, m: ok.map(m => m.pid) })).toString('base64url'), count: ok.length, skipped: list.length - ok.length };
+};
 exports.importCode = async code => {
   code = String(code).trim();
   if (!/^HYD1\.[\w-]{1,20000}$/.test(code)) throw new Error('Code de modpack invalide.');

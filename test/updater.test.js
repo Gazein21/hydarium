@@ -12,7 +12,7 @@ const fakeAu = scenario => { const au = new EventEmitter(); au.calls = 0; au.qui
   au.checkForUpdates = async () => { au.calls++; au.emit('checking-for-update'); await tick(1); return scenario(au); };
   au.quitAndInstall = (...a) => { au.quit = a; }; return au; };
 const mk = (o = {}) => { const log = { sent: [], notes: [] }; up._reset();
-  up.init({ packaged: true, platform: 'win32', version: '0.10.51', send: (c, d) => log.sent.push([c, d]), notify: (t, b, a) => log.notes.push([t, b, a]), ...o }); return log; };
+  up.init({ packaged: true, platform: 'win32', version: '0.10.51', autoInstall: () => false, installDelay: 30, send: (c, d) => log.sent.push([c, d]), notify: (t, b, a) => log.notes.push([t, b, a]), ...o }); return log; };
 
 (async () => {
   // 1) comparaison de versions
@@ -38,6 +38,23 @@ const mk = (o = {}) => { const log = { sent: [], notes: [] }; up._reset();
   assert.throws(() => up.install(), /Ferme Minecraft/); n++; ok(au.quit === null, 'pas d’installation en jeu');
   busy = false; up.install(); await tick(); eq(au.quit, [false, true], 'quitAndInstall(false, true)');
   assert.throws(() => { mk({ updater: () => fakeAu(() => {}) }); up.install(); }, /Aucune mise à jour/); n++;
+
+  // 4b) installation AUTOMATIQUE : téléchargée + rien ne tourne → compte à rebours → quitAndInstall(silencieux, relance) ; jamais pendant une partie
+  au = fakeAu(a => { a.emit('update-available', { version: '0.10.52' }); a.emit('update-downloaded', { version: '0.10.52' }); });
+  L = mk({ updater: () => au, autoInstall: () => true }); await up.check(false); s = up.state();
+  ok(s.status === 'installing' && s.latest === '0.10.52' && s.eta > Date.now(), 'auto : compte à rebours annoncé à l’interface'); ok(L.notes.length === 0, 'auto : pas de notification (le bandeau suffit)'); ok(au.quit === null, 'auto : pas encore installé');
+  await tick(80); eq(au.quit, [true, true], 'auto : quitAndInstall(silencieux, relance) à la fin du compte à rebours');
+  let b2 = false; au = fakeAu(a => { a.emit('update-available', { version: '0.10.52' }); a.emit('update-downloaded', { version: '0.10.52' }); });
+  L = mk({ updater: () => au, autoInstall: () => true, isBusy: () => b2 }); b2 = true; await up.check(true); ok(up.state().status === 'ready' && L.notes.length === 1 && au.quit === null, 'auto : une partie tourne → on attend la fermeture, notification classique');
+  b2 = false; au = fakeAu(a => { a.emit('update-available', { version: '0.10.52' }); a.emit('update-downloaded', { version: '0.10.52' }); });
+  L = mk({ updater: () => au, autoInstall: () => true, isBusy: () => b2 }); await up.check(false); b2 = true; await tick(80); ok(up.state().status === 'ready' && au.quit === null, 'auto : une partie démarre pendant le compte à rebours → annulé tout seul');
+  au = fakeAu(a => { a.emit('update-available', { version: '0.10.52' }); a.emit('update-downloaded', { version: '0.10.52' }); });
+  L = mk({ updater: () => au, autoInstall: () => true, installDelay: 60 }); await up.check(false); ok(up.state().status === 'installing', 'auto : programmée'); up.cancel(); await tick(120);
+  ok(up.state().status === 'ready' && au.quit === null, '« Plus tard » : rien n’est installé maintenant'); au.emit('update-downloaded', { version: '0.10.52' }); await tick(120); ok(au.quit === null && up.state().status === 'ready', '« Plus tard » : pas reprogrammé pour la même version');
+  au = fakeAu(a => { a.emit('update-available', { version: '0.10.52' }); a.emit('update-downloaded', { version: '0.10.52' }); });
+  L = mk({ updater: () => au, autoInstall: () => true, installDelay: 5000 }); await up.check(false); up.install(); await tick(); eq(au.quit, [false, true], 'compte à rebours + « Redémarrer et installer » : installé tout de suite'); await tick(50);
+  au = fakeAu(a => { a.emit('update-available', { version: '0.10.52' }); a.emit('update-downloaded', { version: '0.10.52' }); });
+  L = mk({ updater: () => au, autoInstall: () => false }); await up.check(false); await tick(80); ok(up.state().status === 'ready' && au.quit === null && L.notes.length === 1, 'réglage « installer automatiquement » coupé : comme avant');
 
   // 5) à jour
   au = fakeAu(a => a.emit('update-not-available', {})); L = mk({ updater: () => au }); await up.check(true); ok(up.state().status === 'none', 'à jour');

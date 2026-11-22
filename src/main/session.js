@@ -63,6 +63,7 @@ exports.jvmArgs = async inst => {
     const add = [], got = new Set(); if (ownJar(inst)) add.push(ownJar(inst));
     if (add.length) { const api = await fabricApi(inst); if (api) add.push(api); a.push('-Dfabric.addMods=' + [...new Set(add)].join(path.delimiter)); log.info('Hydarium chargé', add.map(x => path.basename(x)).join(', ')); }
     if (c.nativeHud === false) a.push('-Dhydarium.draw=0');
+    if (store.get().settings.inGameMenu === true) a.push('-Dhydarium.menu=1'); // menu Alt+H dans le jeu : expérimental, désactivé par défaut (Alt+H ouvre le menu normal du launcher)
     return a;
   }
   const v = variantOf(inst), dir = path.join(plat.dataDir(), 'instances', inst.id, 'mods'), dst = path.join(dir, forgeModName(inst)); // Forge charge le mod depuis le dossier mods

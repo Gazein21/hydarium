@@ -110,7 +110,7 @@ async function playInner(id, send, opts = {}) {
   const unverified = st.mods.filter(m => m.status === 'unverified' || m.status === 'cf').map(m => ({ pid: m.pid, title: m.title }));
   if (warn.length && !opts.confirm) return { warn, unverified };
   launchPhase = true;
-  const authorization = auth.mclc();
+  const authorization = await auth.ensure(); // renouvelle le jeton Minecraft s'il a expiré (il ne dure que ~23 h)
   const req = await exports.needJava(inst), jv = await chooseJava(inst, req, send), javaPath = jv.path;
   const dir = dirOf(id); fs.mkdirSync(dir, { recursive: true }); require('./session').applyGamma(inst, dir);
   if (!opts.safe) { // client Hydarium : fabriqué AVANT tout téléchargement de Minecraft (loader, bibliothèques, ressources), présenté comme l'un de ses composants : il est donc là dès le PREMIER lancement.

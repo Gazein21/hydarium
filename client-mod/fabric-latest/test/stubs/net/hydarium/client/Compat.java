@@ -1,0 +1,1 @@
+package net.hydarium.client; final class Compat { static boolean keyDown(net.minecraft.client.Minecraft m, String k){return false;} static boolean mouseDown(net.minecraft.client.Minecraft m, int b){return false;} }

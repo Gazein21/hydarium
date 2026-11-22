@@ -57,6 +57,7 @@ const n = (v, d = 0) => (typeof v === 'number' && isFinite(v) ? v : d), t = v =>
 exports.setGame = b => {
   scr = { k: String(b.scr || '').slice(0, 24), t: Date.now() }; // écran ouvert signalé par le mod (voir rpOn)
   if (b.menu) return; // hors d’un monde : seulement l’écran, pas d’état de jeu (sinon le HUD afficherait des zéros)
+  if (!b.derr) drawErr = ''; // le mod ne signale plus de panne
   gameSt = { fps: Math.round(n(b.fps)), x: n(b.x), y: n(b.y), z: n(b.z), yaw: n(b.yaw), pitch: n(b.pitch), dim: t(b.dim), hp: n(b.hp), food: n(b.food),
     armor: (Array.isArray(b.armor) ? b.armor : []).slice(0, 4).map(a => a && typeof a === 'object' ? { id: t(a.id), max: n(a.max), dmg: n(a.dmg) } : null),
     fx: (Array.isArray(b.fx) ? b.fx : []).slice(0, 12).map(e => ({ id: t(e.id), k: t(e.k), t: n(e.t), a: n(e.a) })),
@@ -70,3 +71,12 @@ exports.gameDraws = () => !!(gameSt && gameSt.ed && gameSt.drawn && gameSt.drawn
 
 /* dernier état de jeu reçu (moins de 5 s), ou null */
 exports.gameState = () => (gameSt && Date.now() - gameT < 5000 ? gameSt : null);
+
+/* Le mod annonce pourquoi son dessin en jeu n'a pas démarré (classes absentes, API du jeu changée…) : journal + notification UNE fois par cause, et montré dans Paramètres › Général. */
+let drawErr = '';
+exports.noteDrawError = e => {
+  e = String(e || '').slice(0, 400); if (!e || e === drawErr) return;
+  drawErr = e; require('./log').warn('Mod Hydarium : dessin en jeu indisponible — ' + e);
+  try { require('./notify').show('Hydarium : le HUD en jeu n’a pas démarré', e, 'update:open', 'crash'); } catch (x) {}
+};
+exports.drawError = () => drawErr;

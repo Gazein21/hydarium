@@ -21,7 +21,7 @@ ok(JSON.stringify(ids('fabric', '1.19.4')) === '["fabric-120/core"]' && ids('fab
 ok(ids('fabric', '1.21.1').slice(-1)[0] === 'fabric-120/core' && ids('fabric', '1.21.1').length === 3, 'dernier recours 120/core');
 const p121 = P.plansFor('fabric', '1.21.4').plans[0]; ok(p121.loom === 'latest' && p121.gradle === 'current' && p121.jdk === 21, '1.21.4 : outils récents');
 const p120 = P.plansFor('fabric', '1.20.1').plans[0]; ok(p120.loom === '1.6-SNAPSHOT' && p120.jdk === 17 && p120.draw === true, '1.20.1 : outils figés');
-const pl = P.plansFor('fabric', '26.1.2').plans; ok(pl.length === 1 && pl[0].adapter === 'fabric-latest' && pl[0].draw === false && pl[0].jdk === 25, '26.x');
+const pl = P.plansFor('fabric', '26.1.2').plans; ok(pl.length === 2 && pl.every(p => p.adapter === 'fabric-latest' && p.jdk === 25) && pl.map(p => p.draw).join() === 'true,false', '26.x : un passage adaptatif (dessin en jeu) puis core (repli sans dessin)');
 ok(ids('fabric', '1.20.1').every((id, i, a) => P.plansFor('fabric', '1.20.1').plans[i].draw === !id.endsWith('/core')), 'draw faux seulement pour core');
 ok(P.plansFor('forge', '1.8.9').plans[0].static === true && P.plansFor('forge', '1.12.2').ok && P.plansFor('forge', '1.12.2').plans[0].generated === true && !P.plansFor('forge', '1.16.5').ok, 'forge');
 

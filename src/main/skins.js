@@ -40,6 +40,7 @@ function extractFrom(jarBuf) {
     const png = e.getData(); try { check(png); } catch (err) { continue; } // fichier inattendu : on l’ignore, on essaiera un autre jar
     fs.mkdirSync(mdir(), { recursive: true }); fs.writeFileSync(b.file + '.tmp', png); fs.renameSync(b.file + '.tmp', b.file); n++;
   }
+  try { require('./mctex').extractFrom(z); } catch (e) { /* icônes d'instances : facultatif, jamais bloquant */ }   // même jar : on en profite pour les objets des icônes d'instances
   return n;
 }
 function localJars() { // jars de Minecraft déjà téléchargés par le launcher (les plus récents d’abord, 4 au plus)
@@ -70,11 +71,12 @@ const ensureDefaults = () => {
   return dl;
 };
 exports.ensureDefaults = ensureDefaults;
+exports.localJars = localJars;
 exports.retryDefaults = () => { dlErr = ''; return ensureDefaults(); };
 const defaultsState = () => !missingMojang().length ? 'ready' : dl ? 'loading' : dlErr ? 'error' : 'idle';
 
 async function api(p, o = {}) {
-  const r = await fetch(API + p, { ...o, headers: { Authorization: 'Bearer ' + auth.token(), ...(o.headers || {}) }, signal: AbortSignal.timeout(20000) });
+  const r = await fetch(API + p, { ...o, headers: { Authorization: 'Bearer ' + await auth.freshToken(), ...(o.headers || {}) }, signal: AbortSignal.timeout(20000) });
   if (r.status === 401) throw new Error('Session Microsoft expirée : reconnecte-toi (Profil › Changer de compte).');
   if (!r.ok) { let m = ''; try { m = (await r.json()).errorMessage || ''; } catch (e) {} throw new Error('Mojang a refusé la demande (' + r.status + ') ' + m); }
   return r.status === 204 ? null : r.json().catch(() => null);

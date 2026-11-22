@@ -10,7 +10,8 @@ const OKH = ['piston-data.mojang.com', 'fill-data.papermc.io', 'api.papermc.io',
 const hosts = () => (store.get().hosts = store.get().hosts || []);
 const dirOf = id => path.join(plat.dataDir(), 'servers', String(id).replace(/[^a-z0-9]/g, ''));
 const get = id => { const h = hosts().find(x => x.id === id); if (!h) throw new Error('Serveur introuvable.'); return h; };
-const run = new Map(); // id -> { proc, state, players:Set, lines:[] }
+const run = new Map(); // id -> { proc, state, players:Set, lines:[], t0, up }
+const crashes = new Map(); // id -> dernier arrêt inattendu diagnostiqué (assistant de crash, hostcrash.js)
 const j = async u => { const r = await fetch(u, { headers: UA, signal: AbortSignal.timeout(20000) }); if (!r.ok) throw new Error('Service indisponible (' + r.status + ').'); return r.json(); };
 async function dl(url, dest, check) {
   if (!OKH.includes(new URL(url).hostname)) throw new Error('Source de téléchargement refusée.');
@@ -183,27 +184,62 @@ exports.start = async (id, send) => {
   const need = await game.needJava({ version: h.version }), jv = await game.chooseJava({ version: h.version, loader: h.loader, java: '' }, need, send), dir = dirOf(id);
   const modern = h.type === 'forge' || h.type === 'neoforge'; if (!modern && !fs.existsSync(path.join(dir, 'server.jar'))) throw new Error('Fichier server.jar manquant.');
   syncWorldIcon(h);
-  const r = { state: 'starting', players: new Set(), lines: [], proc: null }; run.set(id, r);
+  crashes.delete(id); const r = { state: 'starting', players: new Set(), lines: [], proc: null, t0: Date.now(), up: false }; run.set(id, r);
   const out = l => { r.lines.push(l); if (r.lines.length > 500) r.lines.shift(); send('host:log', { id, line: l }); };
   const proc = spawn(jv.path, [`-Xmx${h.mem}G`, '-Xms1G', ...(modern ? loaderArgs(dir) : ['-jar', 'server.jar']), 'nogui'], { cwd: dir }); r.proc = proc;
   log.info('Serveur démarré', h.name, h.version, h.type, jv.path);
   out(`[Hydarium] Java ${jv.major} · ${h.mem} Go · port ${h.port}`);
   let buf = ''; const feed = d => { buf += d.toString(); const L = buf.split(/\r?\n/); buf = L.pop(); for (const l of L) {
     out(l); let m;
-    if (/\]: Done \(/.test(l)) { r.state = 'running'; send('host:state', { id }); notify.show('Serveur en ligne', h.name + ' · port ' + h.port, '', 'server'); shareAuto(h, true, out); }
+    if (/\]: Done \(/.test(l)) { r.state = 'running'; r.up = true; send('host:state', { id }); notify.show('Serveur en ligne', h.name + ' · port ' + h.port, '', 'server'); shareAuto(h, true, out); }
     else if ((m = l.match(/\]: (\w{3,16}) joined the game/))) { r.players.add(m[1]); send('host:state', { id }); notify.show(h.name, m[1] + ' a rejoint le serveur', '', 'server'); }
     else if ((m = l.match(/\]: (\w{3,16}) left the game/))) { r.players.delete(m[1]); send('host:state', { id }); }
   } };
   proc.stdout.on('data', feed); proc.stderr.on('data', feed);
-  proc.on('error', e => { out('[Hydarium] Impossible de lancer Java : ' + e.message); run.delete(id); send('host:state', { id }); });
-  proc.on('close', c => { out(`[Hydarium] Serveur arrêté (code ${c})`); run.delete(id); send('host:state', { id }); shareAuto(h, false, out); });
+  proc.on('error', e => { out('[Hydarium] Impossible de lancer Java : ' + e.message); run.delete(id); send('host:state', { id }); crashCheck(h, id, r, e.code === 'ENOENT' ? -2 : -1, send); });
+  proc.on('close', c => { out(`[Hydarium] Serveur arrêté (code ${c})`); run.delete(id); send('host:state', { id }); shareAuto(h, false, out); crashCheck(h, id, r, c, send); });
+};
+/* Assistant de crash : un arrêt qu'on n'a pas demandé (code d'erreur, rapport de plantage, arrêt pendant le démarrage) est diagnostiqué ; l'interface propose les réparations. */
+function crashCheck(h, id, r, code, send) {
+  try {
+    let packs = [], hasLevel = false, newestPack = '', levelOld = false;
+    try { const L = require('./hostdp').list(id); packs = L.packs.map(p => p.name); hasLevel = L.hasLevel; newestPack = ([...L.packs].sort((a, b) => b.t - a.t)[0] || {}).name || ''; levelOld = require('./hostdp').levelOld(id); } catch (e) { /* diagnostic sans les data packs */ }
+    const cr = require('./hostcrash').diagnose(h, { dir: dirOf(id), lines: r.lines, code, t0: r.t0, stopped: r.state === 'stopping', wasRunning: r.up, packs, newestPack, hasLevel, levelOld });
+    if (!cr) return;
+    crashes.set(id, cr); send('host:crashed', { id }); log.warn('Serveur arrêté de façon inattendue', h.name, cr.analysis.kind, 'code ' + code);
+    try { notify.show('Le serveur s’est arrêté', h.name + ' : ' + cr.analysis.title, '', 'server'); } catch (e) { /* notification facultative */ }
+  } catch (e) { log.warn('Diagnostic du serveur impossible', e.message); }
+}
+exports.crashCheck = crashCheck;   // exposé pour les tests
+exports.lastCrash = id => crashes.get(id) || null;
+exports.clearCrash = id => { crashes.delete(id); };
+const canBind = p => new Promise(res => { const s = require('net').createServer(); s.once('error', () => res(false)); s.once('listening', () => s.close(() => res(true))); s.listen(p, '0.0.0.0'); });
+async function freePort(h) { for (let p = h.port + 1; p <= Math.min(65535, h.port + 300); p++) { if (hosts().some(x => x.id !== h.id && x.port === p)) continue; if (await canBind(p)) return p; } throw new Error('Aucun port libre trouvé près de ' + h.port + '.'); }
+/** réparation proposée par l'assistant ; l'interface relance ensuite le serveur */
+exports.crashAct = async (id, act, v) => {
+  const h = get(id); if (run.has(id)) throw new Error('Ce serveur est déjà démarré.'); const dir = dirOf(id); v = v === undefined || v === null ? '' : String(v);
+  switch (act) {
+    case 'retry': break;
+    case 'eula': fs.writeFileSync(path.join(dir, 'eula.txt'), '# Accepté depuis Hydarium (https://aka.ms/MinecraftEULA)\neula=true\n'); break;
+    case 'port': exports.setProps(id, { 'server-port': String(await freePort(h)) }); break;
+    case 'mem': { const n = Math.round(+v); if (!(n >= 1 && n <= 32)) throw new Error('Mémoire invalide.'); h.mem = n; store.save(); break; }
+    case 'dpoff': require('./hostdp').setEnabled(id, v, false); break;
+    case 'dprm': require('./hostdp').remove(id, v); break;
+    case 'moddis': { const m = (h.mods || []).find(x => x.pid === v); if (!m) throw new Error('Mod introuvable.'); if (!m.disabled) await require('./mods').toggle(id, v); break; }
+    case 'modrm': await require('./mods').remove(id, v, false); break;
+    case 'lvold': require('./hostdp').restoreLevelOld(id); break;
+    case 'jar': { if (!['vanilla', 'paper', 'fabric'].includes(h.type)) throw new Error('Ce type de serveur se réinstalle depuis son installateur.'); await fetchJar(h.type, h.version, path.join(dir, 'server.jar')); break; }
+    default: throw new Error('Action inconnue.');
+  }
+  crashes.delete(id); return { restart: true };
 };
 exports.stop = id => { const r = run.get(id); if (!r) return; r.state = 'stopping'; try { r.proc.stdin.write('stop\n'); } catch (e) {} setTimeout(() => { if (run.get(id) === r) try { r.proc.kill(); } catch (e) {} }, 25000); };
 exports.cmd = (id, c) => { const r = run.get(id); if (!r) throw new Error('Le serveur n’est pas démarré.'); c = String(c || '').replace(/^\//, '').trim(); if (!c || c.length > 200 || /[\r\n]/.test(c)) throw new Error('Commande invalide.'); r.proc.stdin.write(c + '\n'); r.lines.push('> ' + c); };
 exports.log = id => (run.get(id) || { lines: [] }).lines;
-exports.remove = id => { const h = get(id); if (run.has(id)) throw new Error('Arrête le serveur avant de le supprimer.'); require('./p2p').unshare(id); if (h.upnp) legacyClose(h).catch(() => {}); /* ancien port UPnP encore ouvert : on tente de le refermer */ if (h.link) dropLink(path.join(dirOf(id), h.link.name)); /* on retire le lien d’abord : jamais le monde de l’instance */ fs.rmSync(dirOf(id), { recursive: true, force: true }); store.get().hosts = hosts().filter(x => x.id !== id); store.save(); };
+exports.remove = id => { const h = get(id); if (run.has(id)) throw new Error('Arrête le serveur avant de le supprimer.'); crashes.delete(id); require('./p2p').unshare(id); if (h.upnp) legacyClose(h).catch(() => {}); /* ancien port UPnP encore ouvert : on tente de le refermer */ if (h.link) dropLink(path.join(dirOf(id), h.link.name)); /* on retire le lien d’abord : jamais le monde de l’instance */ fs.rmSync(dirOf(id), { recursive: true, force: true }); store.get().hosts = hosts().filter(x => x.id !== id); store.save(); };
 exports.dir = id => { get(id); return dirOf(id); };
 exports.runState = id => { const r = run.get(id); return r ? r.state : 'stopped'; };
+exports.anyRunning = () => run.size > 0;
 exports.isRunning = id => run.has(id); // un serveur démarré (ou en arrêt) garde ses fichiers ouverts
 exports.stopAll = () => { for (const [, r] of run) try { r.proc.stdin.write('stop\n'); } catch (e) {} };
 

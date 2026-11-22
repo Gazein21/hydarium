@@ -86,7 +86,21 @@ exports.createVanilla = async (addr, version, name) => {
   Object.defineProperty(n, 'failedMods', { value: failed, enumerable: false }); // lu par l’appelant pour prévenir ; pas enregistré
   return n;
 };
-exports.plan = async (addr, opts) => {
+/* Serveur moddé hébergé avec Hydarium et rejoint par invitation privée : l'hôte envoie la liste EXACTE de ses mods (modsync.js). On en tire la version, le loader et la meilleure instance
+   (celle à qui il manque le moins de mods) ; r.sync décrit ce qui sera installé. Sans liste (hôte ancien ou injoignable, serveur sans mods) : le plan reste celui d'avant. */
+async function attachSync(r, addr) {
+  const d = store.get(), srv = d.servers.find(s => s.addr === r.server.addr) || d.servers.find(s => s.addr === addr);
+  if (!srv || !srv.p2p || r.own) return;
+  const ms = require('./modsync'), man = await ms.fetch(srv.p2p); if (!man || !man.mods.length || man.loader === 'vanilla') return;
+  const cands = d.instances.filter(i => i.version === man.mc && i.loader === man.loader), scored = [];
+  for (const i of cands) scored.push({ i, todo: (await ms.states(i, man)).filter(x => x.state !== 'ok').length });
+  scored.sort((a, b) => a.todo - b.todo || (b.i.lastPlayed || 0) - (a.i.lastPlayed || 0));
+  const keep = r.use && cands.some(i => i.id === r.use.id) ? r.use : null, use = keep || (scored[0] ? { id: scored[0].i.id, name: scored[0].i.name } : null);   // l'instance choisie par la personne reste, si elle convient
+  const st = use ? (await ms.states(d.instances.find(i => i.id === use.id), man)).filter(x => x.state !== 'ok') : man.mods.map(x => ({ ...x, state: 'missing' }));
+  Object.assign(r, { version: man.mc, loader: man.loader, mods: [], auto: [], hint: [], pack: null, tooMany: 0, guessed: '', use, preferred: !!(keep && r.preferred), configured: true, unknown: false });   // la version et le loader sont connus avec certitude : pas de question « serveur Vanilla ? »
+  r.sync = { mc: man.mc, loader: man.loader, total: man.mods.length, todo: st.length, create: !use, items: st.slice(0, 40).map(x => ({ title: x.title, state: x.state })) };
+}
+const basePlan = async (addr, opts) => {
   opts = opts || {};
   addr = String(addr || ''); if (!ADDR.test(addr)) throw new Error('Adresse invalide.');
   addr = await require('./p2p').ensureFor(addr); // invitation privée : le port local est rouvert (adresse inchangée pour tous les autres serveurs)
@@ -165,6 +179,11 @@ exports.canon = async addr => {
     for (const s of store.get().servers) { const [sh, sp] = String(s.addr).split(':'); if (sh === h && String(sp || '25565') === String(p || '25565')) return s.addr; const r = await slp.resolve(sh, sp ? +sp : 0); if (r.srv && r.host.toLowerCase() === h.toLowerCase() && String(r.port) === String(p || '25565')) return s.addr; }
   } catch (e) { /* tant pis */ }
   return addr;
+};
+exports.plan = async (addr, opts) => {
+  const r = await basePlan(addr, opts);
+  try { await attachSync(r, String(addr || '')); } catch (e) { log.warn('mods du serveur : aperçu impossible', e.message); }   // jamais bloquant : on rejoint comme avant
+  return r;
 };
 exports.setReq = (id, r) => {
   const s = store.get().servers.find(x => x.id === id); if (!s) throw new Error('Serveur introuvable.');

@@ -51,10 +51,10 @@ function gradleLine(l, st, rep, span) {
   if (m) { st.tasks++; const t = TASKS.find(([re]) => re.test(m[1])); if (t) rep.detail(t[1]); rep.progress(span[0] + (span[1] - span[0]) * (st.tasks / (st.tasks + 8))); return; }
   if (/^Downloading |Download https?:/i.test(l)) rep.detail('Téléchargement des bibliothèques nécessaires…');
 }
-function runGradle(g, jdkHome, project, rep, span) {
+function runGradle(g, jdkHome, project, rep, span, task = 'build') {
   return new Promise(res => {
     const env = { ...process.env, JAVA_HOME: jdkHome, PATH: path.join(jdkHome, 'bin') + path.delimiter + process.env.PATH, GRADLE_USER_HOME: path.join(tools, 'gradle-home') };
-    const args = ['-p', project, 'build', '--no-daemon', '--console=plain'], st = { tasks: 0 }, all = [];
+    const args = ['-p', project, task, '--no-daemon', '--console=plain'], st = { tasks: 0 }, all = [];
     // Windows : gradle.bat doit passer par un shell ; on donne une seule chaîne (pas de tableau d'arguments, c'est ce qui provoquait l'avertissement « DEP0190 »).
     const p = WIN ? spawn(`"${g.bin}" ${args.map(a => /\s/.test(a) ? `"${a}"` : a).join(' ')}`, { env, shell: true, windowsHide: true }) : spawn(g.bin, args, { env });
     const eat = d => String(d).split(/\r\n|\n|\r/).forEach(l => { if (!l.trim()) return; rep.log(l); all.push(l); if (all.length > 400) all.shift(); gradleLine(l, st, rep, span); });
@@ -144,6 +144,10 @@ function writeFabricProject(dir, V, plan, m) {
   if (!loom) throw new Error('Version de Loom introuvable.');
   copyTree(path.join(cm, 'core', 'src'), src); copyTree(path.join(cm, 'fabric-common', 'src'), src);
   copyTree(path.join(cm, plan.adapter, 'src', 'main', 'java'), src, n => plan.tier === 'core' && /^Draw\.java$/.test(n)); // « core » : pas de dessin dans le jeu, le launcher dessine le HUD
+  if (plan.adapter === 'fabric-latest' && plan.adaptive) { // 26.x : le dessin vit dans src/draw (HUD) et src/screens (éditeur, menu), compilés À PART (voir build.gradle plus bas)
+    copyTree(path.join(cm, 'fabric-latest', 'src', 'draw', 'java'), path.join(dir, 'src', 'draw', 'java'));
+    copyTree(path.join(cm, 'fabric-latest', 'src', 'screens', 'java'), path.join(dir, 'src', 'screens', 'java'));
+  }
   copyTree(path.join(cm, plan.adapter, 'src', 'main', 'resources'), res);
   const rj = (f, fn) => { const p = path.join(res, f); if (!fs.existsSync(p)) return; const j = JSON.parse(fs.readFileSync(p, 'utf8')); fn(j); fs.writeFileSync(p, JSON.stringify(j, null, 2)); };
   rj('fabric.mod.json', j => { j.depends = { ...j.depends, minecraft: V, java: '>=' + plan.release }; });
@@ -151,8 +155,11 @@ function writeFabricProject(dir, V, plan, m) {
   const props = `org.gradle.jvmargs=-Xmx2G\nminecraft_version=${V}\nloader_version=${m.loader}\nfabric_version=${m.api}\nloom_version=${loom}\n`;
   fs.writeFileSync(path.join(dir, 'gradle.properties'), props);
   const javaBlock = `java { sourceCompatibility = JavaVersion.VERSION_${plan.release}; targetCompatibility = JavaVersion.VERSION_${plan.release} }\ntasks.withType(JavaCompile).configureEach { it.options.release = ${plan.release}; it.options.encoding = 'UTF-8' }\nprocessResources { inputs.property 'version', project.version; filesMatching('fabric.mod.json') { expand 'version': project.version } }\n`;
+  /* Le HUD (draw) et les écrans (screens) sont compilés séparément et SANS faire échouer la construction : si une API de cette version du jeu a changé, ces classes
+     manquent dans le jar (le mod de base, le code P2P, etc. marchent quand même) au lieu de tout casser. Un seul passage Gradle suffit, au lieu d'un essai par niveau. */
+  const adaptiveBlock = `sourceSets {\n  draw { java { srcDirs = ['src/draw/java'] } }\n  screens { java { srcDirs = ['src/screens/java'] } }\n}\nsourceSets.draw.compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath\nsourceSets.draw.runtimeClasspath += sourceSets.main.output + sourceSets.main.runtimeClasspath\nsourceSets.screens.compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath + sourceSets.draw.output\nsourceSets.screens.runtimeClasspath += sourceSets.main.output + sourceSets.main.runtimeClasspath + sourceSets.draw.output\ntasks.named('compileDrawJava') { options.failOnError = false }\ntasks.named('compileScreensJava') { options.failOnError = false; dependsOn tasks.named('compileDrawJava') }\n`;
   if (plan.unobfuscated) { // Minecraft 26.x : plus de mappings ni de remapJar
-    fs.writeFileSync(path.join(dir, 'build.gradle'), `plugins { id '${plan.plugin}' }\nversion = '1.1.0'\nbase { archivesName = 'hydarium-fabric-${V}' }\nrepositories { mavenCentral() }\ndependencies {\n  minecraft "com.mojang:minecraft:\${project.minecraft_version}"\n  implementation "net.fabricmc:fabric-loader:\${project.loader_version}"\n  implementation "net.fabricmc.fabric-api:fabric-api:\${project.fabric_version}"\n}\n${javaBlock}jar { archiveFileName = '${jar}' }\n`);
+    fs.writeFileSync(path.join(dir, 'build.gradle'), `plugins { id '${plan.plugin}' }\nversion = '1.1.0'\nbase { archivesName = 'hydarium-fabric-${V}' }\nrepositories { mavenCentral() }\ndependencies {\n  minecraft "com.mojang:minecraft:\${project.minecraft_version}"\n  implementation "net.fabricmc:fabric-loader:\${project.loader_version}"\n  implementation "net.fabricmc.fabric-api:fabric-api:\${project.fabric_version}"\n}\n${javaBlock}${plan.adaptive ? adaptiveBlock : ''}jar { archiveFileName = '${jar}'${plan.adaptive ? '; from sourceSets.draw.output; from sourceSets.screens.output' : ''} }\n`);
     fs.writeFileSync(path.join(dir, 'settings.gradle'), `pluginManagement {\n  repositories { maven { url = 'https://maven.fabricmc.net/' }; gradlePluginPortal() }\n  plugins { id '${plan.plugin}' version "\${loom_version}" }\n}\nrootProject.name = 'hydarium-${V}'\n`);
   } else {
     fs.writeFileSync(path.join(dir, 'build.gradle'), `plugins { id '${plan.plugin}' version '${loom}' }\nversion = '1.1.0'\nbase { archivesName = 'hydarium-fabric-${V}' }\nrepositories { mavenCentral() }\ndependencies {\n  minecraft "com.mojang:minecraft:\${project.minecraft_version}"\n  mappings loom.officialMojangMappings()\n  modImplementation "net.fabricmc:fabric-loader:\${project.loader_version}"\n  modImplementation "net.fabricmc.fabric-api:fabric-api:\${project.fabric_version}"\n}\n${javaBlock}remapJar { archiveFileName = '${jar}' }\n`);
@@ -174,7 +181,7 @@ function writeForgeProject(dir, V, plan, m) { // écrit le projet Gradle ; renvo
 async function buildFor(family, V, rep, { dry } = {}) {
   const r = PLAN.plansFor(family, V); if (!r.ok) throw new Error(r.reason);
   const key = family + '-' + V, hash = PLAN.hashSources(root, family, V), tried = []; fs.mkdirSync(out, { recursive: true });
-  const meta = (plan, jar) => fs.writeFileSync(path.join(out, jar.replace(/\.jar$/, '.json')), JSON.stringify({ key, plan: plan.id, tier: plan.tier, draw: !!plan.draw, srcHash: hash, builtAt: new Date().toISOString(), tried }));
+  const meta = (plan, jar, x = {}) => fs.writeFileSync(path.join(out, jar.replace(/\.jar$/, '.json')), JSON.stringify({ key, plan: plan.id, tier: x.tier || plan.tier, draw: x.draw !== undefined ? !!x.draw : !!plan.draw, srcHash: hash, builtAt: new Date().toISOString(), tried }));
   if (family === 'forge' && r.plans[0].static) { const plan = r.plans[0]; await buildOne(plan.adapter, rep, [0, 1]); meta(plan, MODS[plan.adapter].jar); return { jar: MODS[plan.adapter].jar, plan: plan.id, tier: plan.tier, draw: true, tried }; }
   rep.step('Mod Hydarium pour Minecraft ' + V + (family === 'forge' ? ' (Forge)' : ' (Fabric)'));
   let lastErr = null;
@@ -185,21 +192,38 @@ async function buildFor(family, V, rep, { dry } = {}) {
       const m = family === 'forge' ? await forgeMeta(V, dry) : await fabricMeta(V, dry), dir = path.join(tools, 'mods', key + '-' + plan.id.replace('/', '-')), jarName = family === 'forge' ? writeForgeProject(dir, V, plan, m) : writeFabricProject(dir, V, plan, m);
       if (dry) { rep.log('projet écrit : ' + dir); return { jar: jarName, plan: plan.id, tier: plan.tier, draw: !!plan.draw, dir, tried }; }
       const j = await jdk(plan.jdk, rep, [at(.02), at(.3)]); let g = await gradle(plan.gradle, rep, [at(.3), at(.4)]); rep.detail('Préparation du projet…');
-      let res = await runGradle(g, j, dir, rep, [at(.4), at(.97)]);
-      if (!res.ok) { const need = /Gradle (\d+(?:\.\d+){1,2}) or higher is required/.exec(res.text) || /(?:Minimum supported Gradle version is|requires Gradle) (\d+(?:\.\d+){1,2})/i.exec(res.text); if (need && vcmp(need[1], g.version) > 0) { rep.log(`→ Gradle ${need[1]} demandé : nouvel essai`); g = await gradle(need[1], rep, [at(.4), at(.5)]); res = await runGradle(g, j, dir, rep, [at(.5), at(.97)]); } }
+      const task = plan.unobfuscated ? 'jar' : 'build'; // non obfusqué : « jar » suffit (pas de remap, de jar des sources ni de contrôles) → plus rapide
+      let res = await runGradle(g, j, dir, rep, [at(.4), at(.97)], task);
+      if (!res.ok) { const need = /Gradle (\d+(?:\.\d+){1,2}) or higher is required/.exec(res.text) || /(?:Minimum supported Gradle version is|requires Gradle) (\d+(?:\.\d+){1,2})/i.exec(res.text); if (need && vcmp(need[1], g.version) > 0) { rep.log(`→ Gradle ${need[1]} demandé : nouvel essai`); g = await gradle(need[1], rep, [at(.4), at(.5)]); res = await runGradle(g, j, dir, rep, [at(.5), at(.97)], task); } }
       if (!res.ok) { const e = new Error(explain(res.text)); e.tech = res.text; throw e; }
       const built = path.join(dir, 'build', 'libs', jarName); if (!fs.existsSync(built)) throw new Error('Le fichier du mod (' + jarName + ') n’a pas été créé.');
-      fs.copyFileSync(built, path.join(out, jarName)); tried.push(plan.id + ' : OK'); meta(plan, jarName); rep.progress(1);
-      return { jar: jarName, plan: plan.id, tier: plan.tier, draw: !!plan.draw, tried };
+      fs.copyFileSync(built, path.join(out, jarName));
+      const ct = plan.adaptive ? classTier(built) : null; // plan adaptatif : le niveau réel (full / draw / core) se lit dans le jar
+      if (ct && ct.tier !== 'full') { const errs = String(res.text).split('\n').filter(l => /error:/.test(l)).slice(0, 3).map(l => l.replace(/^.*src[\\/](?:main|draw|screens)[\\/]java[\\/]/, '').trim().slice(0, 220)).join(' | '); tried.push((plan.id + ' : dessin partiel (HUD ' + (ct.draw ? 'oui' : 'non') + ', éditeur et menu ' + (ct.screens ? 'oui' : 'non') + ')' + (errs ? ' → ' + errs : '')).slice(0, 700)); }
+      else tried.push(plan.id + ' : OK');
+      meta(plan, jarName, ct ? { tier: ct.tier, draw: ct.draw } : {}); rep.progress(1);
+      return { jar: jarName, plan: plan.id, tier: ct ? ct.tier : plan.tier, draw: ct ? ct.draw : !!plan.draw, tried };
     } catch (e) {
-      lastErr = e; tried.push(plan.id + ' : ' + String(e.message).split('\n')[0].slice(0, 200)); rep.log(`plan ${plan.id} ÉCHEC : ${e.message}`); if (e.tech) rep.log(e.tech);
+      lastErr = e;
+      // les VRAIES erreurs de compilation (contre le jeu de cette version) sont gardées dans la fiche du mod : c'est ce qui permet de corriger sans deviner
+      const errs = String(e.tech || '').split('\n').filter(l => /error:/.test(l)).slice(0, 3).map(l => l.replace(/^.*src[\\/]main[\\/]java[\\/]/, '').trim().slice(0, 220)).join(' | ');
+      tried.push((plan.id + ' : ' + String(e.message).split('\n')[0].slice(0, 200) + (errs ? ' → ' + errs : '')).slice(0, 700)); rep.log(`plan ${plan.id} ÉCHEC : ${e.message}`); if (e.tech) rep.log(e.tech);
       if (!isCompileFail(e.tech)) break; // pas un problème de code : inutile d'essayer un plan plus simple
     }
   }
   const e = new Error(lastErr ? lastErr.message : 'Échec de la construction.'); e.tried = tried; e.tech = lastErr && lastErr.tech; throw e;
 }
 
-module.exports = { buildMods, MODS, buildFor, writeFabricProject, writeForgeProject, isCompileFail };
+/** Niveau de dessin réellement présent dans un jar fabriqué : { draw, screens, tier } (« full » = HUD + éditeur + menu, « draw » = HUD seul, « core » = aucun dessin). */
+function classTier(jarPath) {
+  try {
+    const names = new (require('adm-zip'))(jarPath).getEntries().map(e => e.entryName), has = c => names.includes('net/hydarium/client/' + c + '.class');
+    const draw = has('Draw') && has('HudCanvas') && has('Gx'), screens = has('HudScreen') && has('MenuScreen');
+    return { draw, screens, tier: draw && screens ? 'full' : draw ? 'draw' : 'core' };
+  } catch (e) { return { draw: false, screens: false, tier: 'core' }; }
+}
+
+module.exports = { buildMods, MODS, buildFor, writeFabricProject, writeForgeProject, isCompileFail, classTier };
 
 if (require.main === module) {
   const args = process.argv.slice(2), json = args.includes('--json'), only = args.filter(a => !a.startsWith('--'));

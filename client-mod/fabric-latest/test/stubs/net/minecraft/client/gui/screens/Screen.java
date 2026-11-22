@@ -1,0 +1,1 @@
+package net.minecraft.client.gui.screens; public abstract class Screen { protected Screen(net.minecraft.network.chat.Component c){} public void extractRenderState(net.minecraft.client.gui.GuiGraphicsExtractor g,int x,int y,float d){} public void onClose(){} }

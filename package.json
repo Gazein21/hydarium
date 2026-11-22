@@ -1,6 +1,6 @@
 {
   "name": "hydarium-launcher",
-  "version": "0.10.55",
+  "version": "0.10.74",
   "description": "Hydarium – le launcher Minecraft simple, beau et communautaire",
   "author": "Hydarium",
   "homepage": "https://github.com/Gazein21/hydarium#readme",
@@ -18,7 +18,7 @@
     "dist:mac": "node scripts/fetch-jre.js && electron-builder --mac --publish never",
     "dist:linux": "node scripts/fetch-jre.js && electron-builder --linux --publish never",
     "build:mods": "node scripts/build-mods.js",
-    "test": "node test/version.test.js && node test/modplan.test.js && node test/clientfirst.test.js && node test/modbuild.test.js && node test/crash.test.js && node test/playit.test.js && node test/p2p.test.js && node test/legacyports.test.js && node test/jre.test.js && node test/core-compile.test.js && node --test test/forgegen.test.js && node test/worldexport.test.js && node test/skins.test.js && node test/updater.test.js && node test/layoutsync.test.js && node test/preload.test.js && node test/p2pbridge.test.js && node test/hudstate.test.js",
+    "test": "node test/version.test.js && node test/modplan.test.js && node test/clientfirst.test.js && node test/modbuild.test.js && node test/crash.test.js && node test/playit.test.js && node test/p2p.test.js && node test/legacyports.test.js && node test/jre.test.js && node test/core-compile.test.js && node --test test/forgegen.test.js && node test/worldexport.test.js && node test/skins.test.js && node test/updater.test.js && node test/layoutsync.test.js && node test/preload.test.js && node test/p2pbridge.test.js && node test/hudstate.test.js && node test/hudlatest.test.js && node test/latestplan.test.js && node test/privacy.test.js && node test/templatesafe.test.js && node test/tos.test.js && node test/icon.test.js && node test/modpack.test.js && node test/modsearch.test.js && node test/modicon.test.js && node test/instimg.test.js && node test/drop.test.js && node test/hostview.test.js && node test/auth.test.js && node test/modver.test.js && node test/mctex.test.js && node test/hostdp.test.js && node test/hostcrash.test.js && node test/home.test.js && node test/modsync.test.js && node test/friends.test.js && node test/chat.test.js",
     "release": "node scripts/release.js"
   },
   "dependencies": {

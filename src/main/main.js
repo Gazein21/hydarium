@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, clipboard, dialog, session: electronSession } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, clipboard, dialog, session: electronSession, nativeImage} = require('electron');
 const path = require('path'), fs = require('fs');
 const log = require('./log'), store = require('./store'), auth = require('./auth'), game = require('./game'), plat = require('./platform');
 const spotify = require('./spotify'), modpack = require('./modpack'), datactl = require('./datactl'), media = require('./media'), bridge = require('./bridge'), overlay = require('./overlay'), joiner = require('./joiner'), jre = require('./jre'), playit = require('./playit'), session = require('./session'), host = require('./host'), content = require('./content'), shots = require('./shots'), skins = require('./skins'), updater = require('./updater'), mods = require('./mods'), servers = require('./servers'), notify = require('./notify'), importer = require('./importer');
@@ -8,8 +8,9 @@ process.on('uncaughtException', e => log.error('uncaughtException', e));
 process.on('unhandledRejection', e => log.error('unhandledRejection', e));
 if (!app.requestSingleInstanceLock()) app.quit();
 
-let win;
+let win, friends = null, chat = null;
 const send = (c, d) => {
+  if ((c === 'game:started' || c === 'game:close') && friends) { const t = setTimeout(() => friends.refresh(), 1500); if (t.unref) t.unref(); }   // les amis voient tout de suite « en jeu » / « en ligne »
   if (win && !win.isDestroyed()) {
     if (c === 'game:started' && store.get().settings.minimize) win.minimize();
     if (c === 'game:close' && store.get().settings.minimize) { win.restore(); win.focus(); }
@@ -40,9 +41,11 @@ const focus = () => { if (win) { if (win.isMinimized()) win.restore(); win.show(
 /* taille de l'interface (Paramètres › Apparence) : zoom de la fenêtre, de 75 % à 150 % */
 const logDays = () => { const v = store.get().settings.logDays; return typeof v === 'number' && v >= 0 ? v : 14; }; // jours de conservation des journaux (0 = jamais)
 function applyScale() { try { const v = +store.get().settings.uiScale; if (win && !win.isDestroyed()) win.webContents.setZoomFactor(v >= 0.75 && v <= 1.5 ? v : 1); } catch (e) {} }
+/* Icône d'Hydarium pour les fenêtres : le PNG (le .ico sert seulement à incruster le logo dans l'exécutable, voir scripts/after-pack.js) */
+function appIcon() { try { const i = nativeImage.createFromPath(path.join(__dirname, '..', '..', 'build', 'icon.png')); return i.isEmpty() ? undefined : i; } catch (e) { return undefined; } }
 function createWindow() {
   win = new BrowserWindow({
-    icon: path.join(__dirname, '..', '..', 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
+    icon: appIcon(), // icône de la fenêtre (barre des tâches) : PNG 512 px sur tous les systèmes, plus robuste que le .ico
     width: 1120, height: 720, minWidth: 900, minHeight: 580, backgroundColor: '#0b0d11', title: 'Hydarium', frame: false,
     webPreferences: { preload: path.join(__dirname, '../preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true }
   });
@@ -59,7 +62,7 @@ app.whenReady().then(async () => {
   store.init(plat.dataDir()); log.rotate(logDays());
   log.info(`Démarrage Hydarium ${app.getVersion()} · ${plat.id} ${process.arch} · Electron ${process.versions.electron} · Node ${process.versions.node}`);
   plat.javas(store.get().settings.javas).then(l => log.info('Java détectés :', l.map(j => `Java ${j.major} (${j.version}, ${j.vendor}, ${j.is64 ? 64 : 32} bits) ${j.path}`)));
-  notify.onClick(a => { if (a === 'update:open') { focus(); send('update:open'); } else if (a === 'crash') { focus(); send('game:crash-open'); } else if (a && a.startsWith('file:')) shell.showItemInFolder(a.slice(5)); else if (a && a.startsWith('shot:')) shell.openPath(a.slice(5)); else if (a && a.startsWith('ovl:join:')) { const c = session.current(); overlay.open('join', c && c.id, { addr: a.slice(9) }); } else if (a && a.startsWith('ovl:datapack:')) { const c = session.current(); overlay.open('content', c && c.id, { world: a.slice(13) }); } else focus(); });
+  notify.onClick(a => { if (a === 'friends:open') { focus(); send('friends:open'); } else if (a && a.startsWith('chat:')) { focus(); send('friends:open', { conv: a.slice(5) }); } else if (a === 'update:open') { focus(); send('update:open'); } else if (a === 'crash') { focus(); send('game:crash-open'); } else if (a && a.startsWith('file:')) shell.showItemInFolder(a.slice(5)); else if (a && a.startsWith('shot:')) shell.openPath(a.slice(5)); else if (a && a.startsWith('ovl:join:')) { const c = session.current(); overlay.open('join', c && c.id, { addr: a.slice(9) }); } else if (a && a.startsWith('ovl:datapack:')) { const c = session.current(); overlay.open('content', c && c.id, { world: a.slice(13) }); } else focus(); });
 
   on('platform', () => ({ ...plat.info(), version: app.getVersion() }));
   on('notify', (t, b) => notify.show(String(t).slice(0, 80), String(b).slice(0, 300), ''));
@@ -67,7 +70,7 @@ app.whenReady().then(async () => {
   on('win', a => { if (a === 'min') win.minimize(); else if (a === 'max') win.isMaximized() ? win.unmaximize() : win.maximize(); else if (a === 'close') win.close(); });
   on('set:get', () => store.get().settings);
   on('set:set', async o => {
-    const s = store.get().settings, T = { uiScale: 'number', notif: 'boolean', minimize: 'boolean', autostart: 'boolean', wall: 'string', theme: 'string', mem: 'number', java: 'string', accent: 'string', view: 'string', dl: 'number', favMods: 'object', srvMods: 'object', favContent: 'object', snaps: 'boolean', defJvm: 'string', defResMode: 'string', defW: 'number', defH: 'number', defOptim: 'boolean', gameLang: 'string', langSync: 'boolean', cProfiles: 'object', uiLang: 'string', spotifyId: 'string', notifLaunch: 'boolean', notifCrash: 'boolean', notifShot: 'boolean', notifDone: 'boolean', notifServer: 'boolean', notifQuiet: 'boolean', logDays: 'number', cfKey: 'string', tour: 'boolean', music: 'string', overlayKey: 'string', autoJava: 'boolean', showLog: 'boolean', cfClean: 'boolean', autoUpdate: 'boolean' };
+    const s = store.get().settings, T = { uiScale: 'number', notif: 'boolean', minimize: 'boolean', autostart: 'boolean', wall: 'string', theme: 'string', mem: 'number', java: 'string', accent: 'string', view: 'string', dl: 'number', favMods: 'object', srvMods: 'object', favContent: 'object', snaps: 'boolean', defJvm: 'string', defResMode: 'string', defW: 'number', defH: 'number', defOptim: 'boolean', gameLang: 'string', langSync: 'boolean', cProfiles: 'object', uiLang: 'string', spotifyId: 'string', notifLaunch: 'boolean', notifCrash: 'boolean', notifShot: 'boolean', notifDone: 'boolean', notifServer: 'boolean', notifQuiet: 'boolean', logDays: 'number', cfKey: 'string', tour: 'boolean', music: 'string', overlayKey: 'string', autoJava: 'boolean', showLog: 'boolean', cfClean: 'boolean', autoUpdate: 'boolean', autoInstall: 'boolean', inGameMenu: 'boolean', privacy: 'boolean', tosAccepted: 'number', tosAt: 'number' };
     for (const [k, v] of Object.entries(o || {})) {
       if (typeof v !== T[k]) continue;
       if (k === 'cProfiles') { s.cProfiles = (Array.isArray(v) ? v : []).slice(0, 12).map(p => ({ name: String((p && p.name) || '').slice(0, 24), modules: cleanModules((p && p.modules) || {}) })).filter(p => p.name); continue; }
@@ -127,6 +130,102 @@ app.whenReady().then(async () => {
     if ((keys || []).length > 1) notify.show('Import terminé', `${r.done} instance(s) importée(s).` + (r.skipped && r.skipped.length ? ' Ignorée(s) : ' + r.skipped.slice(0, 3).join(', ') + (r.skipped.length > 3 ? '…' : '') + '.' : ''), null, 'done');
     return r;
   });
+  auth.onChange(a => send('auth:state', a));   // connexion rétablie en arrière-plan, ou refusée pour de bon
+  /* Amis P2P (désactivés tant que la personne ne les a pas activés ; voir friends.js) */
+  const { safeStorage } = require('electron'), encOk = () => { try { return safeStorage.isEncryptionAvailable(); } catch (e) { return false; } };
+  friends = require('./friends').create({
+    store, log, DHT: require('hyperdht'),
+    onMessage: (k, m) => { if (chat) chat.onMessage(k, m); }, onOnline: k => { if (chat) chat.onOnline(k); },   // chat.js : messages d'amis et envoi de ce qui attendait la reconnexion
+    profile: () => { let c = null; try { c = require('./game').isRunning() ? session.current() : null; } catch (e) { /* pas de jeu */ } const i = c ? store.get().instances.find(x => x.id === c.id) : null; return { name: auth.name() || 'Joueur', st: c ? 'playing' : 'online', what: i ? 'Minecraft ' + i.version : '' }; },
+    seal: s => (encOk() ? 'e:' + safeStorage.encryptString(s).toString('base64') : 'p:' + s), unseal: s => (String(s).startsWith('e:') ? safeStorage.decryptString(Buffer.from(String(s).slice(2), 'base64')) : String(s).slice(2)),
+    notify: (kind, d) => {
+      if (kind === 'changed') { if (chat) chat.sync(); return send('friends:changed', {}); }
+      if (kind === 'invite') { send('friends:invite', d); if (chat) chat.record(d.key, { mine: false, card: { k: 'srv', n: d.name, code: d.code } }); notify.show('Invitation de ' + d.from, 'Rejoindre « ' + d.name + ' »', 'friends:open'); }
+      else if (kind === 'request') notify.show('Demande d’ami', d.name + ' veut être ton ami.', 'friends:open');
+      else if (kind === 'friend') notify.show('Nouvel ami', d.name + ' est maintenant ton ami.', 'friends:open');
+      else if (kind === 'removed') notify.show('Ami retiré', d.name + ' t’a retiré de ses amis.', 'friends:open');
+    },
+  });
+  /* Chat : messages, cartes de partage, groupes. Créé avant le démarrage des amis pour ne rater aucun message. */
+  let chatPing = null;   // plusieurs messages d'un coup = un seul rafraîchissement de l'interface
+  chat = require('./chat').create({
+    dir: plat.dataDir(), friends, log, myName: () => auth.name() || 'Joueur',
+    focused: () => !!(win && !win.isDestroyed() && win.isFocused() && !win.isMinimized() && win.isVisible()),
+    notify: (kind, d) => {
+      if (kind === 'changed') { if (!chatPing) chatPing = setTimeout(() => { chatPing = null; send('chat:changed', d); }, 60); }
+      else if (kind === 'msg') notify.show(d.name, (d.from && d.from !== d.name ? d.from + ' : ' : '') + String(d.text).slice(0, 120), 'chat:' + d.conv);
+      else if (kind === 'group-invite') notify.show('Invitation dans un groupe', d.from + ' t’invite dans « ' + d.name + ' ».', 'friends:open');
+      else if (kind === 'group-removed') notify.show('Groupe quitté', 'Tu ne fais plus partie de « ' + d.name + ' ».', 'friends:open');
+    },
+  });
+  chat.sync();
+  if (friends.config().on) friends.start().catch(e => log.warn('amis : démarrage impossible', e.message));
+  const KEYRE = /^[0-9a-f]{64}$/, key = k => { k = String(k || ''); if (!KEYRE.test(k)) throw new Error('Ami invalide.'); return k; };
+  on('friends:status', () => friends.status());
+  on('friends:enable', async v => { await friends.enable(!!v); return friends.status(); });
+  on('friends:hidden', v => { friends.setHidden(!!v); return friends.status(); });
+  on('friends:reset', async () => { await friends.reset(); chat.wipe(); return friends.status(); });
+  on('friends:request', code => friends.request(String(code || '')));
+  on('friends:accept', k => friends.accept(key(k)));
+  on('friends:decline', (k, block) => friends.decline(key(k), !!block));
+  on('friends:cancel', k => friends.cancel(key(k)));
+  on('friends:unblock', k => friends.unblock(key(k)));
+  on('friends:remove', k => friends.remove(key(k)));
+  const joinFriendSrv = async (code, name) => { // accepter l'invitation d'un ami : on réutilise le serveur déjà enregistré pour ce code, sinon on l'ajoute
+    const pc = require('./p2p').normalize(String(code || '')); if (!pc) throw new Error('Invitation invalide.');
+    let s = store.get().servers.find(x => x.p2p === pc);
+    if (!s) { await servers.addP2p({ name: String(name || '').slice(0, 40) || 'Serveur d’un ami', code: pc }); s = store.get().servers.find(x => x.p2p === pc); }
+    return { addr: s.addr };
+  };
+  on('friends:join', (code, name) => joinFriendSrv(code, name));
+  on('friends:invite', (k, hostId) => { // le code d'invitation vient du serveur de CETTE personne (jamais de l'interface)
+    const info = host.p2pInfo(String(hostId || '')), h = (store.get().hosts || []).find(x => x.id === hostId);
+    if (!info.sharing || !info.code) throw new Error('Démarre ton serveur avec les invitations privées activées pour inviter un ami.');
+    const ok = friends.invite(key(k), h ? h.name : 'Serveur', info.code); chat.record(key(k), { mine: true, card: { k: 'srv', n: h ? h.name : 'Serveur', code: info.code } }); return ok;
+  });
+  /* ===== Chat entre amis (voir chat.js) : la conversation est toujours une clé d'ami ou « g:<groupe> » ===== */
+  const CONVRE = /^([0-9a-f]{64}|g:[0-9a-f]{16})$/, conv = c => { c = String(c || ''); if (!CONVRE.test(c)) throw new Error('Conversation invalide.'); return c; }, keys = l => (Array.isArray(l) ? l : []).slice(0, 20).map(key);
+  /** miniature carrée de 96 px (JPEG ≤ 11 Ko) de l'image d'une instance, ou '' : elle voyage avec la carte, l'ami la voit tout de suite */
+  const thumbOf = id => {
+    try {
+      const r = require('./instimg').get(id); if (!r) return ''; let img = nativeImage.createFromBuffer(Buffer.from(r.u.split(',')[1], 'base64')); if (img.isEmpty()) return '';
+      const { width: w, height: h } = img.getSize(), s = Math.min(w, h); img = img.crop({ x: Math.floor((w - s) / 2), y: Math.floor((h - s) / 2), width: s, height: s }).resize({ width: 96, height: 96, quality: 'good' });
+      for (const q of [72, 55, 40]) { const b = img.toJPEG(q).toString('base64'); if (b.length <= 11000) return b; }
+    } catch (e) { log.warn('miniature de partage', e.message); }
+    return '';
+  };
+  /** carte d'une instance : un modpack du catalogue se partage par RÉFÉRENCE ; sinon par recette (mods Modrinth) ; jamais de fichiers */
+  const shareCard = id => {
+    const i = store.get().instances.find(x => x.id === id); if (!i) throw new Error('Instance introuvable.');
+    const p = i.pack, byRef = p && (p.src === 'modrinth' || p.src === 'curseforge') && typeof p.pid === 'string';
+    if (byRef) return { card: { k: 'pack', n: i.name, src: p.src, pid: p.pid, v: i.version }, skipped: 0, thumb: thumbOf(id) };
+    const s = mods.share(id); return { card: { k: 'inst', n: i.name, v: i.version, l: i.loader, m: s.count, code: s.code }, skipped: s.skipped, thumb: thumbOf(id) };
+  };
+  const dlBusy = new Set();
+  on('chat:list', () => chat.list());
+  on('chat:messages', c => chat.messages(conv(c)));
+  on('chat:thumb', h => chat.thumb(String(h || '')));
+  on('chat:send', (c, t) => chat.send(conv(c), t));
+  on('chat:read', c => chat.read(conv(c)));
+  on('chat:active', c => chat.setActive(c ? conv(c) : null));
+  on('chat:share', (c, instId) => { const t = (Array.isArray(c) ? c : [c]).slice(0, 10).map(conv), s = shareCard(String(instId || '')); for (const x of t) chat.sendCard(x, s.card, s.thumb); return { sent: t.length, skipped: s.skipped, kind: s.card.k }; });   // l'envoi est la confirmation : la personne a choisi à qui
+  on('chat:dl', async (c, mid) => {   // « Télécharger » / « Rejoindre » sur une carte reçue : rien ne part tant qu'on n'a pas cliqué
+    c = conv(c); mid = String(mid || ''); const card = chat.card(c, mid), bk = c + '|' + mid; if (dlBusy.has(bk)) throw new Error('Déjà en cours.'); dlBusy.add(bk);
+    try {
+      let out;
+      if (card.k === 'inst') { const r = await mods.importCode(card.code); r.inst.name = String(card.n).slice(0, 40); store.save(); out = { kind: 'inst', id: r.inst.id, name: r.inst.name, failed: r.failed.length }; }
+      else if (card.k === 'pack') { const r = await require('./packs').install('modpack', card.pid, card.src, null, p => send('import:progress', p)); out = { kind: 'pack', id: r.id, name: r.name, failed: (r.bad || []).length }; }
+      else if (card.k === 'srv') { const r = await joinFriendSrv(card.code, card.n); out = { kind: 'srv', addr: r.addr, name: card.n }; }
+      else throw new Error('Carte inconnue.');
+      if (card.k !== 'srv') chat.setDl(c, mid, { s: 'done', id: out.id, t: Date.now() });
+      return out;
+    } finally { dlBusy.delete(bk); }
+  });
+  on('chat:gnew', (name, ks) => chat.createGroup(String(name || ''), keys(ks)));
+  on('chat:gadd', (c, ks) => chat.groupAdd(conv(c), keys(ks)));
+  on('chat:gkick', (c, k) => chat.groupKick(conv(c), key(k)));
+  on('chat:gaccept', c => chat.groupAccept(conv(c)));
+  on('chat:gleave', c => chat.groupLeave(conv(c)));
   on('auth:current', auth.current); on('auth:login', auth.login); on('auth:logout', auth.logout);
   on('versions', game.versions);
   on('inst:list', () => store.get().instances);
@@ -139,7 +238,7 @@ app.whenReady().then(async () => {
     if ((loader === 'forge' || loader === 'neoforge') && !/^[\w.+-]{1,40}$/.test(i.loaderVer || '')) throw new Error('Choisis une version de ' + loader + '.');
     const n = store.addInstance({ name, version: v.id, type: v.type, loader }); try { content.defApply(n.id); } catch (e) { log.warn('réglages par défaut', e.message); } if (loader === 'forge' || loader === 'neoforge') { n.loaderVer = i.loaderVer; store.save(); } return n;
   });
-  on('inst:delete', id => { const L = host.linksTo(id); if (L.some(h => host.isRunning(h.id))) throw new Error('Le serveur « ' + L.find(h => host.isRunning(h.id)).name + ' » utilise un monde de cette instance : arrête-le d’abord.'); L.forEach(h => host.unlinkWorld(h.id)); /* le serveur garde une copie de son monde */ try { require('./stats').bank(id); } catch (e) { log.warn('stats avant suppression', e.message); } game.remove(id); store.removeInstance(id); }); // les statistiques de l’instance sont gardées avant sa suppression
+  on('inst:delete', id => { const L = host.linksTo(id); if (L.some(h => host.isRunning(h.id))) throw new Error('Le serveur « ' + L.find(h => host.isRunning(h.id)).name + ' » utilise un monde de cette instance : arrête-le d’abord.'); L.forEach(h => host.unlinkWorld(h.id)); /* le serveur garde une copie de son monde */ try { require('./stats').bank(id); } catch (e) { log.warn('stats avant suppression', e.message); } game.remove(id); try { require('./instimg').clear(id); } catch (e) {} store.removeInstance(id); }); // les statistiques de l’instance sont gardées avant sa suppression
   on('game:stop', () => game.stop());
   require('./autojoin').init(send); on('join:state', () => require('./autojoin').state()); on('join:confirm', () => require('./autojoin').confirm()); on('join:answer', a => { a = a || {}; require('./autojoin').answer({ vanilla: a.vanilla === true, version: /^\d{1,2}(\.\d{1,2}){1,2}$/.test(String(a.version || '')) ? String(a.version) : '' }); }); on('join:cancel', () => require('./autojoin').cancel()); on('join:run', (addr, id) => require('./autojoin').run(String(addr || ''), id));
   on('game:play', (id, o) => { // l'instance se lance toujours ; mais ouvrir un monde relié à un serveur en ligne = rejoindre ce serveur (le monde est verrouillé par lui)
@@ -147,7 +246,8 @@ app.whenReady().then(async () => {
     if (h) { if (host.runState(h.id) !== 'running') throw new Error('Le serveur « ' + h.name + ' » utilise ce monde et démarre encore : réessaie dans un instant.'); o.server = 'localhost:' + h.port; delete o.world; }
     return game.play(id, send, o);
   });
-  on('inst:detail', async id => { const s = mods.status(id); return { ...s, need: await game.needJava(s.inst) }; });
+  on('inst:detail', async id => { const s = mods.status(id); return { ...s, mods: require('./modicon').attach(s.mods), need: await game.needJava(s.inst) }; }); // images des mods : jointes ici seulement (cache), pas dans la liste d'instances
+  on('mods:icons', id => require('./modicon').fill(id));
   on('inst:set', async (id, o) => {
     const i = store.get().instances.find(x => x.id === id); if (!i || !o) return;
     if (o.mem >= 1 && o.mem <= 32) i.mem = Math.round(o.mem);
@@ -156,6 +256,7 @@ app.whenReady().then(async () => {
     if (typeof o.cat === 'string') i.cat = o.cat.trim().slice(0, 24);
     if (Array.isArray(o.tags)) i.tags = [...new Set(o.tags.map(t => String(t).trim().slice(0, 20)).filter(Boolean))].slice(0, 12);
     if (typeof o.cover === 'string' && (o.cover === '' || BIOS.includes(o.cover))) i.cover = o.cover;
+    if (typeof o.item === 'string') { if (o.item === 'auto' || o.item === '') delete i.item; else if (o.item === 'none' || require('./mctex').valid(o.item)) i.item = o.item; }   // objet de l'icône générée : automatique (rien d'enregistré), aucun, ou l'un de la liste
     if (typeof o.notes === 'string') i.notes = o.notes.slice(0, 500);
     if (o.minMem >= 1 && o.minMem <= 32) i.minMem = Math.round(o.minMem);
     if (o.res && ['default', 'window', 'full'].includes(o.res.mode)) i.res = { mode: o.res.mode, w: Math.min(7680, Math.max(400, Math.round(+o.res.w) || 1280)), h: Math.min(4320, Math.max(300, Math.round(+o.res.h) || 720)) };
@@ -168,8 +269,12 @@ app.whenReady().then(async () => {
     if (typeof o.jvm === 'string') { if (o.jvm.length > 300 || !JVM.test(o.jvm)) throw new Error('Arguments JVM invalides (seulement -X…, -XX:… ou -D…=…).'); i.jvm = o.jvm.trim(); }
     store.save();
   });
+  on('inst:imgget', id => require('./instimg').get(id));   // image de l'instance (donnée à l'interface à la demande, pas dans la liste)
+  on('inst:imgpick', async id => { const f = await pick('Choisir une image', ['openFile'], [{ name: 'Image', extensions: ['png', 'jpg', 'jpeg'] }]); if (!f[0]) return false; require('./instimg').fromFile(id, f[0]); return true; });
+  on('inst:imgpack', async id => { await require('./instimg').fromPack(id); return true; });
+  on('inst:imgclear', id => { require('./instimg').clear(id); return true; });
   on('inst:open', (id, sd) => { const i = store.get().instances.find(x => x.id === id); if (!i) return; const d = ['mods', 'saves', 'resourcepacks', 'shaderpacks', 'screenshots'].includes(sd) ? path.join(game.dirOf(id), sd) : game.dirOf(id); fs.mkdirSync(d, { recursive: true }); return shell.openPath(d); });
-  on('inst:dup', id => { const i = store.get().instances.find(x => x.id === id); if (!i) throw new Error('Instance introuvable.'); const c = store.addInstance({ ...i, name: i.name + ' (copie)' }); c.mods = JSON.parse(JSON.stringify(i.mods)); c.mem = i.mem; if (i.client) c.client = { ...JSON.parse(JSON.stringify(i.client)), on: true }; store.save(); try { fs.cpSync(game.dirOf(id), game.dirOf(c.id), { recursive: true }); } catch (e) {} return c; });
+  on('inst:dup', id => { const i = store.get().instances.find(x => x.id === id); if (!i) throw new Error('Instance introuvable.'); const c = store.addInstance({ ...i, name: i.name + ' (copie)' }); c.mods = JSON.parse(JSON.stringify(i.mods)); c.mem = i.mem; if (i.client) c.client = { ...JSON.parse(JSON.stringify(i.client)), on: true }; store.save(); try { fs.cpSync(game.dirOf(id), game.dirOf(c.id), { recursive: true }); } catch (e) {} if (i.img) require('./instimg').copy(id, c.id); return c; });
   on('inst:code', id => mods.code(id));
   on('inst:import', c => mods.importCode(c));
   on('mods:search', (id, q) => mods.search(id, q));
@@ -203,7 +308,7 @@ app.whenReady().then(async () => {
     store.save(); try { session.writeConfig(i, game.dirOf(i.id)); } catch (e) {} try { require('./hud').refresh(i.id); } catch (e) {}
     send('client:synced', { id: i.id, client: i.client }); try { require('./overlay').send('client:synced', { id: i.id, client: i.client }); } catch (e) {}
   };
-  bridge.route('POST', '/v1/state', (q, b) => { require('./hud').setGame(b || {}); if (b && b.gmenu) { try { require('./session').releaseOverlayKey(); } catch (e) { log.warn('raccourci du menu', e.message); } } if (b && b.tg) { try { syncToggles(b.tg); } catch (e) { log.warn('synchro des modules', e.message); } } if (b && b.lay) { try { syncLayout(b.lay); } catch (e) { log.warn('synchro de la disposition', e.message); } } if (b && b.menu) return { ok: true }; /* simple signalement d’écran (hors monde) : pas de statistiques */ try { require('./stats').onState(b || {}); } catch (e) {} return { ok: true }; });
+  bridge.route('POST', '/v1/state', (q, b) => { require('./hud').setGame(b || {}); if (b && b.derr) require('./hud').noteDrawError(b.derr); if (b && b.gmenu && store.get().settings.inGameMenu === true) { try { require('./session').releaseOverlayKey(); } catch (e) { log.warn('raccourci du menu', e.message); } } if (b && b.tg) { try { syncToggles(b.tg); } catch (e) { log.warn('synchro des modules', e.message); } } if (b && b.lay) { try { syncLayout(b.lay); } catch (e) { log.warn('synchro de la disposition', e.message); } } if (b && b.menu) return { ok: true }; /* simple signalement d’écran (hors monde) : pas de statistiques */ try { require('./stats').onState(b || {}); } catch (e) {} return { ok: true }; });
   bridge.route('POST', '/v1/p2p/open', (q, b) => require('./p2pbridge').open(b && b.code)); // code d'invitation tapé dans le champ d'adresse du jeu
   bridge.route('GET', '/v1/music', async () => ({ track: await media.get() }));
   bridge.route('POST', '/v1/music', async (q, b) => ({ track: await media.act(String(b.cmd || '')) }));
@@ -236,6 +341,23 @@ app.whenReady().then(async () => {
     return mods.batch(id, Array.isArray(pids) ? pids.map(String).slice(0, 500) : [], String(action), { dry: !!o.dry, cascade: !!o.cascade });
   });
   on('host:world', (id, instId, folder, mode) => host.attachWorld(id, String(instId), folder, mode)); on('host:unlink', id => host.unlinkWorld(id));
+  on('tex:items', () => require('./mctex').items());   // objets des icônes d'instances (extraits du jeu de la personne)
+  require('./p2p').setManifest(id => require('./modsync').build(id));   // l'hôte envoie la liste de ses mods aux invités (jamais sans le code d'invitation)
+  on('modsync:apply', (instId, addr) => { // installe, dans l'instance choisie, les mods exacts du serveur (la liste vient de la mémoire du launcher, jamais de l'interface)
+    const s = store.get().servers.find(x => x.addr === String(addr)); if (!s || !s.p2p) throw new Error('Serveur inconnu.');
+    return require('./modsync').apply(String(instId), s.p2p, t => send('modsync:step', { t }));
+  });
+  on('host:crash', id => host.lastCrash(id)); on('host:crashclear', id => host.clearCrash(id)); on('host:crashact', (id, a, v) => host.crashAct(id, String(a), v));   // assistant de crash des serveurs
+  on('hostdp:list', id => require('./hostdp').list(id));   // data packs d'un serveur hébergé
+  on('hostdp:add', async id => { const f = await pick('Choisir des data packs (.zip)', ['openFile', 'multiSelections'], [{ name: 'Data pack', extensions: ['zip'] }]); return f.length ? require('./hostdp').add(id, f) : { added: [], skipped: [] }; });
+  on('hostdp:remove', (id, n) => require('./hostdp').remove(id, String(n)));
+  on('hostdp:toggle', (id, n, on) => require('./hostdp').setEnabled(id, String(n), !!on));
+  on('mods:versions', (id, pid) => mods.versions(id, String(pid)));
+  on('mods:setversion', (id, pid, vid) => { // changer la version d'un mod remplace son fichier : refusé pendant que le jeu (ou le serveur) l'utilise
+    const c = session.current(); if (c && c.id === id) throw new Error('Ferme le jeu avant de changer la version d’un mod.');
+    if (host.isRunning && host.isRunning(id)) throw new Error('Arrête le serveur avant de changer la version d’un mod.');
+    return mods.setVersion(id, String(pid), String(vid));
+  });
   on('mods:setall', (id, on) => { // tout désactiver / tout activer : refusé pendant que le jeu (ou le serveur) utilise les fichiers
     const c = session.current(); if (c && c.id === id) throw new Error('Ferme le jeu avant de changer l’état des mods.');
     if (host.isRunning && host.isRunning(id)) throw new Error('Arrête le serveur avant de changer l’état des mods.');
@@ -263,7 +385,16 @@ app.whenReady().then(async () => {
   on('cf:status', () => ({ key: require('./curseforge').hasKey() }));
   on('cf:openkeys', () => shell.openExternal('https://console.curseforge.com/#/api-keys')); // navigateur par défaut
   on('cf:check', k => require('./curseforge').check(String(k || '')));
-  on('modpack:import', async () => { const f = await pick('Choisir un modpack', ['openFile'], [{ name: 'Modpack', extensions: ['mrpack', 'zip'] }]); if (!f[0]) return null; const r = await modpack.run(f[0], p => send('import:progress', p)); require('./notify').show('Modpack importé', r.name, '', 'done'); return r; });
+  /* modpack : choisi dans une fenêtre, ou déposé sur la fenêtre (chemin donné par le système ; on vérifie quand même que c'est bien un modpack) */
+  on('modpack:import', async dropped => {
+    let file; if (typeof dropped === 'string' && dropped) { if (!path.isAbsolute(dropped) || require('./drop').classify(dropped) !== 'modpack') throw new Error('Ce fichier n’est pas un modpack reconnu.'); file = dropped; }
+    else { const f = await pick('Choisir un modpack', ['openFile'], [{ name: 'Modpack', extensions: ['mrpack', 'zip'] }]); if (!f[0]) return null; file = f[0]; }
+    const r = await modpack.run(file, p => send('import:progress', p));
+    if (r.kind === 'mrpack') { try { const x = await require('./packs').identifyFile(file), n = x && store.get().instances.find(y => y.id === r.id); if (n) { n.pack = x.ref; store.save(); if (x.icon) await require('./instimg').fromUrl(n.id, x.icon); } } catch (e) { log.warn('image du modpack (fichier)', e.message); } }   // publié sur Modrinth : image officielle ; sinon décor habituel
+    require('./notify').show('Modpack importé', r.name, '', 'done'); return r;
+  });
+  /* glisser-déposer : mods, packs de ressources, shaders, data packs, mondes → dans l'instance ouverte ; modpacks → renvoyés pour confirmation (ils créent une nouvelle instance) */
+  on('inst:drop', (id, paths) => { if (id && !store.get().instances.some(x => x.id === id) && !(store.get().hosts || []).some(x => x.id === id)) throw new Error('Instance introuvable.'); return require('./drop').run(id || '', paths); });
   on('host:export', async id => { const h = host.list().find(x => x.id === id); const r = await dialog.showSaveDialog(win, { title: 'Exporter le serveur', defaultPath: (h ? h.name : 'serveur').replace(/[^\w -]/g, '_') + '.zip', filters: [{ name: 'Zip', extensions: ['zip'] }] }); if (r.canceled || !r.filePath) return false; host.export(id, r.filePath); return true; });
   on('host:import', async () => { const f = await pick('Choisir un serveur exporté', ['openFile'], [{ name: 'Zip', extensions: ['zip'] }]); return f[0] ? host.import(f[0]) : null; });
   /* accès Internet gratuit via l'agent playit.gg */
@@ -306,12 +437,12 @@ app.whenReady().then(async () => {
   createWindow();
   setTimeout(() => { try { servers.warm(); } catch (e) {} }, 2500);
   /* mises à jour : réglage « Mises à jour automatiques » (Paramètres › Général). Jamais pendant une partie. */
-  updater.init({ packaged: app.isPackaged, version: app.getVersion(), portable: !!process.env.PORTABLE_EXECUTABLE_FILE, appImage: !!process.env.APPIMAGE, send, isBusy: () => require('./game').isRunning(), enabled: () => store.get().settings.autoUpdate !== false, notify: (t, b, a) => notify.show(t, b, a, 'update') });
+  updater.init({ packaged: app.isPackaged, version: app.getVersion(), portable: !!process.env.PORTABLE_EXECUTABLE_FILE, appImage: !!process.env.APPIMAGE, send, isBusy: () => require('./game').isRunning() || require('./host').anyRunning(), enabled: () => store.get().settings.autoUpdate !== false, autoInstall: () => store.get().settings.autoInstall !== false, notify: (t, b, a) => notify.show(t, b, a, 'update') });
   updater.startup();
-  on('update:state', () => updater.state()); on('update:check', () => updater.check(true)); on('update:install', () => updater.install()); on('update:open', () => shell.openExternal(updater.PAGE));
+  on('client:drawerr', () => require('./hud').drawError() || require('./modbuild').notes()); on('update:state', () => updater.state()); on('update:check', () => updater.check(true)); on('update:install', () => updater.install()); on('update:cancel', () => updater.cancel()); on('update:open', () => shell.openExternal(updater.PAGE));
   setTimeout(() => { skins.ensureDefaults().catch(() => {}); }, 6000); // skins par défaut de Minecraft : récupérés en arrière-plan pour que le Profil les ait déjà // l'onglet Serveurs s'ouvre alors avec l'état déjà connu
   setTimeout(() => { host.closeLegacyPorts().catch(e => log.warn('closeLegacyPorts', e.message)); }, 4000); // anciennes versions : ports ouverts sur la box (UPnP) refermés une fois
   app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
 });
-app.on('before-quit', () => { host.stopAll(); playit.stop(); require('./p2p').stopAll().catch(() => {}); });
+app.on('before-quit', () => { host.stopAll(); playit.stop(); require('./p2p').stopAll().catch(() => {}); if (chat) chat.flush(); if (friends) friends.stop().catch(() => {}); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

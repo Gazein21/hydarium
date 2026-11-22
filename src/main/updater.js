@@ -1,4 +1,4 @@
-/* Mises à jour d’Hydarium : à chaque lancement (et toutes les 6 h), on regarde la dernière Release du dépôt GitHub.
+/* Mises à jour d’Hydarium : à chaque lancement (et toutes les heures), on regarde la dernière Release du dépôt GitHub.
    • Installeur Windows / AppImage : electron-updater télécharge la mise à jour en arrière-plan et l’installe à la fermeture du launcher
      (ou tout de suite avec « Redémarrer et installer »). Jamais pendant qu’une partie tourne.
    • Version portable, macOS, ou autre : on prévient seulement qu’une version existe (lien vers la page de téléchargement).
@@ -8,10 +8,10 @@ const log = require('./log');
 const pkg = (() => { try { return require('../../package.json'); } catch (e) { return {}; } })();
 const pub = (pkg.build && pkg.build.publish) || {}, OWNER = pub.owner || 'Gazein21', REPO = pub.repo || 'hydarium';
 const PAGE = `https://github.com/${OWNER}/${REPO}/releases/latest`;
-const EVERY = 6 * 3600 * 1000;
+const EVERY = 3600 * 1000;      // une vérification par heure : une version publiée sur GitHub arrive chez les joueurs qui ont le launcher ouvert en moins d'une heure
 
-let env = null, au = null, timer = null, notified = '';
-const S = { status: 'idle', mode: 'auto', current: '', latest: '', percent: 0, error: '', url: PAGE, at: 0 };
+let env = null, au = null, timer = null, notified = '', instT = null, declined = '';
+const S = { status: 'idle', mode: 'auto', current: '', latest: '', percent: 0, error: '', url: PAGE, at: 0, eta: 0 };
 
 const num = v => String(v || '').replace(/^v/i, '').split('-')[0].split('.').map(x => parseInt(x, 10) || 0);
 /* 1 si a > b, -1 si a < b, 0 si égal (numéros « 0.10.52 ») */
@@ -45,10 +45,28 @@ function wire() {
   au.on('download-progress', p => set({ status: 'downloading', percent: Math.round(p.percent || 0) }));
   au.on('update-downloaded', i => {
     set({ status: 'ready', latest: i.version, percent: 100, at: Date.now() });
+    if (autoNow(i.version)) return;   // installation automatique lancée : le compte à rebours remplace la notification
     if (notified !== i.version) { notified = i.version; try { env.notify('Hydarium ' + i.version + ' est prête', 'La mise à jour s’installera à la fermeture du launcher, ou tout de suite depuis Paramètres.', 'update:open'); } catch (e) {} }
   });
   au.on('error', e => { log.warn('updater erreur', e && e.message); if (S.status !== 'ready') set({ status: 'error', error: nice(e), at: Date.now() }); });
 }
+
+/* Installation automatique : dès qu'une mise à jour est téléchargée ET que rien ne tourne (ni partie, ni serveur hébergé), le launcher annonce « redémarrage dans N s »
+   (bouton « Plus tard » dans l'interface) puis s'installe et se relance tout seul. Sinon la mise à jour s'installe à la fermeture, comme avant.
+   Réglage « Installer automatiquement » (settings.autoInstall, vrai par défaut). */
+function autoNow(version) {
+  if (instT || declined === version || !au || !env.autoInstall() || env.isBusy()) return false;
+  const delay = env.installDelay;
+  set({ status: 'installing', eta: Date.now() + delay });
+  instT = setTimeout(() => {
+    instT = null;
+    if (env.isBusy()) { set({ status: 'ready', eta: 0 }); return; }          // une partie vient de démarrer : on attend la fermeture
+    try { au.quitAndInstall(true, true); } catch (e) { set({ status: 'error', error: nice(e), eta: 0 }); }
+  }, delay);
+  if (instT.unref) instT.unref();
+  return true;
+}
+exports.cancel = () => { if (instT) { clearTimeout(instT); instT = null; } if (S.status === 'installing') { declined = S.latest; set({ status: 'ready', eta: 0 }); } return exports.state(); };
 
 /* version non installable automatiquement : on lit la dernière Release et on compare */
 async function manualCheck() {
@@ -68,7 +86,7 @@ async function manualCheck() {
 exports.check = async (manual = false) => {
   if (!env) return exports.state();
   if (S.mode === 'dev') { set({ status: 'dev' }); return exports.state(); }
-  if (['checking', 'downloading', 'ready'].includes(S.status)) return exports.state();
+  if (['checking', 'downloading', 'ready', 'installing'].includes(S.status)) return exports.state();
   if (!manual && env.isBusy()) return exports.state(); // pas de téléchargement pendant une partie
   try {
     if (S.mode === 'auto') { if (!au) { au = env.updater(); wire(); } await au.checkForUpdates(); }
@@ -80,7 +98,7 @@ exports.check = async (manual = false) => {
 
 /* appelé une fois, la fenêtre ouverte */
 exports.init = e => {
-  env = { packaged: false, platform: process.platform, portable: false, appImage: false, isBusy: () => false, enabled: () => true, send() {}, notify() {}, fetch: (...a) => fetch(...a), updater: () => require('electron-updater').autoUpdater, ...e };
+  env = { packaged: false, platform: process.platform, portable: false, appImage: false, isBusy: () => false, enabled: () => true, autoInstall: () => true, installDelay: 8000, send() {}, notify() {}, fetch: (...a) => fetch(...a), updater: () => require('electron-updater').autoUpdater, ...e };
   S.current = String(env.version || pkg.version || '0.0.0'); S.mode = modeOf(); S.status = S.mode === 'dev' ? 'dev' : 'idle';
   return exports.state();
 };
@@ -90,9 +108,10 @@ exports.startup = (delay = 8000) => {
   timer = setInterval(() => { if (env.enabled()) exports.check(false).catch(() => {}); }, EVERY); timer.unref();
 };
 exports.install = () => {
-  if (S.status !== 'ready' || !au) throw new Error('Aucune mise à jour prête à installer.');
+  if (instT) { clearTimeout(instT); instT = null; }
+  if ((S.status !== 'ready' && S.status !== 'installing') || !au) throw new Error('Aucune mise à jour prête à installer.');
   if (env.isBusy()) throw new Error('Ferme Minecraft avant d’installer la mise à jour.');
   setImmediate(() => au.quitAndInstall(false, true)); // fenêtre d’installation discrète, relance d’Hydarium ensuite
 };
-exports._reset = () => { au = null; env = null; notified = ''; if (timer) clearInterval(timer); Object.assign(S, { status: 'idle', mode: 'auto', current: '', latest: '', percent: 0, error: '', url: PAGE, at: 0 }); };
+exports._reset = () => { au = null; env = null; notified = ''; declined = ''; if (instT) clearTimeout(instT); instT = null; if (timer) clearInterval(timer); Object.assign(S, { status: 'idle', mode: 'auto', current: '', latest: '', percent: 0, error: '', url: PAGE, at: 0 }); };
 exports.PAGE = PAGE;

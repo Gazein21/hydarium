@@ -28,8 +28,11 @@ public final class Features {
 
     public static boolean sprint(Config c) { return c.get("togglesprint").on; }
 
-    /** Touche qui ouvre l'éditeur en jeu (disposition et réglages des widgets). Réglable : module « hudedit », champ « key » du fichier de configuration. */
-    public static String editorKey(Config c) { return Features.key(c, "hudedit", "RSHIFT"); }
+    /**
+     * Touche qui ouvre l'éditeur en jeu (disposition et réglages des widgets). AUCUNE par défaut depuis 0.10.59 (Maj droite ouvrait l'éditeur sans le vouloir) :
+     * l'éditeur s'ouvre par le bouton « Modifier en jeu » du launcher. Réglable : module « hudedit », champ « key » du fichier de configuration ; chaîne vide = aucune touche.
+     */
+    public static String editorKey(Config c) { return Features.key(c, "hudedit", ""); }
 
     /**
      * Raccourci « Alt+H » (format du launcher / d'Electron) → noms de touches de {@link Keys}, toutes à tenir ensemble : {ALT→LALT, H}.

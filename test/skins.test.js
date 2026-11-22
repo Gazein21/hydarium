@@ -7,7 +7,7 @@ const stub = (name, exp) => { const f = require.resolve(path.join(base, name)); 
 const db = {};
 stub('platform.js', { dataDir: () => data });
 stub('store.js', { get: () => db, save: () => {} });
-stub('auth.js', { token: () => 'tok' });
+stub('auth.js', { token: () => 'tok', freshToken: async () => 'tok' });
 const skins = require(path.join(base, 'skins.js'));
 let n = 0; const ok = (c, m) => { assert.ok(c, m); n++; };
 

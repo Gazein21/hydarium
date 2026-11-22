@@ -6,7 +6,7 @@
 
 ## Ce que ça change pour le joueur
 - **Dessin** : un seul dessin, partagé par toutes les versions (`Painter`), donc identique partout. Le HUD du launcher ne dessine plus rien pour les modules que le mod dessine déjà (mécanisme `drawn`, inchangé).
-- **Éditeur en jeu** : touche **Maj droite** (réglable : module `hudedit`, champ `key`, du fichier de configuration), ou bouton **« Modifier en jeu (vrais widgets) »** dans la page du mode client du launcher. On y voit les vrais widgets avec leurs vraies valeurs :
+- **Éditeur en jeu** : **aucune touche par défaut depuis 0.10.59** (réglable : module `hudedit`, champ `key`, du fichier de configuration, par exemple `F8`), ou bouton **« Modifier en jeu (vrais widgets) »** dans la page du mode client du launcher. On y voit les vrais widgets avec leurs vraies valeurs :
   - glisser à la souris (aimantation aux bords, au centre et aux autres widgets, guides bleus) ; flèches = 1 pixel ; `+` / `-` = taille ; `R` = réinitialiser ; Échap ou « Terminé » = fermer ;
   - liste des 12 widgets avec case à cocher (un module actif mais vide, par exemple la musique sans lecture, montre un contenu d'exemple pour pouvoir être placé) ;
   - réglages du widget choisi : taille, opacité, fond, couleur, éléments affichés (armure : icône / nom / % ; effets : icône / nom / niveau / durée), réinitialiser.

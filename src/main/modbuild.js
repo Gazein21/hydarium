@@ -56,7 +56,11 @@ const legacyFresh = (f, d) => { const s = sources(); if (!s) return true; let ne
 const current = d => {
   const h = hashOf(d); // sans sources on ne peut pas juger : on garde ce qu'on a
   for (const f of candidates(d.key)) {
-    if (f.legacy) { if (legacyFresh(f, d)) { chosen.set(d.key, f); return f; } continue; }
+    if (f.legacy) {
+      // jar livré par la CI (hydarium-latest.jar) : on ne le prend pas s'il a été construit pour UNE AUTRE version du jeu, ou sans dessin, quand on sait fabriquer le bon sur place
+      const lm = metaOf(d.key, f); if (sources() && lm && ((lm.mc && d.version && lm.mc !== d.version) || lm.draw === false)) continue;
+      if (legacyFresh(f, d)) { chosen.set(d.key, f); return f; } continue;
+    }
     const m = metaOf(d.key, f); if (!h || (m && m.srcHash === h)) { chosen.set(d.key, f); return f; }
   }
   chosen.delete(d.key); return null;
@@ -149,6 +153,18 @@ exports.prepare = (inst, send) => {
     if (jobs.has(d.key)) return; // déjà en cours pour cette version
     exports.ensure(inst, null).catch(() => {}); // pas de send : aucune progression envoyée à l'interface
   } catch (e) { log.warn('modbuild.prepare', e.message); }
+};
+
+/** Pourquoi un mod fabriqué sur ce PC n'a pas (tout) le dessin en jeu : les erreurs de compilation réelles des niveaux plus complets, lues dans les fiches du mod. '' si rien à signaler. */
+exports.notes = () => {
+  let out = [];
+  try {
+    for (const n of fs.readdirSync(outDir())) {
+      if (!/^hydarium-fabric-.*\.json$/.test(n)) continue; const m = readJson(path.join(outDir(), n)); if (!m || !m.tried || m.tier === 'full' || !/^fabric-latest\//.test(m.plan || '')) continue;
+      const bad = m.tried.filter(t => !/: OK$/.test(t)); if (bad.length) out.push('Minecraft ' + String(m.key).replace(/^fabric-/, '') + ' (niveau « ' + m.tier + ' » retenu) : ' + bad.join(' ; '));
+    }
+  } catch (e) {}
+  return out.join(' || ').slice(0, 900);
 };
 
 /** État pour l'interface : { mod: 'ok' | 'building' | 'missing' | 'failed' | 'unsupported' | 'forge189', key, reason, draw, canBuild, pct, text, error }. */

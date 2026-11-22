@@ -42,6 +42,18 @@ public class HydariumClient implements ClientModInitializer {
     /** HudScreen.open() si cette version a l'éditeur en jeu (cherché par réflexion, comme Draw), sinon null. */
     private static java.lang.reflect.Method openEditor = null;
     private static boolean editorDown = false;
+    /** Pourquoi le dessin en jeu n'a pas démarré (vide = tout va bien) : envoyé au launcher, qui l'écrit dans son journal et le montre. Une seule raison est gardée : la première. */
+    public static volatile String drawErr = "";
+    public static void reportDrawError(String msg) {
+        if (msg == null || msg.isEmpty() || !drawErr.isEmpty()) return;
+        drawErr = msg.length() > 400 ? msg.substring(0, 400) : msg;
+        System.err.println("[Hydarium] dessin en jeu indisponible : " + drawErr);
+    }
+    private static String why(Throwable t) {
+        Throwable c = t; while (c != null && c.getCause() != null && c.getCause() != c) c = c.getCause();
+        if (c instanceof ClassNotFoundException || c instanceof NoClassDefFoundError) return "classes de dessin absentes du mod (compilation en échec pour cette version du jeu) : " + c.getMessage();
+        return c == null ? "erreur inconnue" : c.getClass().getSimpleName() + (c.getMessage() == null ? "" : " : " + c.getMessage());
+    }
     /** Images par seconde comptées par le dessin du HUD (Draw), utilisées tant que le compteur du jeu n'est pas lisible (jeu obfusqué 1.20 / 1.21 : réflexion par noms Mojang impossible). */
     public static final Fps frames = new Fps();
     static volatile boolean fpsNative = false;
@@ -91,10 +103,10 @@ public class HydariumClient implements ClientModInitializer {
     public void onInitializeClient() {
         cfg.poll();
         Minecraft mc = Minecraft.getInstance();
-        try { drawing = "1".equals(System.getProperty("hydarium.draw", "1")) && Class.forName("net.hydarium.client.Draw").getMethod("install").invoke(null) != null; } catch (Throwable t) { drawing = false; }
-        try { openEditor = drawing ? Class.forName("net.hydarium.client.HudScreen").getMethod("open") : null; } catch (Throwable t) { openEditor = null; }
+        try { drawing = "1".equals(System.getProperty("hydarium.draw", "1")) && Class.forName("net.hydarium.client.Draw").getMethod("install").invoke(null) != null; } catch (Throwable t) { drawing = false; reportDrawError("HUD : " + why(t)); }
+        try { openEditor = drawing ? Class.forName("net.hydarium.client.HudScreen").getMethod("open") : null; } catch (Throwable t) { openEditor = null; System.err.println("[Hydarium] éditeur en jeu indisponible : " + why(t)); }
         state.editor = openEditor != null; // le launcher propose « Modifier en jeu » seulement si l'éditeur existe ici
-        try { openMenu = drawing ? Class.forName("net.hydarium.client.MenuScreen").getMethod("open") : null; } catch (Throwable t) { openMenu = null; }
+        try { openMenu = drawing && "1".equals(System.getProperty("hydarium.menu", "0")) ? Class.forName("net.hydarium.client.MenuScreen").getMethod("open") : null; } catch (Throwable t) { openMenu = null; }
         state.menu = openMenu != null; // le launcher libère alors son raccourci global : Alt+H ouvre le menu DANS le jeu
         ClientTickEvents.END_CLIENT_TICK.register(HydariumClient::onTick);
         ClientLifecycleEvents.CLIENT_STOPPING.register(c -> restore(c)); // les réglages temporaires ne doivent pas finir dans options.txt
@@ -147,6 +159,7 @@ public class HydariumClient implements ClientModInitializer {
         Runtime r = Runtime.getRuntime(); s.memUsedGb = (r.totalMemory() - r.freeMemory()) / 1073741824.0; s.memMaxGb = r.maxMemory() / 1073741824.0;
         s.clock = HHMM.format(new Date()); s.sessionSecs = (System.currentTimeMillis() - t0) / 1000; s.music = music; s.musicPlaying = musicPlaying;
         s.layout = cfg.layoutJson();
+        s.derr = drawErr;
         json = Bridge.stateJson(s, drawing ? Hud.ALL : new String[0]);
     }
 
@@ -156,7 +169,8 @@ public class HydariumClient implements ClientModInitializer {
         Compat.nightVision(p, Features.nightVision(cfg));
         final Minecraft m = mc; final boolean typing = Compat.hasScreen(mc);
         // éditeur en jeu : touche (Maj droite par défaut) ou demande du launcher (« Modifier en jeu »)
-        boolean edk = !typing && openEditor != null && Compat.keyDown(mc, Features.editorKey(cfg));
+        String ekey = Features.editorKey(cfg); // vide = pas de touche : l'éditeur s'ouvre par le bouton « Modifier en jeu » du launcher
+        boolean edk = !typing && openEditor != null && !ekey.isEmpty() && Compat.keyDown(mc, ekey);
         if (openEditor != null && ((edk && !editorDown) || (!typing && cfg.editorRequested()))) { cfg.ackEditor(); try { openEditor.invoke(null); } catch (Throwable t) { } }
         editorDown = edk;
         if (openMenu != null) {

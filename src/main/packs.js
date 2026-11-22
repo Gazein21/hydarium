@@ -5,6 +5,14 @@ const store = require('./store'), cf = require('./curseforge');
 const MR = 'https://api.modrinth.com/v2', UA = { 'User-Agent': 'Hydarium/0.10 (help@hydarium.net)' };
 const j = async u => { const r = await fetch(u, { headers: UA, signal: AbortSignal.timeout(12000) }); if (!r.ok) throw new Error('Modrinth : HTTP ' + r.status); return r.json(); };
 const icon = u => (typeof u === 'string' && u.startsWith('https://cdn.modrinth.com/') ? u : '');
+const cfIcon = m => { const u = m && m.logo && (m.logo.url || m.logo.thumbnailUrl); return typeof u === 'string' && /^https:\/\/media\.forgecdn\.net\//.test(u) ? u : ''; };
+/** adresse du logo officiel d'un modpack déjà installé (instance.pack = { src, pid }) ; '' si aucun */
+exports.logoOf = async ref => {
+  if (!ref) return '';
+  if (ref.src === 'curseforge' || /^cf\d+$/.test(String(ref.pid))) { const id = String(ref.pid).replace(/^cf/, ''); if (!/^\d+$/.test(id)) return ''; return cfIcon(await cf.mod(+id)); }
+  if (!/^[A-Za-z0-9]{8}$/.test(String(ref.pid))) return '';
+  return icon((await j(`${MR}/project/${ref.pid}`)).icon_url);
+};
 const SORT = { downloads: 'downloads', follows: 'follows', newest: 'newest', updated: 'updated' };
 
 /* ----- recherche (même forme de résultat que content.search) ----- */
@@ -16,6 +24,18 @@ exports.search = async (type, q, offset, source, sort) => {
   const facets = [['project_type:modpack']], idx = SORT[sort] || (q ? 'relevance' : 'downloads');
   const r = await j(`${MR}/search?query=${encodeURIComponent(String(q || '').slice(0, 80))}&limit=20&offset=${Math.max(0, Math.min(+offset || 0, 480))}&index=${idx}&facets=${encodeURIComponent(JSON.stringify(facets))}`);
   return { total: r.total_hits, hits: r.hits.map(h => ({ pid: h.project_id, slug: h.slug, title: h.title, desc: h.description, icon: icon(h.icon_url), author: h.author, downloads: h.downloads, ok: false, installed: false, src: 'modrinth', mc: (h.versions || []).slice(-1)[0] || '', loaders: (h.categories || []).filter(c => ['fabric', 'forge', 'neoforge', 'quilt'].includes(c)) })) };
+};
+
+/* ----- un fichier .mrpack choisi sur le disque : s'il est publié sur Modrinth, on le retrouve par son empreinte (SHA-1) ----- */
+const sha1File = f => new Promise((ok, ko) => { const h = require('crypto').createHash('sha1'), s = fs.createReadStream(f); s.on('data', d => h.update(d)); s.on('error', ko); s.on('end', () => ok(h.digest('hex'))); });
+/** { ref: { src, pid, title }, icon } si ce fichier est un modpack publié sur Modrinth, sinon null (jamais d'exception : introuvable, hors ligne…) */
+exports.identifyFile = async file => {
+  try {
+    const v = await j(`${MR}/version_file/${await sha1File(file)}?algorithm=sha1`);   // 404 = fichier inconnu de Modrinth
+    if (!v || !/^[A-Za-z0-9]{8}$/.test(String(v.project_id || ''))) return null;
+    const p = await j(`${MR}/project/${v.project_id}`); if (p.project_type !== 'modpack') return null;
+    return { ref: { src: 'modrinth', pid: p.id, title: p.title }, icon: icon(p.icon_url) };
+  } catch (e) { return null; }
 };
 
 /* ----- téléchargement d'un fichier dans le dossier temporaire ----- */
@@ -33,12 +53,12 @@ async function packFile(pid, source) {
     const id = String(pid).replace(/^cf/, ''); if (!/^\d+$/.test(id)) throw new Error('Modpack invalide.');
     const m = await cf.mod(+id), files = (m.latestFiles || []).filter(f => /\.zip$/i.test(f.fileName || '')).sort((a, b) => new Date(b.fileDate) - new Date(a.fileDate)), f = files[0];
     if (!f) throw new Error('Aucun fichier à télécharger pour ce modpack (l’auteur ne l’autorise peut-être pas hors de CurseForge).');
-    return { title: m.name, url: cf.fileUrl(f), name: f.fileName, hosts: ['forgecdn.net'], ref: { src: 'curseforge', pid: 'cf' + id, title: m.name } };
+    return { title: m.name, url: cf.fileUrl(f), name: f.fileName, hosts: ['forgecdn.net'], icon: cfIcon(m), ref: { src: 'curseforge', pid: 'cf' + id, title: m.name } };
   }
   if (!/^[A-Za-z0-9]{8}$/.test(String(pid))) throw new Error('Modpack invalide.');
   const [p, vs] = await Promise.all([j(`${MR}/project/${pid}`), j(`${MR}/project/${pid}/version`)]);
   const v = vs && vs[0], f = v && (v.files.find(x => x.primary) || v.files[0]); if (!f) throw new Error('Ce modpack n’a aucune version téléchargeable.');
-  return { title: p.title, url: f.url, name: f.filename, hosts: ['modrinth.com'], ref: { src: 'modrinth', pid, title: p.title } };
+  return { title: p.title, url: f.url, name: f.filename, hosts: ['modrinth.com'], icon: icon(p.icon_url), ref: { src: 'modrinth', pid, title: p.title } };
 }
 
 exports.install = async (type, pid, source, instId, progress) => {
@@ -46,7 +66,7 @@ exports.install = async (type, pid, source, instId, progress) => {
     const f = await packFile(pid, source), file = await fetchTo(f.url, f.name, f.hosts);
     try {
       const r = await require('./modpack').run(file, progress || (() => {}));
-      const n = store.get().instances.find(x => x.id === r.id); if (n) { n.pack = f.ref; store.save(); }
+      const n = store.get().instances.find(x => x.id === r.id); if (n) { n.pack = f.ref; store.save(); if (f.icon) { try { await require('./instimg').fromUrl(n.id, f.icon); } catch (e) { require('./log').warn('image du modpack', e.message); } } }
       return { id: r.id, name: r.name, bad: r.bad || [] };
     } finally { try { fs.unlinkSync(file); } catch (e) {} }
   }

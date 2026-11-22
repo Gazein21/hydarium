@@ -17,7 +17,26 @@ let ovT = OVL === 'hub' || OVL === 'modules' ? 'modules' : OVL, NP = null, SRVQ 
 const hash = s => [...String(s)].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
 const BIO = ['plains', 'cherry', 'sunset', 'night', 'snow', 'desert', 'nether', 'end'], BIOL = { plains: 'Plaines', cherry: 'Cerisiers', sunset: 'Crépuscule', night: 'Nuit', snow: 'Neige', desert: 'Désert', nether: 'Nether', end: 'End', jungle: 'Jungle', mesa: 'Badlands', taiga: 'Taïga', swamp: 'Marais', mushroom: 'Champignons', deepdark: 'Abysses' }, BIOALL = [...BIO, 'jungle', 'mesa', 'taiga', 'swamp', 'mushroom', 'deepdark'];
 const biome = i => i.cover || BIO[hash(i.id) % BIO.length];
-const cover = (i, w, h) => scene(i.srv ? 42 : hash(i.id) % 97 + 3, biome(i), w, h); // instances créées pour un serveur : toujours la même image
+/* images d'instance (photo perso ou logo du modpack) : demandées une fois au processus principal, puis gardées ici ; le décor s'affiche en attendant */
+const IMG = {}, IMGQ = new Set(); let imgT = 0;
+function imgOf(i) {
+  if (!i.img) return null; const m = IMG[i.id]; if (m && m.t === i.img.t) return m;
+  const k = i.id + ':' + i.img.t; if (!IMGQ.has(k)) { IMGQ.add(k); call('inst:imgget', i.id).then(r => { if (r) { IMG[i.id] = r; clearTimeout(imgT); imgT = setTimeout(() => render(), 60); } }).catch(() => {}); }
+  return null;
+}
+/* Objet de Minecraft dessiné sur le décor (icône générée) : textures extraites du jeu de la personne (tex:items). Pas de jar → TEX reste vide et seul le décor s'affiche. */
+let TEX = null, TEXT = 0, TEXQ = false;
+function texNeed() {
+  if (TEXQ || (TEX && (Object.keys(TEX.img).length || Date.now() - TEXT < 60000))) return;   // vide : on réessaie au plus une fois par minute (un jeu a pu être téléchargé entre-temps)
+  TEXQ = true; call('tex:items').then(r => { TEX = r && r.img ? r : { order: [], img: {} }; }).catch(() => { TEX = { order: [], img: {} }; }).finally(() => { TEXT = Date.now(); TEXQ = false; if (Object.keys(TEX.img).length) { clearTimeout(imgT); imgT = setTimeout(() => render(), 60); } });
+}
+function itemOf(i) {   // choisi par la personne, sinon automatique (stable : dépend de l'identifiant de l'instance)
+  texNeed(); if (!TEX || i.item === 'none') return '';
+  if (i.item && TEX.img[i.item]) return TEX.img[i.item];
+  const o = TEX.order; for (let k = 0; k < o.length; k++) { const n = o[(hash(i.id) + k) % o.length]; if (TEX.img[n]) return TEX.img[n]; }
+  return '';
+}
+const cover = (i, w, h) => { const m = imgOf(i); if (m) return m.kind === 'logo' ? `<img class="cbg" src="${m.u}" alt=""><div class="clogo"><img src="${m.u}" alt=""></div>` : `<img class="cphoto" src="${m.u}" alt="">`; const it = itemOf(i); return scene(i.srv ? 42 : hash(i.id) % 97 + 3, biome(i), w, h) + (it ? `<div class="cobj"><img src="${it}" alt=""></div>` : ''); }; // instances créées pour un serveur : toujours la même image
 const ldn = l => ({ neoforge: 'NeoForge', forge: 'Forge', fabric: 'Fabric', quilt: 'Quilt', vanilla: 'Vanilla' }[l] || cap(l));
 const cap = s => s ? s[0].toUpperCase() + s.slice(1) : '';
 const swc = k => `<div class="cover">${scene(11, k, 170, 96)}</div>`;
@@ -26,7 +45,7 @@ const SELI = new Set(), SELS = new Set(), SELM = new Set(); // SELM : mods coch�
 let WS = null; // fenêtre « monde ↔ serveur »
 const selBox = (on, a, id) => `<div class="selbox ${on ? 'on' : ''}" data-a="${a}" data-id="${esc(id)}" title="Sélectionner" role="checkbox" aria-checked="${on}"><svg viewBox="0 0 16 16" width="12" height="12"><path d="M3 8.5l3.2 3.2L13 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`;
 const selBar = (n, total, p) => `<div class="selbar ${n ? 'on' : ''}"><span>${n ? '<b>' + n + '</b> sélectionné' + (n > 1 ? 's' : '') : 'Sélection multiple'}</span><button class="btn g sm" data-a="${p}all">${n === total ? 'Tout désélectionner' : 'Tout sélectionner'}</button>${n ? `<button class="btn g sm" data-a="${p}tag">${ic('tag', 13)} Ajouter un tag…</button><button class="btn dg sm" data-a="${p === 's' ? 'sdelmany' : 'idel'}">${ic('trash', 13)} ${p === 's' ? 'Retirer' : 'Supprimer'}</button><button class="btn sec sm" data-a="${p}none">Annuler</button>` : ''}</div>`;
-const modBar = (n, total) => `<div class="selbar ${n ? 'on' : ''}"><span>${n ? '<b>' + n + '</b> sélectionné' + (n > 1 ? 's' : '') : 'Sélection multiple : coche des mods pour les désactiver ou les retirer'}</span><button class="btn g sm" data-a="mselall">${n === total ? 'Tout désélectionner' : 'Tout sélectionner'}</button>${n ? `<button class="btn sec sm" data-a="mselact" data-v="off">${ic('x', 13)} Désactiver</button><button class="btn sec sm" data-a="mselact" data-v="on">${ic('refresh', 13)} Activer</button><button class="btn dg sm" data-a="mselact" data-v="remove">${ic('trash', 13)} Retirer</button><button class="btn sec sm" data-a="mselnone">Annuler</button>` : ''}</div>`;
+const modBar = (n, total, mods) => `<div class="selbar ${n ? 'on' : ''}">${n ? `<span><b>${n}</b> sélectionné${n > 1 ? 's' : ''}</span><button class="btn sec sm" data-a="mselact" data-v="off">${ic('x', 13)} Désactiver</button><button class="btn sec sm" data-a="mselact" data-v="on">${ic('refresh', 13)} Activer</button><button class="btn dg sm" data-a="mselact" data-v="remove">${ic('trash', 13)} Retirer</button><button class="btn sec sm" data-a="mselnone">Annuler</button>` : modFind('', mods)}</div>`;
 const tagsOf = i => i.tags || [i.loader === 'vanilla' ? 'Vanilla' : 'Moddé', ...(i.cat ? [i.cat] : [])];
 const tagBd = i => tagsOf(i).map(t => `<span class="bd">${esc(t)}</span>`).join('');
 const hrs = s => s >= 3600 ? (s / 3600).toFixed(1).replace('.', ',') + ' h' : Math.round(s / 60) + ' min';
@@ -37,8 +56,8 @@ const P = { edit: '<path d="M4 20l1-5L16 4l4 4L9 19z"/><path d="M14 6l4 4"/>', h
 const ic = (k, s = 16) => `<svg class="i" viewBox="0 0 24 24" width="${s}" height="${s}">${P[k]}</svg>`;
 Object.assign(P, { wifioff: '<path d="M2 8.8a15 15 0 0 1 4.2-2.6M22 8.8A15 15 0 0 0 10 5.1M5 12.9a10 10 0 0 1 3.2-2M19 12.9a10 10 0 0 0-4.3-2.3M8.5 16.4a5 5 0 0 1 5.8-.7M12 20h.01M2 2l20 20"/>' });
 Object.assign(P, { walk: '<circle cx="13" cy="4.5" r="2"/><path d="M9 21l2-6-2-2 1-5 3-1 2 3 3 1M11 15l4 2 1 4M10 8L7 11"/>', pin: '<path d="M12 21s-7-6.2-7-11a7 7 0 0114 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>', kbd: '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10"/>', gauge: '<path d="M4 18a8 8 0 1116 0"/><path d="M12 18l4-6"/>', mouse: '<rect x="7" y="3" width="10" height="18" rx="5"/><path d="M12 7v4"/>', map: '<path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/>', flag: '<path d="M6 21V4h11l-2 4 2 4H6"/>', shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>', flask: '<path d="M9 3h6M10 3v6l-5 9a2 2 0 002 3h10a2 2 0 002-3l-5-9V3"/>', wifi: '<path d="M2 9a15 15 0 0120 0M5 12.5a10 10 0 0114 0M8.5 16a5 5 0 017 0"/><circle cx="12" cy="19.5" r="1"/>', clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', chip: '<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/>', compass: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>', music: '<path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/>', timer: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/>', sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>', eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>', bolt: '<path d="M13 2L5 14h6l-1 8 8-12h-6z"/>', pencil: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>', zoom: '<circle cx="11" cy="11" r="6"/><path d="M16 16l5 5M11 8v6M8 11h6"/>', skin: '<circle cx="12" cy="7" r="3.5"/><path d="M5 21v-6a7 7 0 0114 0v6z"/>', dl: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>' });
-const NAV = [['home', 'Accueil', 'home'], ['inst', 'Instances', 'cube'], ['srv', 'Serveurs', 'globe'], ['catalog', 'Catalogue', 'store'], ['shots', 'Captures', 'cam'], ['host', 'Mon serveur', 'server'], ['set', 'Paramètres', 'gear']];
-const TT = { home: 'Accueil', inst: 'Instances', srv: 'Serveurs', catalog: 'Catalogue', host: 'Mon serveur', hostd: 'Mon serveur', shots: 'Captures', set: 'Paramètres', acc: 'Profil', detail: 'Instance' };
+const NAV = [['home', 'Accueil', 'home'], ['inst', 'Instances', 'cube'], ['srv', 'Serveurs', 'globe'], ['catalog', 'Catalogue', 'store'], ['friends', 'Amis', 'users'], ['shots', 'Captures', 'cam'], ['host', 'Mon serveur', 'server'], ['set', 'Paramètres', 'gear']];
+const TT = { home: 'Accueil', inst: 'Instances', srv: 'Serveurs', catalog: 'Catalogue', friends: 'Amis', host: 'Mon serveur', hostd: 'Mon serveur', shots: 'Captures', set: 'Paramètres', acc: 'Profil', detail: 'Instance' };
 const BD = { ok: '<span class="bd ok">✔ Vérifié</span>', unverified: '<span class="bd wa">⚠ Non vérifié</span>', trusted: '<span class="bd ok">✔ Approuvé par toi</span>', cf: '<span class="bd wa">⚠ CurseForge · non vérifié</span>', missing: '<span class="bd er">✖ Mod manquant</span>', off: '<span class="bd">Désactivé</span>' };
 const WALLS = [['auto', 'Selon l’heure'], ['none', 'Aucun'], ['plains', 'Plaines'], ['cherry', 'Cerisiers'], ['sunset', 'Coucher de soleil'], ['night', 'Nuit'], ['snow', 'Neige'], ['nether', 'Nether'], ['end', 'End'], ['desert', 'Désert'], ['jungle', 'Jungle'], ['mesa', 'Badlands'], ['taiga', 'Taïga'], ['swamp', 'Marais'], ['mushroom', 'Champignons'], ['deepdark', 'Abysses']];
 const ACC = ['#3ddc84', '#4fa3d1', '#b388ff', '#ff7a8a', '#f5a524', '#26c6da'];
@@ -52,7 +71,9 @@ const sw = (k, l, d) => `<div class="sw"><div style="flex:1"><b>${l}</b><small>$
 const jlabel = j => `Java ${j.major} · ${j.vendor} · ${j.is64 ? '64' : '32'} bits${j.bundled ? ' · fourni par Hydarium' : j.system ? ' · du système' : j.custom ? ' · ajouté' : ''}`;
 const javas = async force => { if (!jl || force || Date.now() - jlT > 3e4) { jl = await call('java:list', !!force).catch(() => []); jlT = Date.now(); } return jl; };
 const srvTile = (x, bg) => x.net === 'down' ? `<div class="mt" style="background:#2a3140;display:flex;align-items:center;justify-content:center;color:#9aa4b5" title="Pas de connexion Internet">${ic('wifioff', 26)}</div>` : tile(x.icon, x.name, bg); // connexion perdue : icône « pas de wifi » à la place de l'image
-const tile = (src, t, bg) => src ? `<img class="mt" src="${esc(src)}" alt="">` : `<div class="mt" style="background:${bg || '#2a3140'}">${esc((t || '?')[0].toUpperCase())}</div>`;
+/* pastille de secours d'un mod sans image : couleur tirée de son nom (un mod garde toujours la même, et les mods se distinguent) */
+const tcol = t => { let h = 7; for (const c of String(t || '?')) h = (h * 31 + c.codePointAt(0)) >>> 0; return `hsl(${h % 360},40%,30%)`; };
+const tile = (src, t, bg) => src ? `<img class="mt" src="${esc(src)}" alt="">` : `<div class="mt" style="background:${bg || tcol(t)}">${esc([...String(t || '?')][0].toUpperCase())}</div>`;
 const byId = id => inst.find(i => i.id === id);
 
 /* ===== fenêtres (modales) : remplacent confirm(), qui bloque la saisie dans Electron ===== */
@@ -69,7 +90,7 @@ const gcard = i => `<div class="card gc" data-a="open" data-id="${esc(i.id)}"><d
 const lcard = i => `<div class="card hv ${SELI.has(i.id) ? 'sel' : ''}" data-a="open" data-id="${esc(i.id)}"><div class="ic">${selBox(SELI.has(i.id), 'isel', i.id)}<div class="cover th">${cover(i, 168, 100)}</div><div><b>${esc(i.name)}</b> ${tagBd(i)}<small>${sub(i)} · ${i.lastPlayed ? 'joué ' + ago(i.lastPlayed) : 'jamais joué'} · ${hrs(i.playtime)}</small></div></div><div class="row">${playB(i.id, 'sm')}${act(i)}</div></div>`;
 
 let SRVC = null;
-const homeSrv = l => { const list = (l || saved.map(x => ({ ...x, online: null }))).slice(0, 4); return list.map(x => `<div class="card"><div class="ic">${srvTile(x, '#3a4a6a')}<div><b>${esc(x.name)}</b><small>${esc(x.addr)}${x.online ? ' · en ligne · ' + x.players + '/' + x.max + ' joueurs' : x.online === false ? ' · hors ligne' : ''}</small></div></div><button class="btn sm" data-a="join" data-v="${esc(x.addr)}" ${playing ? 'disabled' : ''}>${ic('play', 12)} Rejoindre</button></div>`).join('') || '<div class="card"><span class="mu">Aucun serveur ajouté pour l’instant.</span><button class="btn sm" data-a="p" data-v="srv">Ajouter un serveur</button></div>'; };
+const homeSrv = l => { const list = (l || saved.map(x => ({ ...x, online: null }))).slice(0, 4); return list.map(x => `<div class="card"><div class="ic">${srvTile(x, '#3a4a6a')}<div><b>${esc(x.name)}</b><small>${priv(esc(x.addr))}${x.online ? ' · en ligne · ' + x.players + '/' + x.max + ' joueurs' : x.online === false ? ' · hors ligne' : ''}</small></div></div><button class="btn sm" data-a="join" data-v="${esc(x.addr)}" ${playing ? 'disabled' : ''}>${ic('play', 12)} Rejoindre</button></div>`).join('') || '<div class="card"><span class="mu">Aucun serveur ajouté pour l’instant.</span><button class="btn sm" data-a="p" data-v="srv">Ajouter un serveur</button></div>'; };
 const homeSrvFill = () => { if (page !== 'home' || !saved.length) return; call('srv:list').then(l => { SRVC = l; const e = $('#homesrv'); if (e && page === 'home') e.innerHTML = homeSrv(l); }).catch(() => {}); };
 function home() {
   const s = [...inst].sort((a, b) => b.lastPlayed - a.lastPlayed), h = s[0];
@@ -78,8 +99,7 @@ function home() {
   return (acc ? '' : '<div class="note">Connecte-toi avec Microsoft pour jouer. <button class="btn sm" data-a="login">Se connecter</button></div>') + hero +
     `<div class="sh"><h3>Récemment joué</h3><a data-a="p" data-v="inst">Tout voir</a></div><div class="hrow"><div class="g3 hg">${s.slice(0, 4).map((i, k) => `<div class="rw r${k + 1}">${gcard(i)}</div>`).join('')}<div class="card add" data-a="newInst"><div><div style="font-size:26px">＋</div><b style="color:var(--tx)">Nouvelle instance</b><br><span class="mu">Version, loader, mods ou code</span></div></div></div></div>
     <div class="sh"><h3>Mes serveurs</h3><a data-a="p" data-v="srv">Tout voir</a></div><div id="homesrv">${homeSrv(SRVC)}</div>
-    <div class="two"><div><div class="sh"><h3>Quêtes du mois</h3></div><div class="card soon"><div><b>Bientôt disponible</b><small>Des quêtes à terminer pour gagner des récompenses.</small></div></div></div>
-    <div><div class="sh"><h3>Amis en ligne</h3></div><div class="card soon"><div><b>Bientôt disponible</b><small>Vois qui joue et rejoins-le en un clic.</small></div></div></div></div>`;
+    <div><div class="sh"><h3>Amis en ligne</h3></div>${friendsHome()}</div>`;
 }
 function instPage() {
   const tags = [...new Set(inst.flatMap(tagsOf))].sort((a, b) => (['Vanilla', 'Moddé'].indexOf(b) + 1) - (['Vanilla', 'Moddé'].indexOf(a) + 1) || a.localeCompare(b));
@@ -91,7 +111,7 @@ function instPage() {
   ${!grid && l.length ? selBar(l.filter(i => SELI.has(i.id)).length, l.length, 'i') : ''}
   ${l.length ? (grid ? `<div class="g3">${l.map(gcard).join('')}</div>` : l.map(lcard).join('')) : `<p class="mu" style="text-align:center;padding:30px">Aucune instance${catF ? ' avec ce tag' : ''}. Clique sur « Nouvelle instance » ou « Importer… ».</p>`}`;
 }
-const modsSplit = (list, fn, empty) => { const on = list.filter(x => !x.disabled), off = list.filter(x => x.disabled); return (on.length ? `<div class="sh"><h3>Actifs (${on.length})</h3></div>` + on.map(fn).join('') : '') + (off.length ? `<div class="sh"><h3>Désactivés (${off.length})</h3></div>` + off.map(fn).join('') : '') || empty; };
+const modsSplit = (list, fn, empty) => { const t = modTerms(MODF), on = list.filter(x => !x.disabled), off = list.filter(x => x.disabled), c = l => l.filter(x => modMatch(x, t)).length; const head = (g, label, l) => l.length ? `<div class="sh" data-gh="${g}" ${c(l) ? '' : 'hidden'}><h3>${label} (<span class="gc">${c(l)}</span>)</h3></div>` + l.map(fn).join('') : ''; return head('on', 'Actifs', on) + head('off', 'Désactivés', off) || empty; };
 /* ----- page d’instance ----- */
 const fileCard = (x, type) => `<div class="card"><div class="ic">${tile(x.icon, x.title, type === 'shader' ? '#c9a227' : '#4f9d6a')}<div><b>${esc(x.title)}</b><small>${x.enabled ? '<span style="color:var(--ac)">Activé</span>' : 'Désactivé'} · ${x.size ? mo(x.size) : 'dossier'} · ${esc(x.name)}</small></div></div><div class="row"><button class="btn sm ${x.enabled ? 'sec' : ''}" data-a="pkTog" data-t="${type}" data-n="${esc(x.name)}">${x.enabled ? 'Désactiver' : 'Activer'}</button><button class="ib" title="Supprimer" data-a="pkRm" data-t="${type}" data-n="${esc(x.name)}">${ic('trash', 14)}</button></div></div>`;
 async function packsTab(i, type) {
@@ -106,13 +126,19 @@ async function worldsTab(i) {
   return `<div class="row between" style="margin-bottom:10px"><p class="mu" style="margin:0">Les mondes de cette instance. Une sauvegarde est copiée dans le dossier <i>backups</i>.</p><div class="row"><button class="btn sec sm" data-a="mapdl">${ic('search', 13)} Télécharger des maps</button><button class="btn sm" data-a="wImp" data-k="dir">${ic('down', 13)} Importer un dossier</button><button class="btn sm" data-a="wImp" data-k="zip">${ic('down', 13)} Importer un .zip</button><button class="btn g sm" data-a="folder" data-id="${esc(i.id)}" data-sub="saves">${ic('folder', 13)}</button></div></div>
   ${l.map(w => `<div class="card"><div class="ic">${w.icon ? `<img class="mt" style="image-rendering:pixelated" src="${w.icon}" alt="">` : tile('', w.folder, '#3a4a6a')}<div><b>${esc(w.folder)}</b><small>modifié ${ago(w.mtime)}${w.valid ? '' : ' · dossier sans level.dat'}${w.srv ? ' · relié au serveur « ' + esc(w.srv) + ' »' + (w.srvOn ? ' (en ligne : « Rejoindre le serveur »)' : '') : ''}</small></div></div><div class="row"><button class="btn sm" data-a="wPlay" data-w="${esc(w.folder)}" ${playing ? 'disabled' : ''} ${w.srvOn ? 'title="Ce monde est ouvert par ton serveur : tu le rejoins en ligne"' : ''}>${ic('play', 12)} ${w.srvOn ? 'Rejoindre le serveur' : 'Jouer'}</button><button class="btn g sm" data-a="wSet" data-w="${esc(w.folder)}">${ic('cog', 12)} Paramètres</button><button class="btn g sm" data-a="wOp" data-op="backup" data-w="${esc(w.folder)}">Sauvegarder</button><button class="btn g sm" data-a="wOp" data-op="dup" data-w="${esc(w.folder)}">Dupliquer</button><button class="btn g sm" data-a="wExp" data-w="${esc(w.folder)}" title="Copie ce monde dans une autre instance" ${w.valid ? '' : 'disabled'}>${ic('copy', 12)} Exporter</button><button class="btn g sm" data-a="w2s" data-w="${esc(w.folder)}" title="Crée un serveur à partir de ce monde (relié ou copié)" ${w.valid ? '' : 'disabled'}>${ic('link', 12)} Serveur</button><button class="ib" title="Supprimer" data-a="wOp" data-op="delete" data-w="${esc(w.folder)}">${ic('trash', 14)}</button></div></div>`).join('') || '<p class="mu" style="text-align:center;padding:20px">Aucun monde. Lance l’instance pour en créer un, ou importes-en un.</p>'}`;
 }
+const itemBar = i => {
+  texNeed(); const names = TEX ? TEX.order.filter(n => TEX.img[n]) : []; if (!names.length) return '';
+  const b = (v, inner, title) => `<button class="itm ${(v === 'auto' ? !i.item : i.item === v) ? 'a' : ''}" data-a="itemSet" data-v="${v}" title="${title}">${inner}</button>`;
+  return `<div class="fld" style="margin-top:14px"><label>Objet affiché sur la couverture</label><div class="itms">${b('auto', 'Auto', 'Automatique')}${names.map(n => b(n, `<img src="${TEX.img[n]}" alt="">`, n.replace(/_/g, ' '))).join('')}${b('none', '∅', 'Aucun objet')}</div></div>`;
+};
+const imgBar = i => `<div class="imgbar"><div class="imgprev cover">${cover(i, 132, 62)}</div><button class="btn sec sm" data-a="imgPick">${ic('folder', 13)} Choisir une image…</button>${i.pack ? `<button class="btn sec sm" data-a="imgPack" title="Reprend le logo du modpack « ${esc(i.pack.title || '')} » sur ${i.pack.src === 'curseforge' ? 'CurseForge' : 'Modrinth'}">${ic('down', 13)} Image officielle du modpack</button>` : ''}${i.img ? `<button class="btn g sm" data-a="imgClear">Retirer l’image</button>` : ''}<small class="mu" style="flex-basis:100%">PNG ou JPG. Ton image remplace le décor ci-dessus${i.pack ? ' ; un modpack téléchargé depuis le catalogue reprend automatiquement son image officielle' : ''}.</small></div>`;
 async function cfgTab(i) {
   const L = await javas(), o = await call('opts:get', i.id).catch(() => ({})), r = i.res || { mode: 'default', w: 1280, h: 720 }, S = (v, a) => v == a ? 'selected' : '', cats = [...new Set(inst.map(x => x.cat).filter(Boolean))];
   const rg = (k, l, mn, mx, u) => `<div class="fld"><label>${l} : <b id="v-${k}">${o[k] || '—'}${o[k] ? u : ''}</b></label><input type="range" min="${mn}" max="${mx}" value="${o[k] || mn}" data-opt="${k}" data-live="v-${k}" data-unit="${u}" style="width:100%"></div>`;
   const ck = (k, l) => `<label class="ckb"><input type="checkbox" data-opt="${k}" ${o[k] === 'true' ? 'checked' : ''}> ${l}</label>`;
   return `<div class="card col"><h3>Général</h3><div class="two2"><div class="fld"><label>Nom</label><input data-iset="name" value="${esc(i.name)}" maxlength="40"></div><div class="fld"><label>Tags</label><div class="row">${tagBd(i)}<button class="btn g sm" data-a="cat" data-id="${esc(i.id)}">Modifier…</button></div></div></div>
   <div class="fld"><label>Notes</label><textarea data-iset="notes" rows="2" maxlength="500" placeholder="Ce que contient cette instance…">${esc(i.notes || '')}</textarea></div>
-  <div class="fld"><label>Couverture</label><div class="wps small"><div class="wp ${i.cover ? '' : 'a'}" data-a="cover" data-v="">${swc(BIO[hash(i.id) % 8])}<div class="l">Auto</div></div>${BIOALL.map(k => `<div class="wp ${i.cover === k ? 'a' : ''}" data-a="cover" data-v="${k}">${swc(k)}<div class="l">${BIOL[k]}</div></div>`).join('')}</div></div></div>
+  <div class="fld"><label>Couverture</label><div class="wps small"><div class="wp ${i.cover ? '' : 'a'}" data-a="cover" data-v="">${swc(BIO[hash(i.id) % 8])}<div class="l">Auto</div></div>${BIOALL.map(k => `<div class="wp ${i.cover === k ? 'a' : ''}" data-a="cover" data-v="${k}">${swc(k)}<div class="l">${BIOL[k]}</div></div>`).join('')}</div>${imgBar(i)}${i.img ? '' : itemBar(i)}</div></div>
   <div class="card col"><h3>Java et mémoire</h3><div class="fld"><label>Java · Minecraft ${esc(i.version)} demande Java ${esc(String(await call('inst:detail', i.id).then(d => d.need)))}</label><select data-iset="java"><option value="">Automatique (recommandé)</option>${L.map(j => `<option value="${esc(j.path)}" ${i.java === j.path ? 'selected' : ''}>${esc(jlabel(j))}</option>`).join('')}</select></div><div class="row" style="margin-top:6px"><button class="btn g sm" data-a="javaadd">Ajouter un Java…</button></div>
   <div class="two2"><div class="fld"><label>Mémoire maximale : <b id="v-mem">${i.mem || 4} Go</b></label><input type="range" min="1" max="32" value="${i.mem || 4}" data-iset="mem" data-live="v-mem" data-unit=" Go" style="width:100%"></div><div class="fld"><label>Mémoire minimale</label><select data-iset="minMem" data-num="1">${[1, 2, 4, 8].map(g => `<option value="${g}" ${S(g, i.minMem || 1)}>${g} Go</option>`).join('')}</select></div></div>
   <div class="fld"><label>Arguments JVM (avancé) : par exemple -XX:+UseG1GC</label><input data-iset="jvm" id="jvm" value="${esc(i.jvm || '')}"><div class="chips" style="margin-top:6px"><span class="chip" data-a="jvmp" data-v="-XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M">Préréglage fluidité (G1GC)</span><span class="chip" data-a="jvmp" data-v="">Vider</span></div></div></div>
@@ -120,10 +146,10 @@ async function cfgTab(i) {
   <div class="card col"><div class="row between"><h3>Options du jeu</h3><button class="btn g sm" data-a="defapply" title="Applique le FOV, les touches… définis dans Paramètres › Nouvelles instances">Appliquer mes réglages par défaut</button></div>${o.exists ? '' : '<small>Le jeu n’a pas encore été lancé : ces réglages seront appliqués dès son premier démarrage.</small>'}<div class="two2">${rg('renderDistance', 'Distance d’affichage', 2, 32, ' chunks')}${rg('maxFps', 'FPS maximum (260 = illimité)', 10, 260, '')}</div><div class="two2">${rg('guiScale', 'Échelle de l’interface (0 = auto)', 0, 4, '')}<div class="fld"><label>Langue du jeu</label><select data-opt="lang">${[['fr_fr', 'Français'], ['en_us', 'English (US)'], ['es_es', 'Español'], ['de_de', 'Deutsch'], ['it_it', 'Italiano'], ['pt_br', 'Português (BR)']].map(([k, l]) => `<option value="${k}" ${S(k, o.lang)}>${l}</option>`).join('')}</select></div></div>
   <div class="two2" style="margin-top:6px">${(() => { const fv = o.fov === undefined ? 70 : Math.round(70 + parseFloat(o.fov) * 40), gm = o.gamma === undefined ? 50 : Math.round(parseFloat(o.gamma) * 100), ms = o.mouseSensitivity === undefined ? 100 : Math.round(parseFloat(o.mouseSensitivity) * 200); return `<div class="fld"><label>FOV : <b id="v-fov">${fv}°</b></label><input type="range" min="30" max="110" value="${fv}" data-optc="fov" data-live="v-fov" data-unit="°" style="width:100%"></div><div class="fld"><label>Luminosité : <b id="v-gamma">${gm} %</b></label><input type="range" min="0" max="100" value="${gm}" data-optc="gamma" data-live="v-gamma" data-unit=" %" style="width:100%"></div><div class="fld"><label>Sensibilité : <b id="v-ms">${ms} %</b></label><input type="range" min="0" max="200" value="${ms}" data-optc="mouseSensitivity" data-live="v-ms" data-unit=" %" style="width:100%"></div>`; })()}</div>
   <div class="row" style="gap:18px;margin-top:8px">${ck('fullscreen', 'Plein écran dans le jeu')}${ck('enableVsync', 'Synchronisation verticale')}${ck('entityShadows', 'Ombres des entités')}${ck('viewBobbing', 'Balancement de la vue')}${ck('pauseOnLostFocus', 'Pause si la fenêtre perd le focus')}</div></div>
-  <div class="card col"><h3>Lancement</h3><div class="fld"><label>Rejoindre automatiquement un serveur</label><select data-iset="autoServer"><option value="">Non</option>${saved.map(s => `<option value="${esc(s.addr)}" ${S(s.addr, i.autoServer)}>${esc(s.name)} (${esc(s.addr)})</option>`).join('')}</select></div><div class="fld"><label>Arguments du jeu (avancé)</label><input data-iset="args" value="${esc(i.args || '')}" placeholder="--demo"></div></div>
+  <div class="card col"><h3>Lancement</h3><div class="fld"><label>Rejoindre automatiquement un serveur</label><select data-iset="autoServer"><option value="">Non</option>${saved.map(s => `<option value="${esc(s.addr)}" ${S(s.addr, i.autoServer)}>${esc(s.name)}${privOn() ? '' : ' (' + esc(s.addr) + ')'}</option>`).join('')}</select></div><div class="fld"><label>Arguments du jeu (avancé)</label><input data-iset="args" value="${esc(i.args || '')}" placeholder="--demo"></div></div>
   <div class="card col"><h3>Dossiers</h3><div class="row">${[['', 'Instance'], ['mods', 'Mods'], ['saves', 'Mondes'], ['resourcepacks', 'Packs'], ['shaderpacks', 'Shaders'], ['screenshots', 'Captures']].map(([s, l]) => `<button class="btn g sm" data-a="folder" data-id="${esc(i.id)}" data-sub="${s}">${ic('folder', 13)} ${l}</button>`).join('')}</div></div>
   <div class="sh"><h3>Statistiques</h3></div><div class="stat"><div class="card"><span class="mu">Temps de jeu</span><b>${hrs(i.playtime)}</b></div><div class="card"><span class="mu">Dernière session</span><b style="font-size:18px">${i.lastPlayed ? ago(i.lastPlayed) : 'jamais'}</b></div><div class="card"><span class="mu">Mods</span><b>${i.mods.length}</b></div></div>
-  <div class="row" style="margin-top:14px"><button class="btn sec" data-a="dup" data-id="${esc(i.id)}">${ic('copy', 14)} Dupliquer</button><button class="btn sec" data-a="code" data-id="${esc(i.id)}">${ic('link', 14)} Code de partage</button><button class="btn dg" data-a="del" data-id="${esc(i.id)}">${ic('trash', 14)} Supprimer</button></div>`;
+  <div class="row" style="margin-top:14px"><button class="btn sec" data-a="dup" data-id="${esc(i.id)}">${ic('copy', 14)} Dupliquer</button><button class="btn sec" data-a="code" data-id="${esc(i.id)}">${ic('link', 14)} Code de partage</button><button class="btn sec" data-a="chShare" data-id="${esc(i.id)}">${ic('chat', 14)} Envoyer à un ami</button><button class="btn dg" data-a="del" data-id="${esc(i.id)}">${ic('trash', 14)} Supprimer</button></div>`;
 }
 /* « Hydarium Client » : le mod en jeu, présenté comme un mod de la liste (logo, état), non supprimable mais désactivable. Ses réglages se font en jeu (menu Alt+H). */
 async function clientEntry(i) {
@@ -135,20 +161,22 @@ async function clientEntry(i) {
 }
 async function detailView() {
   const d = await call('inst:detail', cur), i = d.inst, van = i.loader === 'vanilla';
+  if (MODFI !== cur) { MODFI = cur; MODF = ''; } // une autre instance : filtre remis à zéro
+  if (!ICONSEEN.has(cur) && d.mods.some(m => !m.icon && !m.noIcon && m.status !== 'missing')) { ICONSEEN.add(cur); const id0 = cur; call('mods:icons', id0).then(n => { if (n && cur === id0 && page === 'detail') render(); }).catch(() => {}); } // images lues dans les jars, une fois par instance et par session
   const tabs = [['mods', 'Mods'], ['worlds', 'Mondes'], ['packs', 'Packs de ressources'], ...(van ? [] : [['shaders', 'Shaders']]), ['shots', 'Captures'], ['cfg', 'Paramètres']];
   if (!tabs.some(t => t[0] === it)) it = 'mods';
   let b = '';
   const CE = it === 'mods' ? await clientEntry(i) : '';
   if (it === 'mods') b = CE + (van ? '<p class="mu">Instance Vanilla : aucun autre mod. Crée une instance Fabric ou Quilt pour en ajouter.</p>' : `${d.conflicts.map(c => `<div class="note" style="border-color:var(--er)">✖ Incompatibilité : <b>${esc(c.a)}</b> et <b>${esc(c.b)}</b> : le jeu ne se lancera pas. <button class="btn sm" data-a="rm" data-pid="${esc(c.fix)}">Retirer ${esc(c.b)}</button></div>`).join('')}
-    <div class="row between" style="margin-bottom:8px"><b>${d.mods.length} mod(s)</b><div class="row"><button class="btn sec sm" data-a="modupd">${ic('refresh', 13)} Mises à jour</button><button class="btn sec sm" data-a="modimp">${ic('down', 13)} Importer un .jar</button>${d.mods.length ? (d.mods.some(m => !m.disabled) ? `<button class="btn sec sm" data-a="modoffall" data-v="0" data-n="${d.mods.filter(m => !m.disabled).length}" title="Désactive tous les mods d’un coup, sans les supprimer">${ic('x', 13)} Tout désactiver</button>` : `<button class="btn sec sm" data-a="modoffall" data-v="1" data-n="${d.mods.length}" title="Réactive tous les mods">${ic('refresh', 13)} Tout activer</button>`) : ''}<button class="btn sm" data-a="browse" data-t="mod">${ic('plus', 13)} Ajouter des mods</button></div></div>
-    ${d.mods.length ? modBar(d.mods.filter(m => SELM.has(m.pid)).length, d.mods.length) : ''}
-    ${modsSplit(d.mods, x => `<div class="card ${x.disabled ? 'dim' : ''} ${SELM.has(x.pid) ? 'sel' : ''}"><div class="ic">${selBox(SELM.has(x.pid), 'msel', x.pid)}${tile(x.icon, x.title)}<div><b>${esc(x.title)}</b> ${x.disabled ? BD.off : BD[x.status]}<small>${x.auto ? 'dépendance automatique · ' : ''}${esc(x.file)}</small></div></div><div class="row">${x.status === 'unverified' || x.status === 'cf' || x.status === 'trusted' ? `<button class="btn g sm" data-a="modtrust" data-pid="${esc(x.pid)}" data-on="${x.status === 'trusted' ? '' : '1'}" title="Ne plus afficher l’avertissement « non vérifié » pour ce mod">${x.status === 'trusted' ? 'Retirer la confiance' : 'Faire confiance'}</button>` : ''}<button class="swt ${x.disabled ? '' : 'on'}" title="${x.disabled ? 'Activer' : 'Désactiver'}" data-a="modtog" data-pid="${esc(x.pid)}"></button><button class="ib" title="Retirer" data-a="rm" data-pid="${esc(x.pid)}">${ic('x', 14)}</button></div></div>`, '<p class="mu" style="text-align:center;padding:20px">Aucun mod. Clique sur « Ajouter des mods » : les plus populaires s’affichent directement.</p>')}`);
+    <div class="row between" style="margin-bottom:8px;gap:10px"><div class="row" style="flex:1;min-width:0;gap:10px"><b style="white-space:nowrap">${d.mods.length} mod(s)</b>${nSel(d.mods) ? modFind('sm', d.mods) : ''}</div><div class="row"><button class="btn sec sm" data-a="modupd">${ic('refresh', 13)} Mises à jour</button><button class="btn sec sm" data-a="modimp">${ic('down', 13)} Importer un .jar</button>${d.mods.length ? `<button class="btn sec sm" data-a="mselall">${nSel(d.mods) === d.mods.length ? 'Tout désélectionner' : 'Tout sélectionner'}</button>` : ''}${d.mods.length ? (d.mods.some(m => !m.disabled) ? `<button class="btn sec sm" data-a="modoffall" data-v="0" data-n="${d.mods.filter(m => !m.disabled).length}" title="Désactive tous les mods d’un coup, sans les supprimer">${ic('x', 13)} Tout désactiver</button>` : `<button class="btn sec sm" data-a="modoffall" data-v="1" data-n="${d.mods.length}" title="Réactive tous les mods">${ic('refresh', 13)} Tout activer</button>`) : ''}<button class="btn sm" data-a="browse" data-t="mod">${ic('plus', 13)} Ajouter des mods</button></div></div>
+    ${d.mods.length ? modBar(nSel(d.mods), d.mods.length, d.mods) : ''}
+    ${modsSplit(d.mods, x => `<div class="card mcard ${x.disabled ? 'dim' : ''} ${SELM.has(x.pid) ? 'sel' : ''}" data-pid="${esc(x.pid)}" data-g="${x.disabled ? 'off' : 'on'}" data-mn="${esc(modKey(x))}" ${modMatch(x, modTerms(MODF)) ? '' : 'hidden'}><div class="ic">${selBox(SELM.has(x.pid), 'msel', x.pid)}${tile(x.icon, x.title)}<div><b>${esc(x.title)}</b> ${x.disabled ? BD.off : BD[x.status]}<small>${x.auto ? 'dépendance automatique · ' : ''}${esc(x.file)}</small></div></div><div class="row">${x.pin ? '<span class="bd" title="Version choisie par toi : « Mises à jour » ne la change pas">Version figée</span>' : ''}${modVerBtn(x)}${x.status === 'unverified' || x.status === 'cf' || x.status === 'trusted' ? `<button class="btn g sm" data-a="modtrust" data-pid="${esc(x.pid)}" data-on="${x.status === 'trusted' ? '' : '1'}" title="Ne plus afficher l’avertissement « non vérifié » pour ce mod">${x.status === 'trusted' ? 'Retirer la confiance' : 'Faire confiance'}</button>` : ''}<button class="swt ${x.disabled ? '' : 'on'}" title="${x.disabled ? 'Activer' : 'Désactiver'}" data-a="modtog" data-pid="${esc(x.pid)}"></button><button class="ib" title="Retirer" data-a="rm" data-pid="${esc(x.pid)}">${ic('x', 14)}</button></div></div>`, '<p class="mu" style="text-align:center;padding:20px">Aucun mod. Clique sur « Ajouter des mods » : les plus populaires s’affichent directement.</p>')}${d.mods.length ? `<div id="modnone" class="mu" style="text-align:center;padding:20px" ${MODF.trim() && !d.mods.some(m => modMatch(m, modTerms(MODF))) ? '' : 'hidden'}>Aucun mod installé ne correspond à « <b>${esc(MODF.trim())}</b> ». <button class="btn sm" data-a="modcat">${ic('search', 13)} Chercher dans le catalogue</button></div>` : ''}`);
   else if (it === 'worlds') b = await worldsTab(i);
   else if (it === 'packs') b = await packsTab(i, 'resourcepack');
   else if (it === 'shaders') b = await packsTab(i, 'shader');
   else if (it === 'shots') { SH = (await call('shots:list')).filter(s => s.inst === i.id); b = shotsGrid(SH, 'Aucune capture dans cette instance. Prends-en une dans le jeu avec F2.'); }
   else b = await cfgTab(i);
-  return `<div class="hero cover" style="height:150px">${cover(i, 640, 150)}<div class="hshade"></div><button class="btn sec sm" style="position:absolute;left:14px;top:14px" data-a="p" data-v="inst">${ic('back', 13)} Retour</button><div class="hc"><h1 style="font-size:24px">${esc(i.name)}</h1><div class="mu">${sub(i)} · ${hrs(i.playtime)} de jeu${i.notes ? ' · ' + esc(i.notes.slice(0, 60)) : ''}</div><div class="row">${playB(i.id)}<button class="btn sec" data-a="folder" data-id="${esc(i.id)}">${ic('folder', 14)} Dossier</button><button class="btn sec" data-a="code" data-id="${esc(i.id)}">${ic('link', 14)} Partager</button></div></div></div><div id="cdb"></div>
+  return `<div class="hero cover" style="height:150px">${cover(i, 640, 150)}<div class="hshade"></div><button class="btn sec sm" style="position:absolute;left:14px;top:14px" data-a="p" data-v="inst">${ic('back', 13)} Retour</button><div class="hc"><h1 style="font-size:24px">${esc(i.name)}</h1><div class="mu">${sub(i)} · ${hrs(i.playtime)} de jeu${i.notes ? ' · ' + esc(i.notes.slice(0, 60)) : ''}</div><div class="row">${playB(i.id)}<button class="btn sec" data-a="folder" data-id="${esc(i.id)}">${ic('folder', 14)} Dossier</button><button class="btn sec" data-a="code" data-id="${esc(i.id)}">${ic('link', 14)} Partager</button><button class="btn sec" data-a="chShare" data-id="${esc(i.id)}">${ic('chat', 14)} À un ami</button></div></div></div><div id="cdb"></div>
   <div class="tabs" style="margin-top:14px">${tabs.map(([k, l]) => `<a class="${it === k ? 'a' : ''}" data-a="it" data-v="${k}">${l}</a>`).join('')}</div>` + b;
 }
 
@@ -303,7 +331,7 @@ async function profile() {
   <div class="stat">${[['Heures jouées', hrs(hTot)], ['Instances', s.n], ['Mods différents', s.mods], ['Serveurs', s.srv]].map(([l, v]) => `<div class="card"><span class="mu">${l}</span><b>${v}</b></div>`).join('')}</div>${skin}
   <div class="sh"><h3>Instances les plus jouées</h3></div><div class="card" style="display:block"><div class="bars">${topL.map(i => `<div><span>${esc(i.name)}</span><i style="width:${Math.max(3, Math.round(i.playtime / mx * 100))}%"></i><small style="width:70px">${hrs(i.playtime)}</small></div>`).join('') || '<span class="mu">Rien de joué pour l’instant.</span>'}</div></div>
   <div class="sh"><h3>Compte</h3></div><div class="row"><button class="btn g" data-a="login">Changer de compte</button><button class="btn g" data-a="logout">Se déconnecter</button></div>
-  <div class="two" style="margin-top:6px"><div><div class="sh"><h3>Amis</h3></div><div class="card soon"><div><b>Bientôt disponible</b><small>Ta liste d’amis, ta visibilité et tes messages.</small></div></div></div><div><div class="sh"><h3>Succès et quêtes</h3></div><div class="card soon"><div><b>Bientôt disponible</b><small>Ta progression apparaîtra ici.</small></div></div></div></div>`;
+  <div class="two" style="margin-top:6px"><div><div class="sh"><h3>Amis</h3></div>${friendsHome()}</div><div><div class="sh"><h3>Succès et quêtes</h3></div><div class="card soon"><div><b>Bientôt disponible</b><small>Ta progression apparaîtra ici.</small></div></div></div></div>`;
 }
 
 /* mises à jour du launcher (Paramètres › Général) : état poussé par le processus principal (updater.js) */
@@ -311,10 +339,71 @@ let UPS = null;
 const updText = u => !u ? 'Vérification en cours…' : ({
   dev: 'Désactivées en mode développement.', idle: 'Hydarium ' + u.current + ' · vérifiées à chaque lancement.', checking: 'Recherche en cours…', none: 'Hydarium ' + u.current + ' est à jour.',
   downloading: 'Téléchargement de la version ' + u.latest + '… ' + (u.percent || 0) + ' %', ready: 'La version ' + u.latest + ' est prête : elle s’installera à la fermeture du launcher.',
+  installing: 'Installation de la version ' + u.latest + '… Hydarium va redémarrer.',
   available: 'La version ' + u.latest + ' est disponible (installation manuelle).', error: u.error || 'Impossible de vérifier.' })[u.status] || '';
-const updCard = () => `<div class="card" id="updc"><div style="flex:1"><b>Mises à jour</b><small>${esc(updText(UPS))}</small></div><div class="row">${UPS && UPS.status === 'ready' ? '<button class="btn" data-a="updInstall">Redémarrer et installer</button>' : ''}${UPS && UPS.status === 'available' ? '<button class="btn" data-a="updOpen">Télécharger</button>' : ''}<button class="btn g" data-a="updCheck" ${UPS && ['checking', 'downloading', 'dev'].includes(UPS.status) ? 'disabled' : ''}>Rechercher une mise à jour</button></div></div>`;
+const updCard = () => `<div class="card" id="updc"><div style="flex:1"><b>Mises à jour</b><small>${esc(updText(UPS))}</small></div><div class="row">${UPS && ['ready', 'installing'].includes(UPS.status) ? '<button class="btn" data-a="updInstall">Redémarrer et installer</button>' : ''}${UPS && UPS.status === 'available' ? '<button class="btn" data-a="updOpen">Télécharger</button>' : ''}<button class="btn g" data-a="updCheck" ${UPS && ['checking', 'downloading', 'dev'].includes(UPS.status) ? 'disabled' : ''}>Rechercher une mise à jour</button></div></div>`;
 /* « HYD-XXXX-… » (casse, espaces, tirets et soulignés libres) : reconnaît une invitation privée dans le champ d'adresse. La vraie validation est faite côté principal (p2p.normalize). */
 const looksLikeInvite = t => /^HYD[0-9A-Z]{12,}$/.test(String(t || '').toUpperCase().replace(/[\s_-]/g, ''));
+/* Mise à jour automatique : bandeau « redémarrage dans N s » (bouton « Plus tard ») tant qu'une installation est programmée */
+let updBarT = null;
+const updBar = u => {
+  let e = $('#updbar');
+  if (!u || u.status !== 'installing') { if (e) e.remove(); clearInterval(updBarT); updBarT = null; return; }
+  if (!e) { e = document.createElement('div'); e.id = 'updbar'; e.className = 'updbar'; document.body.appendChild(e); }
+  const draw = () => { const n = Math.max(0, Math.ceil((u.eta - Date.now()) / 1000)); e.innerHTML = '<span>⬆ Mise à jour <b>' + esc(u.latest) + '</b> : redémarrage dans ' + n + ' s…</span><button class="btn g sm" data-a="updCancel">Plus tard</button>'; };
+  draw(); clearInterval(updBarT); updBarT = setInterval(draw, 500);
+};
+/* Mode confidentialité (stream) : les adresses IP de serveurs et les codes d'invitation sont floutés à l'écran ; l'œil les montre 8 secondes. Actif par défaut
+   (réglage « Mode confidentialité » dans Paramètres › Général). Le texte réel reste copiable par les boutons « Copier » (ils portent la valeur, pas l'affichage). */
+const privOn = () => (cfg || {}).privacy !== false;
+const priv = html => privOn() ? '<span class="priv">' + html + '</span><button class="eye" data-a="eye" title="Afficher un instant" aria-label="Afficher un instant">' + ic('eye', 13) + '</button>' : html;
+const privIn = () => privOn() ? 'privin' : '';
+/* Écran du premier lancement : la vie privée d'abord, puis les règles d'utilisation. À accepter pour utiliser Hydarium ; changer TOS_VERSION le fait revoir à tout le monde.
+   Ton volontairement personnel : Hydarium est un projet personnel, pas une entreprise. */
+const TOS_VERSION = 1;
+const tosHtml = view => `<div class="tosb" role="dialog" aria-modal="true">
+  <h2>${view ? 'Règles d’utilisation et vie privée' : 'Bienvenue sur Hydarium'}</h2>
+  <div class="tosprv"><b>🔒 Vie privée : Hydarium ne collecte aucune donnée personnelle et n’en vend jamais.</b>
+    <p>Il n’existe aucun serveur Hydarium qui reçoive tes informations : ton compte, tes instances, tes mondes et tes réglages restent sur ton ordinateur.</p>
+    <small>Pour fonctionner, le launcher parle directement à des services tiers : Microsoft et Mojang pour te connecter à Minecraft, Modrinth et CurseForge pour les mods, GitHub pour les mises à jour, et en option playit.gg ou d’autres joueurs pour la connexion directe. Ces services voient ton adresse IP, comme avec n’importe quel logiciel, et ont leurs propres règles.</small></div>
+  <h3>Règles d’utilisation</h3>
+  <ol class="tosl">
+    <li><b>Liens officiels uniquement.</b> Hydarium se télécharge seulement depuis sa page officielle (github.com/Gazein21/hydarium). Ne le copie pas et ne le republie pas ailleurs : sites de téléchargement, archives, versions modifiées présentées comme Hydarium.</li>
+    <li><b>Contenu légal et respectueux.</b> N’utilise pas Hydarium pour du contenu illégal (piratage, fichiers dont tu n’as pas les droits…) ni pour diffuser du contenu choquant, haineux ou dangereux, par exemple dans les serveurs, mondes, mods ou skins que tu héberges ou partages.</li>
+    <li><b>Tu es responsable de ce que tu fais.</b> Les serveurs que tu héberges, les codes d’invitation que tu partages et les contenus que tu installes ou diffuses relèvent de ta responsabilité. L’auteur d’Hydarium n’est pas responsable des contenus de tiers ni de l’usage que chacun fait du launcher.</li>
+    <li><b>Minecraft appartient à Mojang.</b> Hydarium n’est affilié ni à Mojang ni à Microsoft. Il faut posséder une copie légale de Minecraft pour jouer.</li>
+    <li><b>Aucune garantie.</b> Hydarium est gratuit et fourni tel quel : pense à sauvegarder tes mondes importants.</li>
+  </ol>
+  ${view ? '<div class="row" style="justify-content:flex-end"><button class="btn" data-a="tosClose">Fermer</button></div>' : `<label class="tosck"><input type="checkbox" id="tosok"> J’ai lu et j’accepte ces règles</label>
+  <div class="row" style="justify-content:flex-end;gap:10px"><button class="btn g" data-a="tosQuit">Quitter</button><button class="btn" id="tosgo" data-a="tosAccept" disabled>Accepter et continuer</button></div>`}
+</div>`;
+const tosShow = view => {
+  if ($('#tos')) return;
+  const e = document.createElement('div'); e.id = 'tos'; e.className = 'tos'; e.innerHTML = tosHtml(view); document.body.appendChild(e);
+  const ck = $('#tosok'); if (ck) ck.onchange = () => { $('#tosgo').disabled = !ck.checked; };
+};
+/** Affiche l'écran tant que la version actuelle des règles n'a pas été acceptée (jamais dans la fenêtre posée sur le jeu). */
+const tosCheck = () => { if (!OVL && (cfg.tosAccepted | 0) < TOS_VERSION) tosShow(false); };
+/* Filtre des mods INSTALLÉS d'une instance (onglet Mods) : tape un nom, les mods actifs et désactivés qui ne correspondent pas sont masqués, en direct (aucun rechargement).
+   Tous les mots tapés doivent se retrouver dans le nom, le fichier ou l'identifiant du mod ; accents et majuscules ignorés. */
+let MODF = '', MODFI = ''; const ICONSEEN = new Set();
+const nrm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+const modKey = m => nrm([m.title, m.file, m.slug].filter(Boolean).join(' '));
+const modTerms = q => nrm(q).split(/\s+/).filter(Boolean);
+const modMatch = (m, terms) => { const k = modKey(m); return terms.every(t => k.includes(t)); };
+/** zone de recherche (placée dans la barre de sélection, ou à côté du total quand des mods sont sélectionnés) */
+const nSel = ms => ms.filter(m => SELM.has(m.pid)).length;
+const modFind = (cls, mods) => `<div class="modf ${cls || ''}"><input id="modf" value="${esc(MODF)}" placeholder="Filtrer les mods installés par nom…" autocomplete="off" spellcheck="false"><button class="ib" data-a="modfclear" title="Effacer" ${MODF ? '' : 'hidden'}>${ic('x', 13)}</button><span id="modcount" class="mu">${mods && modTerms(MODF).length ? mods.filter(m => modMatch(m, modTerms(MODF))).length + ' sur ' + mods.length : ''}</span></div>`;
+/** mise à jour en direct de la liste (sans rechargement) */
+function modFilter(q) {
+  MODF = String(q || ''); const terms = modTerms(MODF), g = { on: 0, off: 0 }; let shown = 0;
+  const cards = document.querySelectorAll('.mcard');
+  cards.forEach(c => { const hit = terms.every(t => (c.dataset.mn || '').includes(t)); c.hidden = !hit; if (hit) { shown++; g[c.dataset.g]++; } });
+  document.querySelectorAll('[data-gh]').forEach(h => { const n = g[h.dataset.gh] || 0; h.hidden = !n; const c = h.querySelector('.gc'); if (c) c.textContent = n; });
+  const cnt = $('#modcount'); if (cnt) cnt.textContent = terms.length ? shown + ' sur ' + cards.length : '';
+  const none = $('#modnone'); if (none) { none.hidden = !(terms.length && !shown); const b = none.querySelector('b'); if (b) b.textContent = MODF.trim(); }
+  const x = document.querySelector('[data-a="modfclear"]'); if (x) x.hidden = !MODF;
+}
 /* état de la récupération des skins Mojang (extraits du jeu au premier usage) */
 const skDefNote = x => x.defaultsState === 'loading' ? '<p class="mu">Téléchargement des skins par défaut de Minecraft… (une seule fois, quelques secondes)</p>'
   : x.defaultsState === 'error' ? `<p class="mu">Skins par défaut de Minecraft indisponibles : ${esc(x.defaultsError || 'erreur inconnue')} <a style="color:var(--ac);cursor:pointer" data-a="skRetry">Réessayer</a></p>` : '';
@@ -342,12 +431,13 @@ const creditsHtml = C => {
 async function setView() {
   const tabs = [['gen', 'Général'], ['new', 'Nouvelles instances'], ['notif', 'Notifications'], ['music', 'Musique'], ['app', 'Apparence'], ['stat', 'Statistiques'], ['java', 'Java'], ['exp', 'Avancé'], ['data', 'Données'], ['help', 'Aide et journaux'], ['credits', 'Crédits']];
   let b = ''; if (st === 'new') DEFO = await call('defopts:get').catch(() => ({})); if (st === 'music') SPS = await call('spotify:status').catch(() => ({})); let SZ = st === 'data' ? await call('data:sizes').catch(() => ({})) : null;
-  if (st === 'gen') b = `<div class="card" style="display:block">${sw('notif', 'Notifications', 'Lancement du jeu, plantages et erreurs, dans le centre de notifications de ton système.')}${sw('minimize', 'Réduire pendant le jeu', 'Libère des ressources pendant que Minecraft tourne.')}${sw('autostart', 'Lancer au démarrage', 'Ouvre Hydarium avec ton ordinateur.')}${sw('showLog', 'Afficher les logs du jeu', 'Ouvre une fenêtre de logs au lancement (préparation, téléchargements) et pendant la partie. Désactivé : aucune fenêtre, les journaux restent dans Paramètres › Aide et journaux.')}
+  if (st === 'gen') b = `<div class="card" style="display:block">${sw('notif', 'Notifications', 'Lancement du jeu, plantages et erreurs, dans le centre de notifications de ton système.')}${sw('minimize', 'Réduire pendant le jeu', 'Libère des ressources pendant que Minecraft tourne.')}${sw('autostart', 'Lancer au démarrage', 'Ouvre Hydarium avec ton ordinateur.')}${sw('showLog', 'Afficher les logs du jeu', 'Ouvre une fenêtre de logs au lancement (préparation, téléchargements) et pendant la partie. Désactivé : aucune fenêtre, les journaux restent dans Paramètres › Aide et journaux.')}</div>`;
   if (st === 'gen') b += srvModsCard();
-  if (st === 'gen') { UPS = await call('update:state').catch(() => UPS); b += sw('autoUpdate', 'Mises à jour automatiques', 'Vérifie GitHub à chaque lancement et télécharge la nouvelle version en arrière-plan (jamais pendant une partie).').replace('<div class="sw">', '<div class="card"><div class="sw" style="width:100%">').replace(/<\/div>$/, '</div></div>') + updCard(); }
-
+  if (st === 'gen') { UPS = await call('update:state').catch(() => UPS); const de = await call('client:drawerr').catch(() => ''); if (de) b += '<div class="keywarn" style="margin-bottom:10px">⚠ <b>Le HUD en jeu n’a pas pu démarrer</b> (le HUD du launcher le remplace). Cause : ' + esc(de) + '</div>'; b += sw('privacy', 'Mode confidentialité (stream)', 'Floute à l’écran les adresses IP des serveurs et les codes d’invitation, pour éviter de les montrer par erreur en direct ou sur une capture. Un bouton œil les affiche 8 secondes ; « Copier » fonctionne sans rien montrer. Activé par défaut.').replace('<div class="sw">', '<div class="card"><div class="sw" style="width:100%">').replace(/<\/div>$/, '</div></div>'); b += sw('autoUpdate', 'Mises à jour automatiques', 'Vérifie GitHub à chaque lancement et télécharge la nouvelle version en arrière-plan (jamais pendant une partie).').replace('<div class="sw">', '<div class="card"><div class="sw" style="width:100%">').replace(/<\/div>$/, '</div></div>') + sw('autoInstall', 'Installer automatiquement', 'Quand une mise à jour est téléchargée et que rien ne tourne (ni partie, ni serveur hébergé), Hydarium redémarre tout seul pour l’installer. Bouton « Plus tard » pendant le compte à rebours.').replace('<div class="sw">', '<div class="card"><div class="sw" style="width:100%">').replace(/<\/div>$/, '</div></div>') + sw('inGameMenu', 'Menu Alt+H dans le jeu (expérimental)', 'Remplace la fenêtre du launcher par un écran du jeu pour Alt+H (Fabric 26.x). Instable pour l’instant : désactivé par défaut, Alt+H ouvre le menu normal du launcher. Redémarre le jeu après changement.').replace('<div class="sw">', '<div class="card"><div class="sw" style="width:100%">').replace(/<\/div>$/, '</div></div>') + updCard(); }
+  if (st === 'gen') b += `
     <div class="sh"><h3>Importer</h3></div><div class="card"><div><b>Depuis un autre launcher</b><small>Choisis le dossier d’une instance, d’un launcher (Prism, MultiMC…) ou un dossier .minecraft.</small></div><button class="btn g" data-a="impman">Choisir un dossier…</button></div>
     <div class="card"><div><b>Langue de l’interface</b><small>Français ou English (les phrases longues peuvent rester en français).</small></div><select data-set="uiLang"><option value="fr" ${cfg.uiLang !== 'en' ? 'selected' : ''}>Français</option><option value="en" ${cfg.uiLang === 'en' ? 'selected' : ''}>English</option></select></div>
+    <div class="card"><div><b>Règles d’utilisation et vie privée</b><small>Ce que fait (et ne fait pas) Hydarium avec tes données, et les règles à respecter.</small></div><button class="btn g" data-a="tosView">Relire</button></div>
     <div class="card"><div><b>Assistant de bienvenue</b><small>Revoir la connexion et l’import automatique.</small></div><button class="btn g" data-a="wizre">Relancer</button></div><p class="mu">Langue : français (d’autres langues viendront). Hydarium ${esc(pf.version || '')} · ${esc(pf.id || '')} ${esc(pf.arch || '')} · <a class="hmail" data-a="mail" title="Contact">help@hydarium.net</a></p>`;
   if (st === 'new') b = `<p class="mu" style="margin-top:0">Ces réglages s’appliquent aux instances que tu crées ensuite.</p><div class="card" style="display:block">
     <div class="sw"><div style="flex:1"><b>Mémoire</b><small id="rm">${cfg.mem || 4} Go</small></div><input type="range" id="mem0" min="2" max="16" value="${cfg.mem || 4}" style="width:160px"></div>
@@ -400,12 +490,12 @@ async function srvView() {
   const cats = [...new Set(l.map(x => x.cat).filter(Boolean))]; if (srvCat && !cats.includes(srvCat)) srvCat = '';
   const order = new Map(l.map((x, n) => [x.id, n]));
   l = l.filter(x => !srvCat || x.cat === srvCat).sort((a, b) => (b.fav ? 1 : 0) - (a.fav ? 1 : 0) || (srvSort === 'name' ? a.name.localeCompare(b.name) : srvSort === 'players' ? (b.players || 0) - (a.players || 0) : srvSort === 'online' ? (b.online ? 1 : 0) - (a.online ? 1 : 0) : order.get(a.id) - order.get(b.id)));
-  return `<div class="row" style="margin-bottom:8px"><input id="sn2" placeholder="Nom (facultatif)"><input id="sa" placeholder="Adresse du serveur ou invitation privée (HYD-…)"><button class="btn" data-a="sadd">Ajouter</button></div>
+  return `<div class="row" style="margin-bottom:8px"><input id="sn2" placeholder="Nom (facultatif)"><input id="sa" class="${privIn()}" placeholder="Adresse du serveur ou invitation privée (HYD-…)"><button class="btn" data-a="sadd">Ajouter</button></div>
   <div class="keywarn" style="margin-bottom:12px">🔑 <b>Une invitation privée, c’est comme un mot de passe.</b> Elle donne un accès direct à l’ordinateur de l’hôte : ne la publie pas (Discord public, vidéo, stream) et attention, elle s’affiche en clair dans la liste des serveurs du jeu.</div>
   <div class="row between" style="margin-bottom:10px"><div class="chips" style="margin:0"><span class="chip ${srvCat ? '' : 'a'}" data-a="scat" data-v="">Tous</span>${cats.map(c => `<span class="chip ${srvCat === c ? 'a' : ''}" data-a="scat" data-v="${esc(c)}">${esc(c)}</span>`).join('')}</div><div class="row"><span class="mu">Trier :</span><select data-srvsort="1"><option value="manual" ${srvSort === 'manual' ? 'selected' : ''}>Mon ordre</option><option value="name" ${srvSort === 'name' ? 'selected' : ''}>Nom</option><option value="players" ${srvSort === 'players' ? 'selected' : ''}>Joueurs</option><option value="online" ${srvSort === 'online' ? 'selected' : ''}>En ligne d’abord</option></select></div></div>
   <p class="mu" style="margin-top:0">« Rejoindre » lance l’instance que tu as choisie pour le serveur (liste « Instance »), sinon une instance compatible détectée (version, loader, mods). Les favoris ★ restent en haut.</p>
   ${l.length ? selBar(l.filter(x => SELS.has(x.id)).length, l.length, 's') : ''}
-  ${l.map(s => `<div class="card ${SELS.has(s.id) ? 'sel' : ''}"><div class="ic">${selBox(SELS.has(s.id), 'ssel', s.id)}<button class="star ${s.fav ? 'on' : ''}" data-a="sfav" data-id="${esc(s.id)}" title="Favori">${s.fav ? '★' : '☆'}</button>${srvTile(s, '#3a4a6a')}<div><b>${esc(s.name)}</b> ${s.cat ? `<span class="bd">${esc(s.cat)}</span>` : ''}${s.p2p ? '<span class="bd" title="Connexion directe de PC à PC, sans port ouvert">Invitation privée</span>' : ''}<small>${s.p2p ? 'invitation privée (connexion directe)' : esc(s.addr)}${s.fromGame ? ' · ajouté dans le jeu (' + esc(s.fromGame) + ')' : ''} · ${s.online === null ? 'état inconnu' : s.online ? 'en ligne · ' + s.players + '/' + s.max + ' joueurs' : 'hors ligne'}${s.version ? ' · ' + esc(s.version) : ''}</small></div></div><div class="row">${srvSort === 'manual' && !srvCat ? `<button class="ib" data-a="smove" data-id="${esc(s.id)}" data-d="-1" title="Monter">↑</button><button class="ib" data-a="smove" data-id="${esc(s.id)}" data-d="1" title="Descendre">↓</button>` : ''}<select data-sinst="${esc(s.id)}" title="Instance lancée par défaut pour ce serveur" style="max-width:170px"><option value="">Instance : auto</option>${inst.map(x => `<option value="${esc(x.id)}" ${x.id === s.inst ? 'selected' : ''}>${esc(x.name)} (${esc(x.version)})</option>`).join('')}</select><button class="btn" data-a="join" data-v="${esc(s.addr)}" ${playing ? 'disabled' : ''}>${ic('play', 12)} Rejoindre</button><button class="btn g" data-a="scfg" data-id="${esc(s.id)}">Configurer</button><button class="btn g" data-a="sdel" data-id="${esc(s.id)}">Retirer</button></div></div>`).join('') || '<p class="mu" style="text-align:center;padding:24px">Ajoute ton premier serveur.</p>'}`;
+  ${l.map(s => `<div class="card ${SELS.has(s.id) ? 'sel' : ''}"><div class="ic">${selBox(SELS.has(s.id), 'ssel', s.id)}<button class="star ${s.fav ? 'on' : ''}" data-a="sfav" data-id="${esc(s.id)}" title="Favori">${s.fav ? '★' : '☆'}</button>${srvTile(s, '#3a4a6a')}<div><b>${esc(s.name)}</b> ${s.cat ? `<span class="bd">${esc(s.cat)}</span>` : ''}${s.p2p ? '<span class="bd" title="Connexion directe de PC à PC, sans port ouvert">Invitation privée</span>' : ''}<small>${s.p2p ? 'invitation privée (connexion directe)' : priv(esc(s.addr))}${s.fromGame ? ' · ajouté dans le jeu (' + esc(s.fromGame) + ')' : ''} · ${s.online === null ? 'état inconnu' : s.online ? 'en ligne · ' + s.players + '/' + s.max + ' joueurs' : 'hors ligne'}${s.version ? ' · ' + esc(s.version) : ''}</small></div></div><div class="row">${srvSort === 'manual' && !srvCat ? `<button class="ib" data-a="smove" data-id="${esc(s.id)}" data-d="-1" title="Monter">↑</button><button class="ib" data-a="smove" data-id="${esc(s.id)}" data-d="1" title="Descendre">↓</button>` : ''}<select data-sinst="${esc(s.id)}" title="Instance lancée par défaut pour ce serveur" style="max-width:170px"><option value="">Instance : auto</option>${inst.map(x => `<option value="${esc(x.id)}" ${x.id === s.inst ? 'selected' : ''}>${esc(x.name)} (${esc(x.version)})</option>`).join('')}</select><button class="btn" data-a="join" data-v="${esc(s.addr)}" ${playing ? 'disabled' : ''}>${ic('play', 12)} Rejoindre</button><button class="btn g" data-a="scfg" data-id="${esc(s.id)}">Configurer</button><button class="btn g" data-a="sdel" data-id="${esc(s.id)}">Retirer</button></div></div>`).join('') || '<p class="mu" style="text-align:center;padding:24px">Ajoute ton premier serveur.</p>'}`;
 }
 
 /* ===== navigateur de contenu Modrinth (mods, packs de ressources, shaders) ===== */
@@ -553,6 +643,21 @@ async function wiz(s) {
 
 
 /* ===== mises à jour des mods ===== */
+/* ----- choisir la version d'un mod (Modrinth seulement) ----- */
+const modVerBtn = (x, off) => /^[A-Za-z0-9]{8}$/.test(String(x.pid)) && x.src !== 'cf' ? `<button class="ib" title="Choisir la version" data-a="modver" data-pid="${esc(x.pid)}" ${off ? 'disabled' : ''}>${ic('tag', 14)}</button>` : '';
+let VER = null;
+const hdpReport = r => { if (r.added.length) flash(r.added.length + ' data pack' + (r.added.length > 1 ? 's' : '') + ' ajouté' + (r.added.length > 1 ? 's' : '')); if (r.skipped.length) note(r.skipped.map(x => x.name + ' : ' + x.why).join(' · '), 'Data packs'); };
+const verType = t => t === 'beta' ? '<span class="bd wa">bêta</span>' : t === 'alpha' ? '<span class="bd er">alpha</span>' : '';
+async function verModal(pid) {
+  openModal('<h3>Version du mod</h3><div class="spin" style="margin:20px auto"></div>');
+  let r; try { r = await call('mods:versions', cur, pid); } catch (e) { closeModal(); throw e; }
+  VER = { pid };
+  const day = s => { const d = new Date(s); return isNaN(d) ? '' : d.toLocaleDateString(); };
+  openModal(`<h3>${esc(r.title)} : choisir la version</h3><small class="mu">Versions compatibles avec Minecraft ${esc(r.mc)} (${esc(r.loader)}).${r.pinned ? ' Version figée : « Mises à jour » ne la change pas.' : ''}</small>
+    <div class="vlist">${r.versions.length ? r.versions.map(v => `<div class="ml ${v.current ? 'sel' : ''}"><div style="flex:1"><b>${esc(v.number || v.name)}</b> ${verType(v.type)}${v.current ? ' <span class="bd ok">Installée</span>' : ''}${v.latest ? ' <span class="bd">Dernière</span>' : ''}<br><small>${esc(day(v.date))}${v.file ? ' · ' + esc(v.file) : ''}</small></div>${v.current ? '' : `<button class="btn sm" data-a="verSet" data-vid="${esc(v.vid)}">Utiliser cette version</button>`}</div>`).join('') : '<p class="mu">Aucune version compatible trouvée.</p>'}</div>
+    <small class="mu" style="display:block">Une version qui n’est pas la dernière est figée : « Mises à jour » ne la remplacera pas. Certains mods exigent une version précise de leurs dépendances (ex. Iris et Sodium) : si le jeu ne démarre plus, reviens à la version précédente.</small>
+    <div class="row end" style="margin-top:12px"><button class="btn sec" data-a="mclose">Fermer</button></div>`, true);
+}
 function updModal() {
   openModal(`<h3>Mises à jour des mods</h3>${UPD.length ? UPD.map(u => `<div class="ml"><div style="flex:1"><b>${esc(u.title)}</b><br><small>${esc(u.from)} → ${esc(u.to)}</small></div><button class="btn sm" data-a="updOne" data-pid="${esc(u.pid)}">Mettre à jour</button></div>`).join('') : '<p>Tous tes mods sont à jour pour cette version de Minecraft ✓</p>'}<div class="row end" style="margin-top:12px"><button class="btn sec" data-a="updClose">Fermer</button>${UPD.length > 1 ? '<button class="btn" data-a="updAll">Tout mettre à jour</button>' : ''}</div>`, true);
 }
@@ -630,21 +735,90 @@ function playersHtml(h, P, on) {
   <div class="row" style="margin:10px 0"><input id="hnew" placeholder="Ajouter un joueur (pseudo)" maxlength="16" style="flex:1;width:auto"><button class="btn sm" data-a="hadd" data-act="add-whitelist">+ Liste blanche</button><button class="btn g sm" data-a="hadd" data-act="op">+ Opérateur</button><button class="btn g sm" data-a="hadd" data-act="ban">Bannir</button></div>
   <div class="plcols">${lst('Liste blanche', P.whitelist, 'remove-whitelist', 'Vide : tout le monde peut entrer si elle est désactivée.')}${lst('Opérateurs', P.ops, 'deop', 'Aucun opérateur.')}${lst('Bannis', P.banned, 'pardon', 'Personne de banni.')}</div>${P.online ? '' : '<small>Serveur hors ligne (online-mode désactivé) : les pseudos sont identifiés sans compte Microsoft.</small>'}</div>`;
 }
+/* Sections repliables (« Options avancées », « Autres adresses »). L'état ouvert/fermé choisi par la personne est gardé pendant la session (HADV) ; sinon `auto` décide (ex. : playit.gg déjà utilisé = ouvert). */
+const HADV = {};
+const advBox = (key, title, hint, body, auto, cls = '') => `<details class="adv ${cls}" data-adv="${esc(key)}" ${(key in HADV ? HADV[key] : auto) ? 'open' : ''}><summary><span>${title}</span>${hint ? `<small class="mu">${hint}</small>` : ''}</summary>${body}</details>`;
+document.addEventListener('click', e => { const sm = e.target.closest && e.target.closest('details[data-adv] > summary'); if (sm) HADV[sm.parentElement.dataset.adv] = !sm.parentElement.open; });   // au clic, `open` n'a pas encore changé
+const pgAuto = (h, G) => !!(h.playitAddress || (G && ((G.tunnels || {})[h.port] || G.installing || ['starting', 'claim', 'running', 'error'].includes(G.state))));
+/* Adresse du serveur : seule « localhost » est visible d'emblée ; les adresses du réseau local et d'Internet (qui montrent ton IP ou ton tunnel) sont rangées dans « Autres adresses » (floutées par le mode confidentialité). */
+function addrCard(h, G) {
+  const net = (G && G.tunnels && G.tunnels[h.port]) || h.playitAddress || '';
+  const extra = [...(h.ip || []).map(x => ({ l: 'Réseau local (même Wi-Fi)', a: x + ':' + h.port })), ...(net ? [{ l: 'Internet (playit.gg)', a: net }] : [])];
+  const more = extra.length ? advBox(h.id + ':addr', 'Autres adresses <span class="mu">(' + extra.length + ')</span>', '', extra.map(x => `<div class="arow"><span class="mu">${x.l}</span><b>${priv(esc(x.a))}</b><button class="btn g sm" data-a="pgcopy" data-v="${esc(x.a)}">Copier</button></div>`).join('') + '<small class="mu" style="display:block;margin-top:8px">Ces adresses montrent ton IP ou ton tunnel : ne les donne qu’à des amis.</small>', false, 'in') : '';
+  return `<div class="card col"><div class="row between"><div><b>Adresse du serveur</b><br><small>Sur ce PC : <b>localhost:${h.port}</b></small></div><div class="row"><button class="btn g sm" data-a="hmine">Ajouter à Mes serveurs</button><button class="btn sm" data-a="hjoin" data-v="${h.port}" ${h.state === 'running' && !playing ? '' : 'disabled'}>${ic('play', 12)} Rejoindre avec Minecraft</button></div></div>${more}</div>`;
+}
 const p2pCard = (h, I) => {
+  const modNote = h.loader && h.loader !== 'vanilla' ? '<small class="mu" style="display:block;margin-top:8px">Serveur moddé : les amis qui rejoignent avec Hydarium reçoivent automatiquement la liste exacte de tes mods et les installent depuis Modrinth, après avoir confirmé.</small>' : '';
   const head = '<div class="card col" style="margin-top:10px"><b>Invitation privée (sans port ouvert)</b>';
-  if (!I.on) return head + '<small>Tes amis qui ont Hydarium rejoignent ton serveur avec un code, en connexion directe de PC à PC : rien à ouvrir sur ta box, et seuls ceux qui ont le code peuvent entrer. Bien plus sûr qu’ouvrir un port.</small><div class="row" style="margin-top:8px"><button class="btn sm" data-a="p2pon">Activer les invitations privées</button></div></div>';
+  if (!I.on) return head + '<small>Tes amis qui ont Hydarium rejoignent ton serveur avec un code, en connexion directe de PC à PC : rien à ouvrir sur ta box, et seuls ceux qui ont le code peuvent entrer. Bien plus sûr qu’ouvrir un port.</small><div class="row" style="margin-top:8px"><button class="btn sm" data-a="p2pon">Activer les invitations privées</button></div>' + modNote + '</div>';
   const n = I.peers || 0, st = h.state === 'running' ? (I.sharing ? `<span class="bd ok">Partagé · ${n} ami${n > 1 ? 's' : ''} connecté${n > 1 ? 's' : ''}</span>` : '<span class="bd wa">Ouverture du partage…</span>') : '<span class="bd">Le partage démarre avec le serveur</span>';
-  return head + `<div class="keywarn" style="margin-top:8px">🔑 <b>Ce code est comme un mot de passe.</b> Qui l’a peut se connecter à ton serveur et voit ton adresse IP. Ne le publie pas (Discord public, vidéo, stream, capture d’écran) : donne-le seulement à des amis, et si ça fuite clique sur « Nouveau code ».</div><div class="row" style="margin-top:8px"><b class="p2pcode">${esc(I.code)}</b><button class="btn g sm" data-a="p2pcopy" data-v="${esc(I.code)}">Copier</button>${st}</div><div class="row" style="margin-top:8px"><button class="btn g sm" data-a="p2pnew">Nouveau code</button><button class="btn g sm" data-a="p2poff">Désactiver</button></div><small>Tes amis : <b>Mes serveurs</b>, ils collent ce code dans le champ d’adresse puis « Ajouter ». Avec le mode Hydarium (Fabric 1.20.1, 1.21 et 26.x), ils peuvent aussi le coller directement à la place de l’adresse d’un serveur, dans le jeu. « Nouveau code » annule l’ancien. Sans relais, ça ne marche pas sur tous les réseaux (certains opérateurs, 4G/5G) : utilise alors playit.gg ci-dessus.</small></div>`;
+  return head + `<div class="keywarn" style="margin-top:8px">🔑 <b>Ce code est comme un mot de passe.</b> Qui l’a peut se connecter à ton serveur et voit ton adresse IP. Ne le publie pas (Discord public, vidéo, stream, capture d’écran) : donne-le seulement à des amis, et si ça fuite clique sur « Nouveau code ».</div><div class="row" style="margin-top:8px"><b class="p2pcode">${priv(esc(I.code))}</b><button class="btn g sm" data-a="p2pcopy" data-v="${esc(I.code)}">Copier</button>${st}</div><div class="row" style="margin-top:8px"><button class="btn g sm" data-a="p2pnew">Nouveau code</button><button class="btn g sm" data-a="p2poff">Désactiver</button></div><small>Tes amis : <b>Mes serveurs</b>, ils collent ce code dans le champ d’adresse puis « Ajouter ». Avec le mode Hydarium (Fabric 1.20.1, 1.21 et 26.x), ils peuvent aussi le coller directement à la place de l’adresse d’un serveur, dans le jeu. « Nouveau code » annule l’ancien. Sans relais, ça ne marche pas sur tous les réseaux (certains opérateurs, 4G/5G) : utilise alors playit.gg (« Options avancées », juste en dessous).</small>${frInvRow(I)}${modNote}</div>`;
 };
+/* ===== Amis P2P (désactivés par défaut ; voir src/main/friends.js) ===== */
+let FR = null, FRINV = null;
+const frDot = f => `<span class="fdot ${f.online ? (f.st === 'playing' ? 'play' : 'on') : ''}"></span>`;
+const frWhat = f => f.online ? (f.st === 'playing' ? 'en jeu' + (f.what ? ' · ' + esc(f.what) : '') : 'en ligne') : 'hors ligne';
+function frUpdate(s) {   // nouvel état : on redessine ce qui l'affiche, sans perdre ce que la personne est en train de taper
+  FR = s; const inp = $('#frcode'), keep = inp ? inp.value : null;
+  if ($('#frmodal')) { friendsModal(); const n = $('#frcode'); if (n && keep) n.value = keep; }
+  if (['home', 'profile'].includes(page)) render();   // pas la page d'un serveur : on n'y redessine pas en pleine saisie
+  if (typeof chatOnFriends === 'function') chatOnFriends();   // page Amis : liste des discussions
+}
+function friendsHome() {
+  const s = FR;
+  if (!s || !s.on) return `<div class="card soon" data-a="frOpen" style="cursor:pointer"><div><b>${s && s.enabled ? 'Connexion en cours…' : 'Retrouve tes amis'}</b><small>Vois qui est en ligne et invite-les sur ton serveur, sans serveur central. Désactivé par défaut.</small></div><button class="btn sm" data-a="frOpen">${s && s.enabled ? 'Ouvrir' : 'Activer'}</button></div>`;
+  const on = s.friends.filter(f => f.online);
+  return `<div class="card col">${on.length ? on.slice(0, 6).map(f => `<div class="row" style="gap:8px">${frDot(f)}<b>${esc(f.name)}</b><small class="mu">${frWhat(f)}</small></div>`).join('') : '<small class="mu">Aucun ami en ligne pour le moment.</small>'}<div class="row between" style="margin-top:6px"><small class="mu">${s.friends.length} ami${s.friends.length > 1 ? 's' : ''}${s.inbox.length ? ' · <b>' + s.inbox.length + ' demande' + (s.inbox.length > 1 ? 's' : '') + '</b>' : ''}</small><button class="btn sm" data-a="frOpen">Gérer</button></div></div>`;
+}
+const frInvRow = I => FR && FR.on && I && I.sharing && FR.friends.some(f => f.online) ? `<div class="row" style="margin-top:10px;gap:8px"><select id="frinv" class="in" style="max-width:220px">${FR.friends.filter(f => f.online).map(f => `<option value="${esc(f.key)}">${esc(f.name)}</option>`).join('')}</select><button class="btn sm" data-a="frInvGo">Inviter cet ami</button></div>` : '';
+function friendsModal() {
+  const s = FR || { on: false, enabled: false, friends: [], inbox: [], out: [], blocked: 0, blockedKeys: [], code: '', hidden: false };
+  const intro = `<p>Ajoute des amis avec un code, vois quand ils sont en ligne et invite-les sur ton serveur. Tout passe en direct entre vos ordinateurs, sans serveur central.</p>
+    <div class="alert"><b>À savoir avant d’activer.</b> Une connexion directe montre ton adresse IP à la personne en face. Tes amis te voient donc quand vous êtes en ligne tous les deux. Un <b>code ami</b> permanent est créé : quelqu’un qui le connaît peut te joindre directement (il voit alors ton IP et que tu es en ligne), mais ne peut que t’envoyer une demande. Ne le donne qu’à des personnes de confiance. Tu peux apparaître hors ligne, bloquer, ou tout effacer quand tu veux.</div>
+    <div class="row" style="margin-top:12px"><button class="btn" data-a="frOn">Activer les amis</button><button class="btn sec" data-a="mclose">Plus tard</button></div>`;
+  const reqs = s.inbox.length ? `<div class="sh"><h3>Demandes reçues (${s.inbox.length})</h3></div>${s.inbox.map(r => `<div class="ml"><div style="flex:1"><b>${esc(r.name)}</b><br><small class="mu">veut être ton ami</small></div><button class="btn sm" data-a="frAcc" data-k="${esc(r.key)}">Accepter</button><button class="btn g sm" data-a="frDec" data-k="${esc(r.key)}">Refuser</button><button class="btn dg sm" data-a="frBlk" data-k="${esc(r.key)}">Bloquer</button></div>`).join('')}` : '';
+  const outs = s.out.length ? `<div class="sh"><h3>Demandes envoyées (${s.out.length})</h3></div>${s.out.map(r => `<div class="ml"><div style="flex:1"><b>${esc(r.key.slice(0, 8))}…</b><br><small class="mu">${r.delivered ? 'envoyée, en attente de réponse' : 'en attente : livrée quand la personne sera en ligne'}</small></div><button class="btn g sm" data-a="frCan" data-k="${esc(r.key)}">Annuler</button></div>`).join('')}` : '';
+  const list = `<div class="sh"><h3>Mes amis (${s.friends.length})</h3></div>${s.friends.length ? s.friends.map(f => `<div class="ml">${frDot(f)}<div style="flex:1"><b>${esc(f.name)}</b><br><small class="mu">${f.pendingAccept ? 'en attente de sa connexion pour finaliser' : frWhat(f)}</small></div><button class="btn g sm" data-a="frRm" data-k="${esc(f.key)}" data-n="${esc(f.name)}">Retirer</button></div>`).join('') : '<p class="mu">Aucun ami pour l’instant. Donne ton code ou ajoute celui d’un ami ci-dessus.</p>'}`;
+  const body = `<div class="row between" style="margin-top:6px"><small class="mu">Connecté au réseau d’amis${s.name ? ' en tant que <b>' + esc(s.name) + '</b>' : ''}</small><div class="row" style="gap:8px"><small>Apparaître hors ligne</small><button class="swt ${s.hidden ? 'on' : ''}" data-a="frHide" title="Tes amis ne te voient plus connecté"></button></div></div>
+    <div class="sh"><h3>Mon code ami</h3></div><div class="card col"><div class="row between"><code class="frcode">${priv(esc(s.code))}</code><div class="row"><button class="btn g sm" data-a="frCopy">${ic('copy', 13)} Copier</button><button class="btn g sm" data-a="frReset">Nouveau code</button></div></div><small class="mu">Permanent. Donne-le à un ami pour qu’il t’envoie une demande. « Nouveau code » efface tous tes contacts.</small></div>
+    <div class="sh"><h3>Ajouter un ami</h3></div><div class="row" style="gap:8px"><input id="frcode" class="in" placeholder="Code ami de ton ami (HYA-…)" style="flex:1" autocomplete="off" spellcheck="false"><button class="btn" data-a="frAdd">Envoyer la demande</button></div>
+    ${reqs}${outs}${list}
+    ${s.blocked ? `<small class="mu" style="display:block;margin-top:8px">${s.blocked} personne${s.blocked > 1 ? 's' : ''} bloquée${s.blocked > 1 ? 's' : ''} · <button class="btn g sm" data-a="frUnb">Tout débloquer</button></small>` : ''}
+    <div class="row" style="margin-top:14px;flex-wrap:wrap"><button class="btn sec" data-a="mclose">Fermer</button><button class="btn g" data-a="frOff">Désactiver les amis</button></div>`;
+  openModal(`<div id="frmodal"><div class="row between"><h3 style="margin:0">Amis</h3><button class="ib" data-a="mclose">${ic('x', 14)}</button></div>${s.on ? body : intro}</div>`, true);
+}
+/* ----- assistant de crash du serveur : bannière sur la page + fenêtre de diagnostic avec boutons de réparation ----- */
+let LASTH = null;
+const hcBanner = (h, C, on) => C && !on ? `<div class="alert" style="margin-top:10px"><div class="row between"><div><b>Le serveur s’est arrêté de façon inattendue : ${esc(C.analysis.title)}</b><br><small>${esc(C.analysis.hint)}</small></div><div class="row"><button class="btn sm" data-a="hcOpen">Diagnostiquer</button><button class="btn g sm" data-a="hcIgnore">Ignorer</button></div></div></div>` : '';
+function hcrashModal(c) {
+  const a = c.analysis;
+  openModal(`<div class="row between"><h3 style="margin:0">Le serveur s’est arrêté de façon inattendue</h3><button class="ib" data-a="mclose">${ic('x', 14)}</button></div><small>${esc(c.name)}${c.secs !== undefined ? ' · il tournait depuis ' + c.secs + ' s' : ''}${c.report ? ' · rapport : ' + esc(c.report) : ''}</small>
+  <div class="alert" style="margin-top:10px"><b>${esc(a.title)}</b><br>${esc(a.hint)}</div>
+  ${(a.actions || []).length ? `<div class="row" style="margin-top:10px;flex-wrap:wrap;gap:8px">${a.actions.map(x => `<button class="btn ${x.primary ? '' : 'g'}" data-a="hcact" data-id="${esc(x.id)}" data-v="${esc(x.v || '')}">${esc(x.label)}</button>`).join('')}</div>` : ''}
+  ${a.mods.length ? `<div class="sh"><h3>Mods suspects</h3></div>${a.mods.map(m => `<div class="ml"><div style="flex:1"><b>${esc(m.title)}</b><br><small>${esc(m.why || '')}</small></div><button class="btn g sm" data-a="hcdis" data-pid="${esc(m.pid)}">Désactiver</button><button class="btn dg sm" data-a="hcrm" data-pid="${esc(m.pid)}">Désinstaller</button></div>`).join('')}` : ''}
+  ${(a.install || []).length ? `<div class="sh"><h3>Il manque ${a.install.length > 1 ? 'ces mods' : 'ce mod'}</h3></div>${a.install.map(m => `<div class="ml"><div style="flex:1"><b>${esc(m.name)}</b><br><small>Un des mods du serveur en a besoin pour démarrer.</small></div><button class="btn sm" data-a="hcinst" data-slug="${esc(m.slug)}">${ic('down', 13)} Télécharger ${esc(m.name)}</button></div>`).join('')}` : ''}
+  <div class="sh"><h3>Journal (fin)</h3></div><pre class="con" id="hclog" style="height:190px">${esc((c.tail || []).join('\n'))}</pre>
+  <div class="row" style="margin-top:12px;flex-wrap:wrap"><button class="btn g" data-a="hccopy">Copier le journal</button><button class="btn sec" data-a="mclose">Fermer</button></div>`, true);
+  const l = $('#hclog'); if (l) l.scrollTop = l.scrollHeight; LASTH = c;
+}
+/* ----- data packs du serveur (dossier « datapacks » de son monde) ----- */
+const dpSize = n => n >= 1048576 ? (n / 1048576).toFixed(1) + ' Mo' : Math.max(1, Math.round(n / 1024)) + ' Ko';
+function dpCard(h, D, on) {
+  if (!D) return '';
+  const rows = D.packs.map(p => `<div class="ml"><div style="flex:1"><b>${esc(p.title)}</b> ${p.enabled === true ? '<span class="bd ok">Activé</span>' : p.enabled === false ? '<span class="bd">Désactivé</span>' : '<span class="bd wa" title="Pas encore connu du monde : il sera activé au prochain démarrage du serveur">Activé au démarrage</span>'}<br><small>${esc(p.name)} · ${dpSize(p.size)}</small></div>${D.hasLevel ? `<button class="swt ${p.enabled === false ? '' : 'on'}" title="${p.enabled === false ? 'Activer' : 'Désactiver'}" data-a="hdpTog" data-n="${esc(p.name)}" data-on="${p.enabled === false ? '1' : ''}" ${on ? 'disabled' : ''}></button>` : ''}<button class="ib" title="Retirer" data-a="hdpRm" data-n="${esc(p.name)}" ${on ? 'disabled' : ''}>${ic('x', 13)}</button></div>`).join('');
+  return `<div class="card col" style="margin-top:10px"><div class="row between"><h3 style="margin:0">Data packs du serveur</h3><div class="row"><button class="btn sec sm" data-a="hdpAdd" ${on ? 'disabled' : ''}>${ic('down', 13)} Importer un .zip</button><button class="btn sm" data-a="hdpCat" ${on ? 'disabled' : ''}>${ic('plus', 13)} Ajouter depuis le catalogue</button></div></div><small>Dans le monde « ${esc(D.world)} ». Tu peux aussi glisser des .zip sur la fenêtre.${D.linked ? ' Ce monde est relié à une instance : les data packs s’y appliquent aussi.' : ''} ${on ? 'Arrête le serveur pour modifier les data packs.' : ''}</small>${rows || '<p class="mu">Aucun data pack.</p>'}${D.hasLevel || !D.packs.length ? '' : '<small class="mu">L’activation et la désactivation seront possibles après le premier démarrage du serveur : les data packs ajoutés s’activent tout seuls à ce moment-là.</small>'}</div>`;
+}
 async function hostDetail() {
   const l = await call('host:list'), h = l.find(x => x.id === HID); if (!h) { page = 'host'; return hostView(); }
+  const DPK = await call('hostdp:list', HID).catch(() => null), HC = await call('host:crash', HID).catch(() => null);
   cur = HID; HOBJ = h; const pl = h.type === 'paper' ? await call('plugin:list', HID).catch(() => []) : [], hd = h.type === 'fabric' ? await call('inst:detail', HID).catch(() => null) : null;
   const PG = await call('playit:status').catch(() => null), PI = await call('p2p:info', HID).catch(() => ({ on: false, code: '', sharing: false, peers: 0 })), PL = (await call('host:players', HID).catch(() => null)) || { ops: [], whitelist: [], banned: [] }, p = await call('host:props', HID), lines = await call('host:log', HID), on = h.state !== 'stopped', S = (a, b) => a === b ? 'selected' : '';
   const ck = (k, t) => `<label class="ckb"><input type="checkbox" data-hp="${k}" ${p[k] === 'true' ? 'checked' : ''} ${on ? 'disabled' : ''}> ${t}</label>`;
   return `<div class="row between" style="margin-bottom:12px"><div class="row"><button class="btn sec sm" data-a="hback">${ic('back', 13)} Retour</button>${tile(h.icon, h.name, '#2f6b3a')}<input class="hname" data-hname="1" value="${esc(h.name)}" maxlength="40" title="Renommer le serveur"><span class="bd" title="Version du serveur">${esc(h.vlabel || (cap(h.type) + ' ' + h.version))}</span><span class="bd ${h.state === 'running' ? 'ok' : ''}">${{ stopped: 'Arrêté', starting: 'Démarrage…', running: 'En ligne', stopping: 'Arrêt…' }[h.state]}</span></div><div class="row">${on ? `<button class="btn dg" data-a="hstop" ${h.state === 'stopping' ? 'disabled' : ''}>Arrêter</button>` : `<button class="btn" data-a="hstart">${ic('play', 13)} Démarrer</button>`}<button class="btn g" data-a="hfolder" title="Ouvrir le dossier">${ic('folder', 13)}</button><button class="btn g" data-a="hexp" title="Exporter (zip à déployer ailleurs)" ${on ? 'disabled' : ''}>${ic('down', 13)} Exporter</button></div></div>
-  <div class="card col"><b>Adresses</b><small>Sur ce PC : <b>localhost:${h.port}</b>${h.ip.length ? ' · Réseau local (même Wi-Fi) : ' + h.ip.map(x => '<b>' + esc(x) + ':' + h.port + '</b>').join(', ') : ''} ${(PG && PG.tunnels && PG.tunnels[h.port]) || h.playitAddress ? '· Internet (playit.gg) : <b>' + esc((PG && PG.tunnels && PG.tunnels[h.port]) || h.playitAddress) + '</b>' : ''}</small><div class="row" style="margin-top:8px"><button class="btn g sm" data-a="hmine">Ajouter à Mes serveurs</button><button class="btn sm" data-a="hjoin" data-v="${h.port}" ${h.state === 'running' && !playing ? '' : 'disabled'}>${ic('play', 12)} Rejoindre avec Minecraft</button></div></div>
-  ${pgCard(h, PG)}
+  ${hcBanner(h, HC, on)}
+  ${addrCard(h, PG)}
   ${p2pCard(h, PI)}
+  ${advBox(h.id + ':playit', 'Options avancées : accès Internet (playit.gg)', 'si l’invitation privée ne passe pas sur ton réseau', pgCard(h, PG), pgAuto(h, PG))}
   <div class="sh"><h3>Console</h3></div><pre id="hcon" class="con">${esc(lines.join('\n'))}</pre><div class="row" style="margin-top:6px"><input id="hcmd" placeholder="Commande (sans /)  ex : say Bonjour" style="flex:1;width:auto" ${on ? '' : 'disabled'}><button class="btn" data-a="hcmd" ${on ? '' : 'disabled'}>Envoyer</button></div>
   ${playersHtml(h, PL, on)}
   <div class="card col hset" style="margin-top:10px"><div class="row between"><h3 style="margin:0">Paramètres du serveur</h3>${on ? '<span class="bd wa">Arrête le serveur pour les modifier</span>' : ''}</div>
@@ -653,8 +827,9 @@ async function hostDetail() {
   <div class="hsec"><span class="hst">Joueurs et accès</span><div class="three"><div class="fld"><label>Joueurs max</label><input data-hp="max-players" type="number" min="1" value="${esc(p['max-players'])}" ${on ? 'disabled' : ''}></div><div class="fld"><label>Port</label><input data-hp="server-port" type="number" value="${esc(p['server-port'])}" ${on ? 'disabled' : ''}></div></div><div class="hck">${ck('online-mode', 'Comptes Microsoft vérifiés (recommandé)')}${ck('white-list', 'Liste blanche')}</div></div>
   <div class="hsec"><span class="hst">Performances</span><div class="three"><div class="fld"><label>Distance d’affichage <span class="mu">(chunks)</span></label><input data-hp="view-distance" type="number" min="3" max="32" value="${esc(p['view-distance'])}" ${on ? 'disabled' : ''}></div><div class="fld" style="grid-column:span 2"><label>Mémoire : <b id="hmv">${h.mem} Go</b></label><input type="range" min="1" max="16" value="${h.mem}" data-hmem="1" data-live="hmv" data-unit=" Go" style="width:100%" ${on ? 'disabled' : ''}></div></div></div></div>
  <div class="card col" style="margin-top:10px"><div class="row between"><h3 style="margin:0">Monde du serveur</h3><div class="row">${h.link ? `<button class="btn g sm" data-a="hunlink" ${on ? 'disabled' : ''}>Délier</button>` : ''}<button class="btn sec sm" data-a="hworld" ${on ? 'disabled' : ''}>${ic('link', 13)} Utiliser un monde d’une instance…</button></div></div><small>${h.link ? `Relié au monde « ${esc(h.link.folder)} » de l’instance « ${esc((byId(h.link.inst) || {}).name || '?')} » : ce sont les mêmes fichiers des deux côtés. Tu peux lancer l’instance quand le serveur est en ligne : ouvrir ce monde te fait alors rejoindre le serveur.` : `Monde actuel : « ${esc(p['level-name'] || 'world')} ». Tu peux utiliser un monde d’une instance, relié (mêmes fichiers) ou copié.`}${on ? ' Arrête le serveur pour changer de monde.' : ''}</small></div>
+  ${dpCard(h, DPK, on)}
  ${(h.type === 'forge' || h.type === 'neoforge') ? `<div class="card col" style="margin-top:10px"><h3 style="margin:0">Mods du serveur (${h.type === 'forge' ? 'Forge' : 'NeoForge'} ${esc(h.loaderVer || '')})</h3><small>Dépose les fichiers .jar des mods dans le dossier du serveur (sous-dossier « mods »). Les joueurs doivent avoir les mêmes mods. Le téléchargement direct depuis le catalogue arrivera pour les serveurs Forge.</small><div class="row" style="margin-top:8px"><button class="btn g sm" data-a="hfolder">${ic('folder', 13)} Ouvrir le dossier du serveur</button></div></div>` : ''}
-  ${h.type === 'fabric' && hd ? `<div class="card col" style="margin-top:10px"><div class="row between"><h3 style="margin:0">Mods du serveur (Fabric)</h3><div class="row"><button class="btn sec sm" data-a="modupd" ${on ? 'disabled' : ''}>${ic('refresh', 13)} Mises à jour</button>${hd.mods.length ? `<button class="btn dg sm" data-a="modrmall" data-n="${hd.mods.length}" ${on ? 'disabled' : ''}>${ic('x', 13)} Tout retirer</button>` : ''}<button class="btn sm" data-a="browse" data-t="mod" ${on ? 'disabled' : ''}>${ic('plus', 13)} Ajouter des mods</button></div></div><small>Les joueurs doivent avoir les mêmes mods côté client. ${on ? 'Arrête le serveur pour modifier les mods.' : ''}</small>${hd.mods.length ? modBar(hd.mods.filter(m => SELM.has(m.pid)).length, hd.mods.length) : ''}${modsSplit(hd.mods, x => `<div class="ml ${x.disabled ? 'dim' : ''} ${SELM.has(x.pid) ? 'sel' : ''}">${selBox(SELM.has(x.pid), 'msel', x.pid)}${tile(x.icon, x.title)}<div style="flex:1"><b>${esc(x.title)}</b> ${x.disabled ? BD.off : BD[x.status]}<br><small>${esc(x.file)}</small></div><button class="swt ${x.disabled ? '' : 'on'}" data-a="modtog" data-pid="${esc(x.pid)}" ${on ? 'disabled' : ''}></button><button class="ib" data-a="rm" data-pid="${esc(x.pid)}" ${on ? 'disabled' : ''}>${ic('x', 13)}</button></div>`, '<p class="mu">Aucun mod. Fabric API est ajouté automatiquement avec les mods qui en ont besoin.</p>')}</div>` : h.type === 'paper' ? `<div class="card col" style="margin-top:10px"><div class="row between"><h3 style="margin:0">Plugins (Paper)</h3><button class="btn sm" data-a="browse" data-t="plugin" ${on ? 'disabled' : ''}>${ic('plus', 13)} Ajouter des plugins</button></div><small>Source Modrinth ou CurseForge. Arrête le serveur pour modifier les plugins.</small>${pl.map(x => `<div class="ml ${x.enabled ? '' : 'dim'}">${tile(x.icon, x.title, '#7a5ab8')}<div style="flex:1"><b>${esc(x.title)}</b><br><small>${esc(x.file)}</small></div><button class="swt ${x.enabled ? 'on' : ''}" data-a="ptog" data-f="${esc(x.file)}" ${on ? 'disabled' : ''}></button><button class="ib" data-a="prm" data-f="${esc(x.file)}" ${on ? 'disabled' : ''}>${ic('x', 13)}</button></div>`).join('') || '<p class="mu">Aucun plugin.</p>'}</div>` : ''}
+  ${h.type === 'fabric' && hd ? `<div class="card col" style="margin-top:10px"><div class="row between"><h3 style="margin:0">Mods du serveur (Fabric)</h3><div class="row"><button class="btn sec sm" data-a="modupd" ${on ? 'disabled' : ''}>${ic('refresh', 13)} Mises à jour</button>${hd.mods.length ? `<button class="btn dg sm" data-a="modrmall" data-n="${hd.mods.length}" ${on ? 'disabled' : ''}>${ic('x', 13)} Tout retirer</button>` : ''}<button class="btn sm" data-a="browse" data-t="mod" ${on ? 'disabled' : ''}>${ic('plus', 13)} Ajouter des mods</button></div></div><small>Les joueurs doivent avoir les mêmes mods côté client. ${on ? 'Arrête le serveur pour modifier les mods.' : ''}</small>${hd.mods.length ? modBar(hd.mods.filter(m => SELM.has(m.pid)).length, hd.mods.length) : ''}${modsSplit(hd.mods, x => `<div class="ml ${x.disabled ? 'dim' : ''} ${SELM.has(x.pid) ? 'sel' : ''}">${selBox(SELM.has(x.pid), 'msel', x.pid)}${tile(x.icon, x.title)}<div style="flex:1"><b>${esc(x.title)}</b> ${x.disabled ? BD.off : BD[x.status]}${x.pin ? ' <span class="bd" title="Version choisie par toi : « Mises à jour » ne la change pas">Version figée</span>' : ''}<br><small>${esc(x.file)}</small></div>${modVerBtn(x, on)}<button class="swt ${x.disabled ? '' : 'on'}" data-a="modtog" data-pid="${esc(x.pid)}" ${on ? 'disabled' : ''}></button><button class="ib" data-a="rm" data-pid="${esc(x.pid)}" ${on ? 'disabled' : ''}>${ic('x', 13)}</button></div>`, '<p class="mu">Aucun mod. Fabric API est ajouté automatiquement avec les mods qui en ont besoin.</p>')}</div>` : h.type === 'paper' ? `<div class="card col" style="margin-top:10px"><div class="row between"><h3 style="margin:0">Plugins (Paper)</h3><button class="btn sm" data-a="browse" data-t="plugin" ${on ? 'disabled' : ''}>${ic('plus', 13)} Ajouter des plugins</button></div><small>Source Modrinth ou CurseForge. Arrête le serveur pour modifier les plugins.</small>${pl.map(x => `<div class="ml ${x.enabled ? '' : 'dim'}">${tile(x.icon, x.title, '#7a5ab8')}<div style="flex:1"><b>${esc(x.title)}</b><br><small>${esc(x.file)}</small></div><button class="swt ${x.enabled ? 'on' : ''}" data-a="ptog" data-f="${esc(x.file)}" ${on ? 'disabled' : ''}></button><button class="ib" data-a="prm" data-f="${esc(x.file)}" ${on ? 'disabled' : ''}>${ic('x', 13)}</button></div>`).join('') || '<p class="mu">Aucun plugin.</p>'}</div>` : ''}
   <p class="mu">Packs de ressources du serveur : à venir, quand les serveurs pourront être joués en ligne.</p>
   <div class="row" style="margin-top:14px"><button class="btn dg" data-a="hdel" ${on ? 'disabled' : ''}>${ic('trash', 14)} Supprimer ce serveur</button></div>`;
 }
@@ -730,7 +905,7 @@ function edLayer(c) {
 }
 function hudEditorHtml(c) {
   const M = k => (c.modules && c.modules[k]) || { on: false }, boxes = Object.keys(HUDM).filter(k => M(k).on).map(k => { const m = M(k), p = m.pos || { x: HDEF[k][0], y: HDEF[k][1] }, sample = HUDM[k][2] === 'keys' ? keysPrev(m.layout) : esc(HUDM[k][2]); return `<div class="hudm ${selMod === k ? 'sel' : ''}" data-k="${k}" style="left:${p.x * 100}%;top:${p.y * 100}%;opacity:${m.opacity || 1};transform:scale(${m.scale || 1});${m.color ? 'color:' + m.color + ';' : ''}${m.bg === false ? 'background:transparent;' : ''}">${sample}</div>`; }).join(''), sm = selMod && M(selMod).on ? M(selMod) : null;
-  return `<div class="hudw"><div class="row" style="margin-bottom:8px;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn sm" data-a="hudingame">Modifier en jeu (vrais widgets)</button><small>Dans le jeu : Maj droite. L’aperçu ci-dessous n’est qu’une maquette.</small></div><div class="hudprev ${(((c.modules || {}).hud || {}).round === false) ? 'sqhud' : ''}"><span class="hudhint">Glisse les modules où tu veux</span>${boxes}</div><div class="card col hudp">${sm ? `<b>${HUDM[selMod][0]}</b><div class="fld"><label>Taille : <b>${(sm.scale || 1).toFixed(1)}×</b></label><input type="range" min="0.5" max="3" step="0.1" value="${sm.scale || 1}" data-cm="${selMod}" data-f="scale" style="width:100%"></div><div class="fld"><label>Opacité : <b>${Math.round((sm.opacity || 1) * 100)} %</b></label><input type="range" min="0.1" max="1" step="0.05" value="${sm.opacity || 1}" data-cm="${selMod}" data-f="opacity" style="width:100%"></div><div class="row"><label class="ckb"><input type="checkbox" data-cm="${selMod}" data-f="bg" ${sm.bg !== false ? 'checked' : ''}> Fond</label><input type="color" data-cm="${selMod}" data-f="color" value="${sm.color || '#ffffff'}" style="width:40px;height:28px;padding:0;border:0;background:none"></div>` : '<span class="mu">Clique sur un module de l’aperçu pour régler sa taille, son opacité et sa couleur.</span>'}</div></div>`;
+  return `<div class="hudw"><div class="row" style="margin-bottom:8px;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn sm" data-a="hudingame">Modifier en jeu (vrais widgets)</button><small>Ouvre l’éditeur dans le jeu (aucune touche). L’aperçu ci-dessous n’est qu’une maquette.</small></div><div class="hudprev ${(((c.modules || {}).hud || {}).round === false) ? 'sqhud' : ''}"><span class="hudhint">Glisse les modules où tu veux</span>${boxes}</div><div class="card col hudp">${sm ? `<b>${HUDM[selMod][0]}</b><div class="fld"><label>Taille : <b>${(sm.scale || 1).toFixed(1)}×</b></label><input type="range" min="0.5" max="3" step="0.1" value="${sm.scale || 1}" data-cm="${selMod}" data-f="scale" style="width:100%"></div><div class="fld"><label>Opacité : <b>${Math.round((sm.opacity || 1) * 100)} %</b></label><input type="range" min="0.1" max="1" step="0.05" value="${sm.opacity || 1}" data-cm="${selMod}" data-f="opacity" style="width:100%"></div><div class="row"><label class="ckb"><input type="checkbox" data-cm="${selMod}" data-f="bg" ${sm.bg !== false ? 'checked' : ''}> Fond</label><input type="color" data-cm="${selMod}" data-f="color" value="${sm.color || '#ffffff'}" style="width:40px;height:28px;padding:0;border:0;background:none"></div>` : '<span class="mu">Clique sur un module de l’aperçu pour régler sa taille, son opacité et sa couleur.</span>'}</div></div>`;
 }
 const MIC = { prev: '<path d="M6 5v14M19 5.5v13a.8.8 0 01-1.25.66L9.4 13.2a.8.8 0 010-1.32l8.35-5.96A.8.8 0 0119 5.5z" fill="currentColor" stroke="none"/><rect x="4.6" y="5" width="2.2" height="14" rx="1" fill="currentColor" stroke="none"/>', next: '<path d="M5 5.5v13a.8.8 0 001.25.66l8.35-5.96a.8.8 0 000-1.32L6.25 4.84A.8.8 0 005 5.5z" fill="currentColor" stroke="none"/><rect x="17.2" y="5" width="2.2" height="14" rx="1" fill="currentColor" stroke="none"/>', play: '<path d="M7 4.6v14.8a.8.8 0 001.2.7l12-7.4a.8.8 0 000-1.4l-12-7.4a.8.8 0 00-1.2.7z" fill="currentColor" stroke="none"/>', pause: '<rect x="6" y="4.5" width="4.2" height="15" rx="1.2" fill="currentColor" stroke="none"/><rect x="13.8" y="4.5" width="4.2" height="15" rx="1.2" fill="currentColor" stroke="none"/>' };
 const mic = (k, s = 14) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" aria-hidden="true">${MIC[k]}</svg>`;
@@ -742,7 +917,7 @@ async function joinView() {
   if (!S || S.state === 'idle') return '<h2 style="margin:0 0 8px">Rejoindre un serveur</h2><p class="mu">Rien en cours.</p>';
   const p = S.plan, what = p ? `Minecraft ${esc(p.version)}${p.loader !== 'vanilla' ? ' · ' + esc(ldn(p.loader)) : ''}` : '';
   const logl = (S.log || []).slice(-6).map(l => `<div class="mu" style="font-size:12px">• ${esc(l)}</div>`).join('');
-  const head = `<h2 style="margin:0 0 4px">${esc(S.addr)}</h2><p class="mu" style="margin-top:0">${what}${p && p.mods && p.mods.length ? ' · ' + p.mods.length + ' mod(s)' : ''}</p>`;
+  const head = `<h2 style="margin:0 0 4px">${priv(esc(S.addr))}</h2><p class="mu" style="margin-top:0">${what}${p && p.mods && p.mods.length ? ' · ' + p.mods.length + ' mod(s)' : ''}</p>`;
   if (S.state === 'ask') { const A = S.ask || {}; return `${head}<div class="card col" style="gap:8px"><b>Aucune instance connue pour ce serveur</b><span class="mu" style="font-size:12.5px">${esc(S.text)} Est-ce un serveur <b>Vanilla</b> ?</span>
     <div class="fld" style="margin:4px 0 0"><label>Version de Minecraft du serveur</label><select id="jver">${(A.versions || []).map(v => `<option value="${esc(v)}" ${v === A.version ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></div>
     <small class="mu">Si oui, une instance <b>Fabric</b> avec le mod Hydarium${(cfg.srvMods || []).length ? ' et tes mods par défaut (' + (cfg.srvMods || []).map(x => esc(nice(x))).join(', ') + ')' : ''} est créée puis lancée sur le serveur. Sinon, rien n’est créé.</small></div>
@@ -782,7 +957,7 @@ async function smartJoin(addr, name) {
   openModal('<h3>Recherche d’une instance compatible…</h3><div class="spin" style="margin:16px auto"></div>');
   let p; try { p = await call('srv:plan', addr); } catch (e) { closeModal(); throw e; }
   SRVQ = p;
-  if (p.preferred && p.use) { closeModal(); await play(p.use.id, { server: p.server.addr }); return; } // instance choisie pour ce serveur : lancement direct
+  if (p.preferred && p.use && !(p.sync && p.sync.todo)) { closeModal(); await play(p.use.id, { server: p.server.addr }); return; } // instance choisie pour ce serveur : lancement direct (sauf s'il faut d'abord synchroniser des mods)
   if (!p.use && !p.configured) { // aucune instance connue : Hydarium ne crée rien tout seul, il demande
     const vs = [...new Set([...(p.range || []), ...(p.version ? [p.version] : []), ...(p.releases || [])])].slice(0, 40), modded = p.loader !== 'vanilla' || (p.modCount || 0) > 0;
     openModal(`<h3>Rejoindre ${esc(p.server.name)}</h3><p class="mu">${modded ? 'Ce serveur semble moddé, et je ne peux pas deviner ses mods.' : 'Je ne peux pas connaître la version exacte de ce serveur.'}</p>
@@ -794,9 +969,12 @@ async function smartJoin(addr, name) {
   }
   openModal(`<h3>Rejoindre ${esc(p.server.name)}</h3><p>Serveur en <b>Minecraft ${esc(p.version)}</b>${p.loader !== 'vanilla' ? ' avec <b>' + esc(ldn(p.loader)) + '</b>' : ''}.</p>
   ${p.use ? `<div class="alert">Instance compatible trouvée : <b>${esc(p.use.name)}</b>. Elle sera lancée directement connectée au serveur.</div>` : `<div class="alert">Aucune instance compatible. Une nouvelle instance <b>${esc(p.server.name)}</b> (${esc(ldn(p.loader))} ${esc(p.version)}${p.mods.length ? ' + ' + p.mods.length + ' mod(s)' : ''}) sera créée puis lancée.</div>`}
+  ${p.sync ? syncBox(p.sync) : ''}
   ${p.hint.length ? `<small>Mods annoncés par le serveur : ${p.hint.map(esc).join(', ')}. Ajoute-les dans « Configurer » (noms Modrinth) pour qu’ils soient installés automatiquement.</small>` : ''}
-  <div class="row end" style="margin-top:14px"><button class="btn sec" data-a="mclose">Annuler</button><button class="btn" data-a="sjgo">${ic('play', 13)} Rejoindre</button></div>`);
+  <div class="row end" style="margin-top:14px"><button class="btn sec" data-a="mclose">Annuler</button><button class="btn" data-a="sjgo">${ic('play', 13)} ${p.sync && p.sync.todo ? 'Installer les mods et rejoindre' : 'Rejoindre'}</button></div>`);
 }
+/* mods envoyés par l'hôte du serveur (invitation privée) : ce qui sera installé, et l'avertissement de confiance */
+const syncBox = s => `<div class="alert" style="margin-top:8px">${s.todo ? `Ce serveur utilise <b>${s.total} mod${s.total > 1 ? 's' : ''}</b> (liste envoyée par son hôte). <b>${s.todo}</b> ${s.todo > 1 ? 'seront installés ou mis à jour' : 'sera installé ou mis à jour'} ${s.create ? 'dans la nouvelle instance' : 'dans cette instance'}, avec les versions exactes du serveur.<ul style="margin:8px 0 0 18px">${s.items.slice(0, 8).map(x => `<li>${esc(x.title)} <span class="mu">(${x.state === 'missing' ? 'manquant' : x.state === 'differs' ? 'autre version' : 'désactivé'})</span></li>`).join('')}${s.todo > 8 ? `<li class="mu">… et ${s.todo - 8} autre${s.todo - 8 > 1 ? 's' : ''}</li>` : ''}</ul><small class="mu" style="display:block;margin-top:6px">Un mod est du code qui s’exécute sur ton PC : n’accepte que si tu fais confiance à l’hôte. Les mods sont téléchargés depuis Modrinth, jamais depuis l’hôte.</small>` : `Tu as déjà les ${s.total} mods du serveur.`}</div>`;
 async function sjRun() {
   const p = SRVQ; let id = p.use && p.use.id;
   if (!id) {
@@ -808,13 +986,21 @@ async function sjRun() {
     for (let n = 0; n < p.mods.length; n++) { try { await call('mods:add', id, p.mods[n]); mark(n + 1, '<span class="bd ok">✔</span>'); } catch (e) { mark(n + 1, `<span class="bd er">✖ ${esc(e.message.slice(0, 50))}</span>`); } }
     inst = await call('inst:list');
   }
+  if (p.sync && p.sync.todo) {
+    openModal('<h3>Synchronisation des mods…</h3><p id="syt" class="mu">Préparation…</p><div class="spin" style="margin:12px auto"></div>');
+    let r; try { r = await call('modsync:apply', id, p.server.addr); } catch (e) { closeModal(); note(e.message, 'Mods du serveur'); return; }
+    inst = await call('inst:list'); closeModal();
+    const bad = [...r.failed.map(x => esc(x.title) + ' : ' + esc(x.why)), ...r.manual.map(x => esc(x.title) + ' : à installer toi-même (absent de Modrinth)')];
+    if (bad.length && !(await ask('Certains mods n’ont pas pu être installés', `<ul style="margin:6px 0 0 18px">${bad.slice(0, 8).map(x => `<li>${x}</li>`).join('')}</ul><p class="mu">Le serveur risque de refuser la connexion ou de planter sans eux.</p>`, 'Jouer quand même'))) return;
+    if (!bad.length) flash((r.installed.length + r.replaced.length + r.enabled.length) + ' mod' + ((r.installed.length + r.replaced.length + r.enabled.length) > 1 ? 's' : '') + ' synchronisé' + ((r.installed.length + r.replaced.length + r.enabled.length) > 1 ? 's' : '') + ' ✓');
+  }
   closeModal(); await play(id, { server: p.server.addr });
 }
 function srvCfg(id) {
   const s = saved.find(x => x.id === id), r = s.req || {};
   openModal(`<h3>Configurer « ${esc(s.name)} »</h3>
   <div class="sh" style="margin-top:4px"><h3>Le serveur</h3></div>
-  <div class="two2"><div class="fld"><label>Nom</label><input id="sq-n" value="${esc(s.name)}" maxlength="40" style="width:100%"></div><div class="fld"><label>Adresse (IP ou nom de domaine)</label><input id="sq-a" value="${esc(s.addr)}" maxlength="106" placeholder="play.exemple.fr ou 192.168.1.10:25565" style="width:100%" spellcheck="false"></div></div>
+  <div class="two2"><div class="fld"><label>Nom</label><input id="sq-n" value="${esc(s.name)}" maxlength="40" style="width:100%"></div><div class="fld"><label>Adresse (IP ou nom de domaine)</label><input id="sq-a" class="${privIn()}" value="${esc(s.addr)}" maxlength="106" placeholder="play.exemple.fr ou 192.168.1.10:25565" style="width:100%" spellcheck="false"></div></div>
   <div class="fld"><label>Catégorie (pour le classer)</label><input id="sq-c" value="${esc(s.cat || '')}" maxlength="24" placeholder="Ex. : Amis, PvP, Survie…" style="width:100%"></div>
   <div class="fld"><label>Instance lancée par défaut</label><select id="sq-i"><option value="">Automatique (instance compatible)</option>${inst.map(x => `<option value="${esc(x.id)}" ${x.id === s.inst ? 'selected' : ''}>${esc(x.name)} (${esc(x.version)}${x.loader !== 'vanilla' ? ', ' + esc(ldn(x.loader)) : ''})</option>`).join('')}</select></div>
   <div class="sh"><h3>Pour bien le rejoindre</h3></div><small style="display:block;margin-bottom:8px">Aide Hydarium à choisir ou créer la bonne instance. Laisse « Auto » pour que ce soit détecté.</small>
@@ -846,9 +1032,9 @@ function impMenu() {
   <div class="card hv" data-a="impman"><div class="ic"><div class="mt" style="background:#4f9d6a">${ic('folder', 20)}</div><div><b>Un dossier d’un autre launcher</b><small>Prism, MultiMC, CurseForge, ATLauncher, Minecraft officiel…</small></div></div></div>
   <div class="card col"><div class="ic"><div class="mt" style="background:#b388ff">${ic('link', 20)}</div><div><b>Un code de partage Hydarium</b></div></div><div class="row" style="margin-top:8px"><input id="cd" placeholder="HYD1…" style="flex:1;width:auto"><button class="btn g" data-a="impcode">Importer</button></div></div></div><div class="row end" style="margin-top:12px"><button class="btn sec" data-a="mclose">Fermer</button></div>`);
 }
-async function impFile() {
-  openModal('<h3>Import du modpack</h3><p id="imptx" class="mu">Choisis un fichier…</p><div class="bar" style="width:100%"><i id="impb" style="width:0"></i></div>');
-  let r; try { r = await call('modpack:import'); } catch (e) { closeModal(); if (/clé CurseForge/i.test(e.message)) { cfKeyModal('Ce modpack vient de CurseForge : ajoute ta clé gratuite, puis relance l’import.'); return; } throw e; }
+async function impFile(file) {
+  openModal(`<h3>Import du modpack</h3><p id="imptx" class="mu">${file ? 'Lecture du pack…' : 'Choisis un fichier…'}</p><div class="bar" style="width:100%"><i id="impb" style="width:0"></i></div>`);
+  let r; try { r = await call('modpack:import', file); } catch (e) { closeModal(); if (/clé CurseForge/i.test(e.message)) { cfKeyModal('Ce modpack vient de CurseForge : ajoute ta clé gratuite, puis relance l’import.'); return; } throw e; }
   if (!r) return closeModal(); inst = await call('inst:list');
   openModal(`<h3>Modpack importé ✓</h3><p>« ${esc(r.name)} » (${esc({ mrpack: 'Modrinth', curseforge: 'CurseForge', prism: 'Prism / MultiMC' }[r.kind])}) est prêt.</p>${r.bad.length ? `<div class="note" style="border-color:var(--wa)">${r.bad.length} fichier(s) n’ont pas pu être téléchargés : ${r.bad.slice(0, 5).map(esc).join(', ')}.</div>` : ''}<div class="row end"><button class="btn sec" data-a="mclose">Fermer</button><button class="btn" data-a="open" data-id="${esc(r.id)}" data-close="1">Ouvrir l’instance</button></div>`); render();
 }
@@ -906,7 +1092,7 @@ function statsHtml(z) {
   return `${fun.length ? `<div class="note">${fun.join(' · ')}</div>` : ''}
   <div class="sh" style="margin-top:0"><h3>Temps de jeu</h3></div><div class="stat">${card('⏱', 'Total', hrs(tot))}${card('🎮', 'Lancements', nf(z.launches), z.crashes ? nf(z.crashes) + ' plantage(s)' : 'aucun plantage')}${card('🏆', 'Plus longue session', hrs(z.longest))}${card('⭐', 'Instance préférée', z.favorite ? esc(z.favorite.name) : '—', z.favorite ? hrs(z.favorite.secs) : '')}</div>
   <div class="card" style="display:block;margin-top:10px"><b>14 derniers jours</b><div class="bars14">${z.days.map(d => `<div class="b14" title="${d.d} : ${hrs(d.secs)}"><i style="height:${Math.max(3, Math.round(d.secs / mx * 100))}%"></i><small>${d.d.slice(3)}</small></div>`).join('')}</div></div>
-  <div class="sh"><h3>Serveurs</h3></div><div class="stat">${card('🔌', 'Connexions à des serveurs', nf(z.joins))}${card('🌐', 'Serveurs différents', nf(z.serversJoined))}${card('📌', 'Serveurs enregistrés', nf(z.serversSaved))}${card('🖥', 'Serveurs hébergés', nf(z.hosts))}${card('⏳', 'Temps sur serveurs', hrs(z.srvSecs))}${card('💀', 'Morts sur serveurs', nf(z.srvDeaths))}${card('🧭', 'Distance sur serveurs', z.srvKm.toLocaleString('fr-FR') + ' km')}</div><small class="mu">Morts et distance sur serveurs : relevées par le mod Hydarium. S’il n’est pas construit pour la version jouée, seul le temps passé est compté.</small>${z.topServers.length ? `<div class="card" style="display:block;margin-top:10px"><b>Serveurs les plus visités</b>${z.topServers.map(t => `<div class="row between" style="padding:4px 0"><span>${esc(t.addr)}</span><span class="mu">${t.n ? t.n + ' fois' : ''}${t.n && t.secs ? ' · ' : ''}${t.secs ? hrs(t.secs) : ''}</span></div>`).join('')}</div>` : ''}
+  <div class="sh"><h3>Serveurs</h3></div><div class="stat">${card('🔌', 'Connexions à des serveurs', nf(z.joins))}${card('🌐', 'Serveurs différents', nf(z.serversJoined))}${card('📌', 'Serveurs enregistrés', nf(z.serversSaved))}${card('🖥', 'Serveurs hébergés', nf(z.hosts))}${card('⏳', 'Temps sur serveurs', hrs(z.srvSecs))}${card('💀', 'Morts sur serveurs', nf(z.srvDeaths))}${card('🧭', 'Distance sur serveurs', z.srvKm.toLocaleString('fr-FR') + ' km')}</div><small class="mu">Morts et distance sur serveurs : relevées par le mod Hydarium. S’il n’est pas construit pour la version jouée, seul le temps passé est compté.</small>${z.topServers.length ? `<div class="card" style="display:block;margin-top:10px"><b>Serveurs les plus visités</b>${z.topServers.map(t => `<div class="row between" style="padding:4px 0"><span>${priv(esc(t.addr))}</span><span class="mu">${t.n ? t.n + ' fois' : ''}${t.n && t.secs ? ' · ' : ''}${t.secs ? hrs(t.secs) : ''}</span></div>`).join('')}</div>` : ''}
   <div class="sh"><h3>Dans le jeu <small class="mu">(solo + serveurs)</small></h3></div><div class="stat">${card('💀', 'Morts', nf(z.deaths), z.srvDeaths ? 'dont ' + nf(z.srvDeaths) + ' sur serveurs' : '')}${card('⚔', 'Monstres tués', nf(z.mobKills), 'solo uniquement')}${card('🚶', 'Distance parcourue', z.distanceKm.toLocaleString('fr-FR') + ' km', z.srvKm ? 'dont ' + z.srvKm.toLocaleString('fr-FR') + ' km sur serveurs' : '')}${card('🦘', 'Sauts', nf(z.jumps), 'solo uniquement')}${card('⛏', 'Blocs minés', nf(z.blocksMined), 'solo uniquement')}${card('🔨', 'Objets fabriqués', nf(z.itemsCrafted), 'solo uniquement')}${card('🩸', 'Dégâts infligés', nf(z.damageDealt), 'solo uniquement')}${card('🕒', 'Temps en monde solo', z.worldHours.toLocaleString('fr-FR') + ' h')}</div>
   <div class="sh"><h3>Collection</h3></div><div class="stat">${card('📦', 'Instances', nf(z.instances), Object.entries(z.loaders).map(([k, v]) => v + ' ' + ldn(k)).join(' · '))}${card('🧩', 'Mods installés', nf(z.mods), nf(z.modsDistinct) + ' différents')}${card('🌍', 'Mondes', nf(z.worlds))}${card('📷', 'Captures d’écran', nf(z.screenshots))}${card('🎨', 'Packs de ressources', nf(z.resourcepacks))}${card('✨', 'Shaders', nf(z.shaders))}</div>`;
 }
@@ -920,7 +1106,7 @@ function pgCard(h, G) {
   const port = h.port, det = (G.tunnels || {})[port] || '', saved = h.playitAddress || '', addr = det || saved, list = G.list || [], running = G.state === 'running';
   const intro = '<small>playit.gg fait passer ton serveur par ses relais : tes amis se connectent sans que tu ouvres de port sur ta box et ton adresse IP reste cachée. Il faut le petit programme de playit (gratuit) et un compte playit gratuit. Chaque serveur peut avoir son propre tunnel.</small>';
   const manual = '<div class="row" style="margin-top:8px"><input id="pgaddr" placeholder="Adresse du tunnel (xxx.gl.at.ply.gg:12345)" value="' + esc(saved) + '" style="flex:1;width:auto"><button class="btn g sm" data-a="pgsave">Enregistrer</button></div><small id="pgres" style="display:block;margin-top:6px"></small>';
-  const addrBlock = !addr ? '' : (det ? '<small>Ton serveur est joignable ici :</small>' : '<small>Adresse enregistrée pour ce serveur :</small>') + '<div style="margin-top:6px"><b style="font-size:15px">' + esc(addr) + '</b></div>' + (det || running ? '' : '<small style="display:block;margin-top:4px">L’agent n’est pas lancé : cette adresse ne répond que lorsqu’il tourne.</small>');
+  const addrBlock = !addr ? '' : (det ? '<small>Ton serveur est joignable ici :</small>' : '<small>Adresse enregistrée pour ce serveur :</small>') + '<div style="margin-top:6px"><b style="font-size:15px">' + priv(esc(addr)) + '</b></div>' + (det || running ? '' : '<small style="display:block;margin-top:4px">L’agent n’est pas lancé : cette adresse ne répond que lorsqu’il tourne.</small>');
   const acts = addr ? '<button class="btn sm" data-a="pgcopy" data-v="' + esc(addr) + '">Copier</button>' + (det && saved !== det ? '<button class="btn g sm" data-a="pguse" data-v="' + esc(det) + '">Enregistrer pour ce serveur</button>' : '') + '<button class="btn g sm" data-a="pgcheck" data-v="' + esc(addr) + '" ' + (h.state === 'running' ? '' : 'disabled title="Démarre le serveur d’abord"') + '>Vérifier</button>' : '';
   const others = list.filter(t => !t.pending && (t.type === 'minecraft-java' || !t.type) && t.localPort !== port);
   const picker = !running || !others.length ? '' : '<div class="row" style="margin-top:8px"><select id="pgpick" style="flex:1;width:auto">' + others.map(t => '<option value="' + esc(t.id) + '">' + esc((t.name || 'Tunnel') + ' · ' + (t.address || 'en attente') + (t.localPort ? ' → port ' + t.localPort : '')) + '</option>').join('') + '</select><button class="btn g sm" data-a="pgassign" data-v="' + port + '">' + (det ? 'Utiliser ce tunnel à la place' : 'Utiliser ce tunnel pour ce serveur') + '</button></div><small style="display:block;margin-top:4px">Le tunnel choisi mènera au port ' + port + ' : il ne mènera plus à son ancien serveur.</small>';
@@ -940,19 +1126,19 @@ function pgCard(h, G) {
   const logs = (G.lines || []).slice(-12);
   return head + b + (logs.length ? '<details style="margin-top:8px"><summary><small>Journal de l’agent</small></summary><pre class="con" style="max-height:140px;overflow:auto">' + esc(logs.join('\n')) + '</pre></details>' : '') + '</div>';
 }
-const VIEWS = { ovl: ovlView, catalog: catView, host: hostView, hostd: hostDetail, home, inst: instPage, srv: srvView, shots: shotsView, set: setView, acc: profile, detail: detailView };
-function renderNav() { setTimeout(() => { trNode($('#nav')); trNode($('#me')); }, 0); $('#nav').innerHTML = NAV.map(([k, l, i]) => `<button class="nav ${page === k || (page === 'detail' && k === 'inst') || (page === 'hostd' && k === 'host') ? 'a' : ''}" data-a="p" data-v="${k}"><svg viewBox="0 0 24 24" width="18" height="18" class="i">${P[i]}</svg><span>${l}</span>${k === 'host' && HRUN ? '<i class="ron" title="Un serveur est en ligne"></i>' : ''}</button>`).join(''); }
+const VIEWS = { friends: friendsPage, ovl: ovlView, catalog: catView, host: hostView, hostd: hostDetail, home, inst: instPage, srv: srvView, shots: shotsView, set: setView, acc: profile, detail: detailView };
+function renderNav() { setTimeout(() => { trNode($('#nav')); trNode($('#me')); }, 0); $('#nav').innerHTML = NAV.map(([k, l, i]) => `<button class="nav ${page === k || (page === 'detail' && k === 'inst') || (page === 'hostd' && k === 'host') ? 'a' : ''}" data-a="p" data-v="${k}"><svg viewBox="0 0 24 24" width="18" height="18" class="i">${P[i]}</svg><span>${l}</span>${k === 'host' && HRUN ? '<i class="ron" title="Un serveur est en ligne"></i>' : ''}${k === 'friends' && CH.list.unread ? `<i class="nb">${CH.list.unread > 99 ? '99+' : CH.list.unread}</i>` : ''}</button>`).join(''); }
 const hrun = () => call('host:list').then(l => { HRUN = l.filter(h => h.state !== 'stopped').length; renderNav(); }).catch(() => {});
 async function render() {
   const my = ++rid; $('#ttl').textContent = TT[page] || ''; look();
   renderNav();
-  $('#me').innerHTML = acc ? `<span class="dot"><img alt="" src="https://mc-heads.net/avatar/${esc(acc.uuid)}/64"></span><span><b>${esc(acc.name)}</b><small>Profil ›</small></span>` : `<span class="dot">${ic('user', 16)}</span><span><b>Se connecter</b><small>Compte Microsoft</small></span>`;
+  $('#me').innerHTML = acc ? `<span class="dot"><img alt="" src="https://mc-heads.net/avatar/${esc(acc.uuid)}/64"></span><span><b>${esc(acc.name)}</b><small>${acc.offline ? 'Reconnexion…' : 'Profil ›'}</small></span>` : `<span class="dot">${ic('user', 16)}</span><span><b>Se connecter</b><small>Compte Microsoft</small></span>`;
   let h; try { h = await VIEWS[page](); } catch (e) { h = `<p class="mu">${esc(e.message)}</p>`; note(e.message, 'Erreur'); }
   if (my !== rid) return;
   const ovm = document.querySelector('.ovmain'), ovs = ovm ? ovm.scrollTop : 0, ovk = ovT + '|' + OVQ, m = $('#main'), a = document.activeElement, keep = a && a.id && m.contains(a) ? { id: a.id, v: a.value, s: a.selectionStart, e: a.selectionEnd } : null, key = page + '|' + cur + '|' + it + '|' + st, sc = key === lastKey ? m.scrollTop : 0;
   lastKey = key; m.innerHTML = h; m.scrollTop = sc; { const nm = document.querySelector('.ovmain'); if (nm && ovs && ovk === ovKey) nm.scrollTop = ovs; ovKey = ovk; }
   if (keep) { const n = document.getElementById(keep.id); if (n) { n.focus(); if (n.tagName === 'INPUT' && n.type === 'text') { n.value = keep.v; try { n.setSelectionRange(keep.s, keep.e); } catch (e) {} } } }
-  if (page === 'home') homeSrvFill(); trNode(m);
+  if (page === 'home') homeSrvFill(); if (page === 'friends') chatInit(); chatActiveSync(); trNode(m);
   if (BR && BR.need && (page === 'catalog' || (OVL && ovT === 'content'))) { BR.need = false; brSearch(false); } // la liste « populaires » s’affiche dès l’ouverture, sans devoir saisir un caractère
   document.querySelectorAll('canvas[data-sk]').forEach(drawSkin); document.querySelectorAll('canvas[data-cp]').forEach(drawCape); lazyThumbs();
 }
@@ -1086,6 +1272,45 @@ const ACT = {
     await call('mods:toggle', cur, d.pid, false); render();
   },
   modupd: async () => { openModal('<h3>Mises à jour des mods</h3><div class="spin" style="margin:20px auto"></div>'); const l = await call('mods:updates', cur).catch(e => { closeModal(); throw e; }); UPD = l; updModal(); },
+  frOpen: async () => { try { FR = await call('friends:status'); } catch (e) { /* ancien état */ } friendsModal(); },
+  frOn: async (d, t) => { t.disabled = true; t.textContent = 'Connexion…'; try { frUpdate(await call('friends:enable', true)); } catch (e) { note(e.message, 'Amis'); t.disabled = false; t.textContent = 'Activer les amis'; } },
+  frOff: async () => { if (!(await ask('Désactiver les amis ?', 'Tu ne seras plus joignable. Ta liste d’amis est gardée : tu la retrouveras en réactivant.', 'Désactiver', true))) return; frUpdate(await call('friends:enable', false)); },
+  frHide: async () => frUpdate(await call('friends:hidden', !(FR && FR.hidden))),
+  frCopy: async () => { if (FR && FR.code) { await navigator.clipboard.writeText(FR.code); flash('Code ami copié ✓'); } },
+  frReset: async () => { if (!(await ask('Nouveau code ami ?', '<b>Tous tes amis, demandes et blocages seront effacés</b> et ton ancien code ne fonctionnera plus. Tes anciens amis seront prévenus.', 'Tout effacer', true))) return; frUpdate(await call('friends:reset')); flash('Nouveau code ami créé'); },
+  frAdd: async () => { const v = ($('#frcode') || {}).value; if (!v || !v.trim()) return; try { const r = await call('friends:request', v.trim()); flash(r && r.queued ? 'Demande en attente : livrée quand la personne sera en ligne' : 'Demande envoyée ✓'); const n = $('#frcode'); if (n) n.value = ''; } catch (e) { note(e.message, 'Amis'); } frUpdate(await call('friends:status')); },
+  frAcc: async d => { try { await call('friends:accept', d.k); flash('Ami ajouté ✓'); } catch (e) { note(e.message, 'Amis'); } frUpdate(await call('friends:status')); },
+  frDec: async d => { await call('friends:decline', d.k, false); frUpdate(await call('friends:status')); },
+  frBlk: async d => { await call('friends:decline', d.k, true); frUpdate(await call('friends:status')); },
+  frCan: async d => { await call('friends:cancel', d.k); frUpdate(await call('friends:status')); },
+  frRm: async d => { if (!(await ask('Retirer cet ami ?', `« ${esc(d.n)} » sera retiré de ta liste et prévenu.`, 'Retirer', true))) return; await call('friends:remove', d.k); frUpdate(await call('friends:status')); },
+  frUnb: async () => { for (const k of (FR && FR.blockedKeys) || []) await call('friends:unblock', k); frUpdate(await call('friends:status')); },
+  frInvGo: async () => { const k = ($('#frinv') || {}).value; if (!k) return; try { await call('friends:invite', k, HID); flash('Invitation envoyée ✓'); } catch (e) { note(e.message, 'Inviter un ami'); } },
+  frJoin: async () => { const d = FRINV; if (!d) return; closeModal(); try { const r = await call('friends:join', d.code, d.name + ' (' + d.from + ')'); saved = await call('srv:saved').catch(() => saved); await smartJoin(r.addr); } catch (e) { note(e.message, 'Rejoindre'); } },
+  hcOpen: async () => { const c = await call('host:crash', HID); if (c && HOBJ) hcrashModal({ ...c, id: HID, name: HOBJ.name }); },
+  hcIgnore: async () => { await call('host:crashclear', HID); render(); },
+  hcact: async (d, t) => {
+    const c = LASTH; if (!c) return; const lab = t.textContent; let act = d.id;
+    try {
+      if (act === 'jset') { closeModal(); page = 'set'; st = 'java'; render(); return; }
+      if (act === 'jinst') { t.disabled = true; t.textContent = 'Téléchargement de Java ' + d.v + '…'; const j = await call('java:install', +d.v); jl = null; note('Java ' + j.major + ' installé'); act = 'retry'; }
+      else if (act === 'jadd') { const j = await call('java:add'); if (!j) return; jl = null; note('Java ' + j.major + ' ajouté'); act = 'retry'; }
+      else if (act === 'autojava') { await call('set:set', { autoJava: true }); cfg.autoJava = true; act = 'retry'; }
+      t.disabled = true; t.textContent = 'En cours…';
+      await call('host:crashact', c.id, act, d.v); closeModal();
+      await call('host:start', c.id).catch(e => note(e.message, 'Démarrage impossible')); render();
+    } catch (e) { t.disabled = false; t.textContent = lab; note(e.message, 'Action impossible'); }
+  },
+  hcdis: async d => { await call('host:crashact', LASTH.id, 'moddis', d.pid); flash('Mod désactivé ✓ : relance le serveur'); closeModal(); render(); },
+  hcrm: async d => { await call('host:crashact', LASTH.id, 'modrm', d.pid); flash('Mod désinstallé ✓ : relance le serveur'); closeModal(); render(); },
+  hcinst: async (d, t) => { t.disabled = true; t.textContent = 'Téléchargement…'; try { await call('mods:add', LASTH.id, d.slug); t.outerHTML = '<span class="bd ok">✔ Installé : relance le serveur</span>'; } catch (e) { t.disabled = false; t.textContent = 'Réessayer'; note(e.message, 'Téléchargement impossible'); } },
+  hccopy: async () => { await navigator.clipboard.writeText((LASTH.tail || []).join('\n')); flash('Journal copié ✓'); },
+  hdpAdd: async () => { const r = await call('hostdp:add', HID); hdpReport(r); render(); },
+  hdpCat: () => openBrowser('datapack', 'inst'),
+  hdpTog: async d => { await call('hostdp:toggle', HID, d.n, !!d.on); render(); },
+  hdpRm: async d => { if (!(await ask('Retirer ce data pack ?', `« ${esc(d.n)} » sera supprimé du monde du serveur.`, 'Retirer', true))) return; await call('hostdp:remove', HID, d.n); render(); },
+  modver: d => verModal(d.pid),
+  verSet: async (d, t) => { t.disabled = true; t.textContent = '…'; try { const r = await call('mods:setversion', cur, VER.pid, d.vid); flash(r.pinned ? 'Version installée et figée ✓' : 'Dernière version installée ✓'); } finally { closeModal(); render(); } },
   updOne: async (d, t) => { t.disabled = true; t.textContent = '…'; await call('mods:update', cur, d.pid); UPD = UPD.filter(x => x.pid !== d.pid); updModal(); },
   updAll: async () => { for (const u of [...UPD]) { try { await call('mods:update', cur, u.pid); UPD = UPD.filter(x => x.pid !== u.pid); updModal(); } catch (e) { note(u.title + ' : ' + e.message, 'Erreur'); } } },
   updClose: () => { closeModal(); render(); },
@@ -1172,6 +1397,8 @@ const ACT = {
   browse: d => openBrowser(d.t, 'inst'),
   brClose: () => { const m = BR.mode, w = BR.world; BR = null; if (m === 'create') crModal(); else if (w) worldModal(w); else { closeModal(); render(); } },
   brMore: () => brSearch(true),
+  modfclear: () => { const e = $('#modf'); if (e) { e.value = ''; e.focus(); } modFilter(''); },
+  modcat: () => { const q = MODF.trim(); openBrowser('mod'); if (q && BR) { BR.q = q; const e = $('#bq'); if (e) e.value = q; brSearch(false); } },   // aucun mod installé ne correspond : on cherche dans le catalogue
   brSrc: d => { if (d.v === 'curseforge' && !cfg.cfKey) return cfKeyModal(); setSrc(d.v); },
   cfopen: () => call('cf:openkeys'), cfkclose: () => closeModal(),
   cfkey: () => cfKeyModal(), cfkeyrm: async () => { await call('set:set', { cfKey: '' }); cfg.cfKey = ''; if (curSrc() !== SRC) SRC = 'modrinth'; render(); },
@@ -1220,7 +1447,11 @@ const ACT = {
     catch (e) { closeModal(); note(e.message, 'Export impossible'); }
   },
   wOp: async d => { if (d.op === 'delete' && !(await ask('Supprimer « ' + esc(d.w) + ' » ?', 'Le monde sera supprimé définitivement. Pense à le sauvegarder avant.', 'Supprimer'))) return; await call('worlds:op', cur, d.w, d.op); flash(d.op === 'backup' ? 'Sauvegarde créée dans le dossier backups' : d.op === 'dup' ? 'Monde dupliqué' : 'Monde supprimé'); render(); },
-  cover: async d => { await setI({ cover: d.v }); render(); },
+  cover: async d => { await setI({ cover: d.v }); await refresh(); },   // refresh() recharge AUSSI la liste globale des instances : sinon la page « Instances » gardait l'ancienne icône jusqu'au redémarrage
+  itemSet: async d => { await setI({ item: d.v }); await refresh(); },
+  imgPick: async () => { if (await call('inst:imgpick', cur)) { await refresh(); flash('Image enregistrée'); } },
+  imgPack: async () => { try { await call('inst:imgpack', cur); await refresh(); flash('Image officielle du modpack appliquée'); } catch (e) { note(e.message, 'Image du modpack'); } },
+  imgClear: async () => { await call('inst:imgclear', cur); delete IMG[cur]; await refresh(); flash('Image retirée'); },
   jvmp: async d => { $('#jvm').value = d.v; await setI({ jvm: d.v }); flash('Enregistré'); },
   edflip: () => { const b = $('.edbar'); if (!b) return; const down = b.dataset.pos === 'bottom'; b.dataset.pos = down ? '' : 'bottom'; b.style.top = down ? '12px' : 'auto'; b.style.bottom = down ? 'auto' : '12px'; b.style.left = '50%'; b.style.transform = 'translateX(-50%)'; },
   shAnn: () => annotate(), shot: d => shotModal(+d.i), shNav: d => shotModal(SH.cur + +d.v),
@@ -1235,7 +1466,13 @@ const ACT = {
   skDelDef: async d => { if (await ask('Retirer ce skin par défaut ?', 'Il disparaît de ta liste mais tu peux le restaurer à tout moment. Ton skin actuel sur le compte Mojang ne change pas.', 'Retirer')) { await call('skins:remove', d.id); render(); } },
   updCheck: async () => { try { UPS = await call('update:check'); } catch (e) { flash('Erreur : ' + e.message); } const e = $('#updc'); if (e) e.outerHTML = updCard(); },
   updInstall: async d => { if (await ask('Redémarrer pour installer ?', 'Hydarium se ferme, installe la mise à jour puis se relance. Les serveurs hébergés par le launcher seront arrêtés.', 'Installer', false)) { try { await call('update:install'); } catch (e) { flash('Erreur : ' + e.message); } } },
+  eye: (d, el) => { const p = el.previousElementSibling; if (!p) return; clearTimeout(p._t); p.classList.toggle('show'); if (p.classList.contains('show')) p._t = setTimeout(() => p.classList.remove('show'), 8000); },
+  tosAccept: async () => { const ck = $('#tosok'); if (!ck || !ck.checked) return; cfg.tosAccepted = TOS_VERSION; await call('set:set', { tosAccepted: TOS_VERSION, tosAt: Date.now() }); const e = $('#tos'); if (e) e.remove(); },
+  tosQuit: () => call('win', 'close'),
+  tosClose: () => { const e = $('#tos'); if (e) e.remove(); },
+  tosView: () => tosShow(true),
   updOpen: () => call('update:open').catch(() => {}),
+  updCancel: async () => { UPS = await call('update:cancel').catch(() => UPS); updBar(UPS); const e = $('#updc'); if (e) e.outerHTML = updCard(); toast('Mise à jour repoussée : elle s’installera à la fermeture du launcher.'); },
   skRetry: async () => { flash('Téléchargement des skins par défaut…'); await call('skins:retry'); render(); },
   skRestore: async () => { await call('skins:restore'); flash('Skins par défaut restaurés'); render(); },
   skExp: async d => { if (await call('skins:export', d.id)) flash('Skin exporté'); },
@@ -1294,6 +1531,158 @@ const ACT = {
   crCover: d => { CR.cover = d.v; crModal(); },
   crGo: () => crGo()
 };
+/* ===== Chat entre amis (voir src/main/chat.js) : page « Amis », cartes de partage, groupes ===== */
+Object.assign(P, { chat: '<path d="M4 5h16v11H9l-5 4z"/>', users: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.5 2.7-6 6-6s6 2.5 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14c3 0 5 2 5 5"/>' });
+const CH = { conv: null, list: { convs: {}, groups: [], unread: 0 }, msgs: [], th: {}, draft: {}, busy: new Set(), wasOn: null, stick: true, loaded: false };
+const chG = id => String(id).startsWith('g:');
+const chLetter = n => ([...String(n || '?')][0] || '?').toUpperCase();
+const chLoc = () => (window.UILANG === 'en' ? 'en-GB' : 'fr-FR');
+const chTime = ts => new Date(ts).toLocaleTimeString(chLoc(), { hour: '2-digit', minute: '2-digit' });
+const chDay = ts => new Date(ts).toLocaleDateString(chLoc(), { weekday: 'long', day: 'numeric', month: 'long' });
+const chInstMeta = i => `${i.loader && i.loader !== 'vanilla' ? i.loader[0].toUpperCase() + i.loader.slice(1) : 'Vanilla'} ${i.version} · ${(i.mods || []).length} mod${(i.mods || []).length > 1 ? 's' : ''}`;
+/** toutes les discussions possibles : chaque ami + chaque groupe, les plus récentes d'abord */
+function chConvs() {
+  const L = CH.list, out = [];
+  for (const f of (FR && FR.friends) || []) { const s = L.convs[f.key] || {}; out.push({ id: f.key, kind: 'dm', name: f.name, online: f.online, st: f.st, what: f.what, unread: s.unread || 0, last: s.last || null }); }
+  for (const g of L.groups) { const s = L.convs[g.id] || {}; out.push({ id: g.id, kind: 'group', name: g.name, g, unread: s.unread || 0, last: s.last || null }); }
+  return out.sort((a, b) => ((b.last ? b.last.ts : 0) - (a.last ? a.last.ts : 0)) || ((b.online ? 1 : 0) - (a.online ? 1 : 0)) || a.name.localeCompare(b.name));
+}
+const chCur = () => chConvs().find(c => c.id === CH.conv) || null;
+async function chatLoadList() { try { CH.list = await call('chat:list'); } catch (e) { /* ancien état */ } }
+async function chatLoadMsgs() { if (!CH.conv) { CH.msgs = []; return; } try { CH.msgs = await call('chat:messages', CH.conv); } catch (e) { CH.msgs = []; } }
+
+async function friendsPage() {
+  if (!FR) FR = await call('friends:status').catch(() => null);
+  if (!FR || !FR.on) { CH.wasOn = false; return `<div class="card big"><div><b>${FR && FR.enabled ? 'Connexion au réseau d’amis…' : 'Discute avec tes amis'}</b><small>Messages, partage d’instances et de modpacks, groupes : tout passe en direct entre vos ordinateurs, sans serveur central. Désactivé par défaut.</small></div><button class="btn" data-a="frOpen">${FR && FR.enabled ? 'Ouvrir' : 'Activer les amis'}</button></div>`; }
+  CH.wasOn = true;
+  return `<div class="chat"><aside class="chl"><div class="chh"><b>Discussions</b><span class="row" style="gap:6px"><button class="ib" data-a="chGroup" title="Nouveau groupe" aria-label="Nouveau groupe">${ic('users', 15)}</button><button class="ib" data-a="frOpen" title="Gérer mes amis" aria-label="Gérer mes amis">${ic('gear', 15)}</button></span></div><div class="chs" id="chlist"></div></aside>
+    <section class="chm"><div class="chhd" id="chhd" hidden></div><div class="chms" id="chms"></div><div class="chbar" id="chbar" hidden></div></section></div>`;
+}
+async function chatInit() {
+  if (!$('#chlist')) return;
+  await chatLoadList(); if (CH.conv && !chCur()) CH.conv = null; await chatLoadMsgs();
+  if (!$('#chlist')) return; chatPaintList(); chatPaintHead(); chatPaintMsgs(); chatPaintBar();
+  const el = $('#chms'); if (el) el.addEventListener('scroll', () => { CH.stick = el.scrollHeight - el.scrollTop - el.clientHeight < 60; });
+  chatActiveSync();
+}
+function chItem(c) {
+  const sub = c.last ? `${c.last.mine ? 'Toi : ' : ''}<span data-notr>${esc(c.last.text)}</span>` : c.kind === 'dm' ? frWhat(c) : c.g.st === 'invited' ? 'Invitation à accepter' : c.g.members.length + ' membres';
+  return `<div class="chi ${CH.conv === c.id ? 'a' : ''}" data-a="chOpen" data-c="${esc(c.id)}"><div class="cha ${c.kind === 'group' ? 'g' : ''}">${c.kind === 'group' ? ic('users', 16) : esc(chLetter(c.name))}${c.kind === 'dm' ? frDot(c) : ''}</div><div class="chn"><b data-notr>${esc(c.name)}</b><small>${sub}</small></div>${c.unread ? `<i class="nb">${c.unread > 99 ? '99+' : c.unread}</i>` : ''}</div>`;
+}
+function chatPaintList() {
+  const n = $('#chlist'); if (!n) return; const l = chConvs();
+  n.innerHTML = l.length ? l.map(chItem).join('') : `<p class="mu" style="padding:14px">Aucun ami pour l’instant. Clique sur ${ic('gear', 12)} pour en ajouter avec un code.</p>`; trNode(n);
+}
+function chatPaintHead() {
+  const n = $('#chhd'); if (!n) return; const c = chCur(); n.hidden = !c; if (!c) { n.innerHTML = ''; return; }
+  n.innerHTML = c.kind === 'group'
+    ? `<div class="cha g">${ic('users', 16)}</div><div style="flex:1;min-width:0"><b data-notr>${esc(c.name)}</b><small data-notr>${c.g.members.map(m => esc(m.me ? 'Toi' : m.n)).join(', ')}</small></div><button class="btn g sm" data-a="chManage">Gérer le groupe</button>`
+    : `<div class="cha">${esc(chLetter(c.name))}${frDot(c)}</div><div style="flex:1"><b data-notr>${esc(c.name)}</b><small>${c.online ? frWhat(c) : 'hors ligne · il recevra tes messages à sa connexion'}</small></div>`;
+  trNode(n);
+}
+function chCard(m) {
+  const cc = m.c, k = CH.conv + '|' + m.id, busy = CH.busy.has(k), done = m.dl && m.dl.s === 'done';
+  const meta = cc.k === 'inst' ? `Instance · ${cc.l === 'vanilla' ? 'Vanilla' : cc.l[0].toUpperCase() + cc.l.slice(1)} ${esc(cc.v)} · ${cc.m} mod${cc.m > 1 ? 's' : ''}` : cc.k === 'pack' ? `Modpack ${cc.src === 'curseforge' ? 'CurseForge' : 'Modrinth'}${cc.v ? ' · ' + esc(cc.v) : ''}` : 'Invitation à un serveur';
+  const act = m.mine ? `<small>${cc.k === 'srv' ? 'Invitation envoyée' : 'Envoyé'}</small>` : done ? `<span class="bd ok" style="margin:0">✔ Ajouté</span> <button class="btn g sm" data-a="chOpenInst" data-id="${esc((m.dl && m.dl.id) || '')}">Ouvrir</button>`
+    : `<button class="btn sm" data-a="chDl" data-m="${esc(m.id)}" ${busy ? 'disabled' : ''}>${busy ? 'Téléchargement…' : cc.k === 'srv' ? ic('play', 12) + ' Rejoindre' : ic('dl', 12) + ' Télécharger'}</button>`;
+  return `<div class="chcard"><div class="chct">${tile(null, cc.n)}${cc.th ? `<img data-th="${esc(cc.th)}" alt="" style="visibility:hidden">` : ''}</div><div class="chci"><b data-notr>${esc(cc.n)}</b><small>${meta}</small><div class="row" style="margin-top:6px;gap:6px">${act}</div></div></div>`;
+}
+function chMsg(m, prev, grp) {
+  if (m.k === 's') return `<div class="chsys" data-notr>${esc(m.x)}</div>`;
+  const first = !prev || prev.k === 's' || prev.from !== m.from || m.ts - prev.ts > 300000;
+  const st = !m.mine ? '' : m.st === 'wait' ? '<span title="En attente : la personne n’est pas connectée, elle le recevra à sa connexion">🕓</span>' : m.st === 'fail' ? '<span class="er" title="Pas remis en 14 jours">non remis</span>' : '<span title="Reçu">✓</span>';
+  const body = m.c ? chCard(m) : m.bad ? '<i class="mu">Message non pris en charge : mets Hydarium à jour.</i>' : `<span data-notr>${esc(m.x)}</span>`;
+  return `<div class="chr ${m.mine ? 'me' : ''}">${!m.mine && grp && first ? `<div class="chw" data-notr>${esc(m.who)}</div>` : ''}<div class="chb ${m.c ? 'cd' : ''}">${body}<small class="cht">${chTime(m.ts)} ${st}</small></div></div>`;
+}
+function chatPaintMsgs() {
+  const n = $('#chms'); if (!n) return;
+  if (!CH.conv) { n.innerHTML = `<div class="chempty"><b>Choisis une discussion</b><small>Écris à un ami, crée un groupe, ou partage une instance : ouvre-la dans « Instances » puis « Envoyer à un ami ».</small></div>`; trNode(n); return; }
+  let h = '', day = '', prev = null; const grp = chG(CH.conv);
+  for (const m of CH.msgs) { const d = new Date(m.ts).toDateString(); if (d !== day) { day = d; prev = null; h += `<div class="chday">${esc(chDay(m.ts))}</div>`; } h += chMsg(m, prev, grp); prev = m; }
+  n.innerHTML = h || `<div class="chempty"><b>Dis bonjour 👋</b><small>Les messages et les partages arrivent en direct, ou dès que la personne se connecte.</small></div>`;
+  if (CH.stick) n.scrollTop = n.scrollHeight;
+  n.querySelectorAll('img[data-th]').forEach(async im => { const t = im.dataset.th; try { if (!CH.th[t]) CH.th[t] = await call('chat:thumb', t); if (CH.th[t]) { im.src = CH.th[t]; im.style.visibility = 'visible'; } } catch (e) { /* la lettre reste */ } });
+  trNode(n);
+}
+const chatGrow = t => { t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 120) + 'px'; };
+function chatPaintBar() {
+  const n = $('#chbar'); if (!n) return; const c = chCur(); n.hidden = !c; if (!c) { n.innerHTML = ''; n.dataset.c = ''; return; }
+  if (c.kind === 'group' && c.g.st === 'invited') { n.dataset.c = ''; n.innerHTML = `<small style="flex:1">Tu es invité dans ce groupe : tu peux lire, mais pas écrire tant que tu n’as pas rejoint.</small><button class="btn sm" data-a="chGAccept">Rejoindre</button><button class="btn g sm" data-a="chGLeave">Refuser</button>`; trNode(n); return; }
+  if (n.dataset.c === c.id && $('#chin')) return;   // la zone de saisie reste en place : ce qui est tapé n'est jamais perdu
+  n.dataset.c = c.id;
+  n.innerHTML = `<button class="ib" data-a="chPick" title="Partager une instance" aria-label="Partager une instance">${ic('cube', 15)}</button><textarea id="chin" rows="1" maxlength="1000" placeholder="Écrire un message…"></textarea><button class="btn" data-a="chSend">Envoyer</button>`;
+  const t = $('#chin'); t.value = CH.draft[c.id] || ''; chatGrow(t); trNode(n);
+}
+async function chatRefresh(conv) {
+  const before = CH.list.unread; await chatLoadList(); const cur = !conv || conv === CH.conv; if (cur) await chatLoadMsgs();
+  if (page === 'friends' && $('#chlist')) { if (CH.conv && !chCur()) { CH.conv = null; await chatLoadMsgs(); } chatPaintList(); if (cur) { chatPaintHead(); chatPaintMsgs(); chatPaintBar(); } }
+  if (CH.list.unread !== before) renderNav();
+}
+function chatOnFriends() {   // présence ou liste d'amis changée
+  if (OVL) return; if (!CH.loaded) { CH.loaded = true; chatLoadList().then(() => renderNav()); }
+  if (page !== 'friends') return; const on = !!(FR && FR.on); if (on !== CH.wasOn) return render();
+  if (on && $('#chlist')) { chatPaintList(); chatPaintHead(); chatPaintBar(); }
+}
+let chSentActive;
+function chatActiveSync() {   // le launcher ne notifie pas (et marque lu) la conversation que tu regardes
+  if (OVL) return; const want = page === 'friends' && document.hasFocus() ? CH.conv : null; if (want === chSentActive) return; chSentActive = want; call('chat:active', want).catch(() => {});
+}
+window.addEventListener('focus', chatActiveSync); window.addEventListener('blur', chatActiveSync);
+async function chatSend() {
+  const t = $('#chin'); if (!t || !CH.conv) return; const x = t.value.trim(); if (!x) return;
+  t.value = ''; CH.draft[CH.conv] = ''; chatGrow(t); CH.stick = true;
+  try { await call('chat:send', CH.conv, x); } catch (e) { t.value = x; CH.draft[CH.conv] = x; chatGrow(t); return flash('Erreur : ' + e.message); }
+  await chatRefresh(CH.conv);
+}
+const chFriendBoxes = (attr, skip = []) => FR.friends.filter(f => !skip.includes(f.key)).map(f => `<label class="ml ckb"><input type="checkbox" ${attr}="${esc(f.key)}"> ${frDot(f)}<b data-notr>${esc(f.name)}</b><small style="margin-left:auto">${frWhat(f)}</small></label>`).join('');
+const chChecked = attr => [...document.querySelectorAll('#modal [' + attr + ']:checked')].map(x => x.getAttribute(attr));
+async function chShareModal(id) {
+  const i = byId(id); if (!i) return;
+  if (!FR || !FR.on) { friendsModal(); return; }
+  if (!FR.friends.length) return note('Ajoute d’abord un ami (page Amis › ⚙) pour lui envoyer des instances.', 'Amis');
+  await chatLoadList(); const gs = CH.list.groups.filter(g => g.st === 'member'), nope = ['forge', 'neoforge'].includes(i.loader) && !i.pack;
+  openModal(`<h3>Envoyer à un ami</h3><div class="chcard"><div class="chct">${tile(null, i.name)}</div><div class="chci"><b data-notr>${esc(i.name)}</b><small>${esc(chInstMeta(i))}</small></div></div>
+    <p class="mu" style="margin:10px 0">Ton ami reçoit une carte dans le chat et choisit de la télécharger. <b>Aucun fichier ne part de ton PC</b> : ses mods sont retéléchargés depuis Modrinth${i.pack ? ' (modpack du catalogue : version d’origine)' : ''}.</p>
+    ${nope ? '<div class="alert">Les instances Forge et NeoForge ne se partagent pas encore par carte. Un modpack installé depuis le catalogue, lui, se partage.</div>' : `<div class="sh" style="margin:12px 0 6px"><h3>Amis</h3></div><div class="chpick">${chFriendBoxes('data-chs')}</div>${gs.length ? `<div class="sh" style="margin:12px 0 6px"><h3>Groupes</h3></div><div class="chpick">${gs.map(g => `<label class="ml ckb"><input type="checkbox" data-chs="${esc(g.id)}">${ic('users', 14)}<b data-notr>${esc(g.name)}</b><small style="margin-left:auto">${g.members.length} membres</small></label>`).join('')}</div>` : ''}`}
+    <div class="row end" style="margin-top:14px"><button class="btn sec" data-a="mclose">Annuler</button>${nope ? '' : `<button class="btn" data-a="chShareGo" data-id="${esc(id)}">Envoyer</button>`}</div>`, false);
+}
+async function chShareDone(r) { closeModal(); flash('Envoyé ✓'); if (r.skipped) note(r.skipped + ' mod(s) ne viennent pas de Modrinth : ils ne sont pas inclus dans la carte.', 'Partage'); CH.stick = true; await chatRefresh(); }
+function chManageModal() {
+  const c = chCur(); if (!c || c.kind !== 'group') return; const g = c.g, addable = FR.friends.filter(f => !g.members.some(m => m.k === f.key));
+  openModal(`<div class="row between"><h3 style="margin:0" data-notr>${esc(g.name)}</h3><button class="ib" data-a="mclose">${ic('x', 14)}</button></div><div class="sh"><h3>Membres (${g.members.length})</h3></div>
+    ${g.members.map(m => `<div class="ml"><div style="flex:1"><b data-notr>${esc(m.me ? 'Toi' : m.n)}</b>${m.k === g.adminKey ? ' <span class="bd">admin</span>' : ''}${!m.me && !m.friend ? '<br><small>pas dans tes amis : tes messages lui arrivent par l’admin</small>' : ''}</div>${g.admin && !m.me ? `<button class="btn g sm" data-a="chGKick" data-k="${esc(m.k)}" data-n="${esc(m.n)}">Retirer</button>` : ''}</div>`).join('')}
+    ${g.admin && addable.length ? `<div class="sh"><h3>Ajouter un ami</h3></div><div class="row" style="gap:8px"><select id="chga" class="in" style="flex:1">${addable.map(f => `<option value="${esc(f.key)}">${esc(f.name)}</option>`).join('')}</select><button class="btn sm" data-a="chGAdd">Ajouter</button></div>` : ''}
+    <small style="margin-top:10px">${g.admin ? 'Tu administres ce groupe : toi seul peux ajouter ou retirer des membres, et seulement parmi tes amis.' : 'Seul l’administrateur peut ajouter ou retirer des membres.'}</small>
+    <div class="row end" style="margin-top:14px"><button class="btn dg" data-a="chGLeave">${g.admin ? 'Dissoudre le groupe' : 'Quitter le groupe'}</button></div>`, false);
+}
+Object.assign(ACT, {
+  chOpen: async d => { CH.conv = d.c; CH.stick = true; await chatLoadMsgs(); chatPaintList(); chatPaintHead(); chatPaintMsgs(); chatPaintBar(); chatActiveSync(); const t = $('#chin'); if (t) t.focus(); },
+  chSend: () => chatSend(),
+  chShare: d => chShareModal(d.id),
+  chShareGo: async d => { const to = chChecked('data-chs'); if (!to.length) return flash('Choisis au moins un destinataire'); await chShareDone(await call('chat:share', to, d.id)); },
+  chPick: () => openModal(`<h3>Partager une instance</h3><p class="mu">Une carte part dans cette discussion ; aucun fichier n’est envoyé.</p>${inst.map(i => `<div class="ml"><div style="flex:1"><b data-notr>${esc(i.name)}</b><br><small>${esc(chInstMeta(i))}</small></div><button class="btn sm" data-a="chPickGo" data-id="${esc(i.id)}">Envoyer</button></div>`).join('') || '<p class="mu">Aucune instance.</p>'}<div class="row end" style="margin-top:12px"><button class="btn sec" data-a="mclose">Fermer</button></div>`),
+  chPickGo: async d => { await chShareDone(await call('chat:share', [CH.conv], d.id)); },
+  chDl: async d => {
+    const cv = CH.conv, m = CH.msgs.find(x => x.id === d.m); if (!m || !m.c) return;
+    if (m.c.k === 'srv' && !(await ask('Rejoindre ce serveur ?', `Tu vas rejoindre « ${esc(m.c.n)} », le serveur d’un ami. Une connexion directe lui montre ton adresse IP.`, 'Rejoindre', false))) return;
+    const k = cv + '|' + d.m; CH.busy.add(k); chatPaintMsgs(); let srv = null;
+    try { const r = await call('chat:dl', cv, d.m); if (r.kind === 'srv') srv = r; else flash(r.failed ? 'Ajouté · ' + r.failed + ' mod(s) n’ont pas pu être installés' : 'Instance ajoutée ✓'); }
+    catch (e) { note(e.message, 'Téléchargement impossible'); }
+    finally { CH.busy.delete(k); inst = await call('inst:list').catch(() => inst); await chatLoadMsgs(); chatPaintMsgs(); }
+    if (srv) { saved = await call('srv:saved').catch(() => saved); await smartJoin(srv.addr); }
+  },
+  chOpenInst: d => { if (byId(d.id)) goInst(d.id); else { page = 'inst'; render(); } },
+  chGroup: () => { if (!FR || !FR.on || !FR.friends.length) return note('Ajoute d’abord des amis pour créer un groupe.', 'Groupes'); openModal(`<h3>Nouveau groupe</h3><p class="mu">Seulement des personnes déjà dans tes amis. Chacune reçoit une invitation et décide de rejoindre (même hors ligne : l’invitation arrive à sa connexion).</p><input id="chgn" class="in" maxlength="32" placeholder="Nom du groupe" style="width:100%;margin:6px 0 10px" autocomplete="off"><div class="chpick">${chFriendBoxes('data-chg')}</div><div class="row end" style="margin-top:14px"><button class="btn sec" data-a="mclose">Annuler</button><button class="btn" data-a="chGNew">Créer le groupe</button></div>`); },
+  chGNew: async () => { const ks = chChecked('data-chg'); if (!ks.length) return flash('Choisis au moins un ami'); const id = await call('chat:gnew', ($('#chgn').value || '').trim() || 'Groupe', ks); closeModal(); CH.conv = id; CH.stick = true; await chatRefresh(); chatActiveSync(); },
+  chManage: () => chManageModal(),
+  chGAdd: async () => { const k = ($('#chga') || {}).value; if (!k) return; await call('chat:gadd', CH.conv, [k]); await chatRefresh(CH.conv); chManageModal(); },
+  chGKick: async d => { if (!(await ask('Retirer ce membre ?', `« ${esc(d.n)} » ne fera plus partie du groupe.`, 'Retirer', true))) return; await call('chat:gkick', CH.conv, d.k); await chatRefresh(CH.conv); chManageModal(); },
+  chGAccept: async () => { await call('chat:gaccept', CH.conv); await chatRefresh(CH.conv); const t = $('#chin'); if (t) t.focus(); },
+  chGLeave: async () => { const c = chCur(); if (!c || c.kind !== 'group') return; if (c.g.st === 'member' && !(await ask(c.g.admin ? 'Dissoudre ce groupe ?' : 'Quitter ce groupe ?', c.g.admin ? 'Le groupe disparaît pour tous ses membres.' : 'Tu ne recevras plus ses messages.', c.g.admin ? 'Dissoudre' : 'Quitter', true))) return; await call('chat:gleave', CH.conv); CH.conv = null; closeModal(); await chatRefresh(); chatActiveSync(); },
+});
+document.addEventListener('keydown', e => { if (e.target && e.target.id === 'chin' && e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); chatSend(); } });
+document.addEventListener('input', e => { if (e.target && e.target.id === 'chin') { CH.draft[CH.conv] = e.target.value; chatGrow(e.target); } });
+hyd.on('chat:changed', d => { if (OVL) return; chatRefresh(d && d.conv).catch(() => {}); });
 document.addEventListener('click', guard(async e => {
   if (e.target.dataset && e.target.dataset.bd) return call('ovl:close');
   if (e.target.id === 'modal' && !askRes && !BR && !ANN && !$('#pend')) return closeModal();
@@ -1306,6 +1695,7 @@ document.addEventListener('input', guard(async e => {
   const t = e.target, d = t.dataset;
   if (d.live) document.getElementById(d.live).textContent = t.value + (d.unit || '');
   if (t.id === 'bq' && BR) { BR.q = t.value; clearTimeout(brT); brT = setTimeout(() => brSearch(false), 350); }
+  if (t.id === 'modf') modFilter(t.value);
   if (d.cr === 'name') CR.name = t.value;
   if (d.ovq) { OVQ = t.value; const g = $('#mgrid'); if (g) g.innerHTML = modGrid((byId(cur) || {}).client || { modules: {} }); }
   if (e.target.id === 'tgv' && false) return;
@@ -1365,7 +1755,7 @@ document.addEventListener('keydown', async e => { if (ANN && !ANN.box && !askRes
 /* le mod a signalé une bascule faite en jeu (touche) : la case du menu Alt+H suit l'état réel */
 hyd.on('client:synced', p => { const i = byId(p.id); if (!i) return; i.client = p.client; if (page === 'ovl' && ovT === 'modules' && cur === p.id) { const g = $('#mgrid'); if (g) g.innerHTML = modGrid(p.client); const e = $('#mcount'); if (e) e.textContent = `${CM.filter(x => mOn(p.client, x[0])).length} activés sur ${CM.length}`; } else if (page === 'inst' && cur === p.id) render(); });
 hyd.on('client:progress', p => { const e = document.getElementById('r-hy'); if (e && e.lastChild) e.lastChild.outerHTML = `<span class="mu">${esc(p.text)} ${p.pct}%</span>`; const m = document.getElementById('mod-pct'); if (m) m.textContent = `${p.text} ${p.pct}%`; });
-hyd.on('update:state', u => { const was = UPS && UPS.status; UPS = u; const e = $('#updc'); if (e) e.outerHTML = updCard(); if (u.status === 'ready' && was !== 'ready') toast('Hydarium ' + u.latest + ' est prête : installation à la fermeture.'); });
+hyd.on('update:state', u => { const was = UPS && UPS.status; UPS = u; updBar(u); const e = $('#updc'); if (e) e.outerHTML = updCard(); if (u.status === 'ready' && was !== 'ready') toast('Hydarium ' + u.latest + ' est prête : installation à la fermeture.'); });
 hyd.on('update:open', () => { page = 'set'; st = 'gen'; render(); }); // clic sur la notification système
 hyd.on('client:state', () => { if (page === 'inst') render(); }); // fabrication du mod terminée (ou échouée) : l'état de la carte « Hydarium Client » se met à jour
 hyd.on('game:progress', p => { $('#bar').style.width = (p.total ? Math.round(p.task / p.total * 100) : 0) + '%'; $('#st').textContent = p.label || `Téléchargement : ${p.type} ${p.task}/${p.total}`; });
@@ -1374,17 +1764,65 @@ hyd.on('host:log', ({ id, line }) => { if (page === 'hostd' && HID === id) { con
 hyd.on('host:state', () => { hrun(); if (page === 'host' || page === 'hostd') render(); });
 hyd.on('playit:state', () => { if (page === 'hostd') render(); });
 hyd.on('p2p:state', () => { if (page === 'hostd') render(); });
+/* connexion Microsoft : rétablie en arrière-plan (le compte était « hors ligne »), ou refusée pour de bon par Microsoft */
+/* le serveur vient de s'arrêter sans qu'on l'ait demandé : on ouvre le diagnostic si on est sur sa page (sinon la bannière l'attend, et une notification a été envoyée) */
+hyd.on('host:crashed', d => { if (page === 'hostd' && d.id === HID) { call('host:crash', d.id).then(c => { if (c && HOBJ) hcrashModal({ ...c, id: d.id, name: HOBJ.name }); }).catch(() => {}); render(); } });
+hyd.on('modsync:step', d => { const e = $('#syt'); if (e) e.textContent = String(d.t || ''); });   // progression de la synchronisation des mods d'un serveur
+hyd.on('friends:changed', () => { call('friends:status').then(s => frUpdate(s)).catch(() => {}); });
+hyd.on('friends:open', d => { if (OVL) return; page = 'friends'; if (d && d.conv) CH.conv = d.conv; render(); });   // clic sur une notification d'ami ou de message
+hyd.on('friends:invite', d => {   // un ami t'invite sur son serveur : rien ne se lance sans ton accord
+  FRINV = d; openModal(`<h3>${esc(d.from)} t’invite</h3><p>Rejoindre son serveur « ${esc(d.name)} » ?</p><small class="mu">Si ce serveur utilise des mods, tu verras la liste avant toute installation.</small><div class="row end" style="margin-top:14px"><button class="btn sec" data-a="mclose">Plus tard</button><button class="btn" data-a="frJoin">${ic('play', 13)} Rejoindre</button></div>`);
+});
+hyd.on('auth:state', a => { const had = acc; acc = a; if (!a && had) note('Ta connexion Microsoft a expiré ou a été refusée : reconnecte-toi (Profil › Se connecter).', 'Microsoft'); render(); });
 hyd.on('game:crash', c => { c.at = Date.now(); LASTC = c; crashModal(c); });
 hyd.on('game:crash-open', () => { if (LASTC) crashModal(LASTC); });
 hyd.on('import:progress', p => { const t = $('#imptx'), b = $('#impb'); if (t) t.textContent = p.text; if (b) b.style.width = (p.total ? Math.round(p.done / p.total * 100) : 0) + '%'; });
+/* ===== glisser-déposer : mods, packs, shaders, data packs, mondes dans l'instance ouverte ; modpacks n'importe où (nouvelle instance) ===== */
+let dropDepth = 0, DROPBUSY = false;
+const dropHas = e => !!(e.dataTransfer && [...(e.dataTransfer.types || [])].includes('Files'));
+const dropEl = () => { let e = $('#dropz'); if (!e) { e = document.createElement('div'); e.id = 'dropz'; document.body.appendChild(e); } return e; };
+const dropTarget = () => page === 'detail' ? byId(cur) : page === 'hostd' && HOBJ && HOBJ.id === HID ? { ...HOBJ, srv: true } : null;   // instance ouverte, ou serveur hébergé ouvert
+const dropShow = on => { const z = dropEl(); if (on) { const i = dropTarget(); z.innerHTML = i && i.srv ? `<b>Dépose tes data packs ici</b><span>Fichiers .zip de data packs</span><span class="dzn">→ serveur « ${esc(i.name)} »</span>` : i ? `<b>Dépose tes fichiers ici</b><span>Mods (.jar), packs de ressources, shaders, data packs, mondes</span><span class="dzn">→ « ${esc(i.name)} »</span>` : `<b>Dépose un modpack ici</b><span>.mrpack Modrinth, .zip CurseForge ou export Prism → nouvelle instance</span>`; } z.classList.toggle('on', !!on); };
+async function onDrop(files) {
+  if (DROPBUSY) return; const paths = files.map(f => hyd.pathOf(f)).filter(Boolean);
+  if (!paths.length) return note('Dépose des fichiers depuis ton explorateur de fichiers.', 'Glisser-déposer');
+  DROPBUSY = true;
+  try {
+    const i = dropTarget(), r = await call('inst:drop', i ? i.id : '', paths), C = r.counts;
+    const L = [['mod', 'mod', 'mods'], ['resourcepack', 'pack de ressources', 'packs de ressources'], ['shader', 'shader', 'shaders'], ['datapack', 'data pack', 'data packs'], ['world', 'monde', 'mondes']];
+    const done = L.filter(([k]) => C[k]).map(([k, s, p]) => C[k] + ' ' + (C[k] > 1 ? p : s));
+    if (i && done.length) {
+      if (C.mod) ICONSEEN.delete(i.id);
+      const tab = C.mod ? 'mods' : C.world ? 'worlds' : C.resourcepack ? 'packs' : C.shader ? 'shaders' : ''; if (tab && !i.srv) it = tab;
+      flash('Ajouté à « ' + i.name + ' » : ' + done.join(', ')); await refresh();
+    }
+    const pb = [];
+    if (C.datapack && !(i && i.srv)) pb.push('Les data packs sont préparés pour le prochain nouveau monde de cette instance.');
+    if (r.skipped.length) pb.push(i ? 'Non reconnu : ' + r.skipped.slice(0, 5).join(', ') + (r.skipped.length > 5 ? '…' : '') + '.' : 'Ouvre d’abord une instance pour y déposer des mods, packs, shaders ou mondes.');
+    for (const x of r.errors.slice(0, 4)) pb.push(x.name + ' : ' + x.msg);
+    if (pb.length) note(pb.join(' '), 'Glisser-déposer');
+    if (r.modpacks.length) {
+      const f = r.modpacks[0], nm = f.split(/[\\/]/).pop();
+      if (await ask('Importer ce modpack ?', `« ${esc(nm)} » est un modpack : il sera importé comme une <b>nouvelle instance</b> (Minecraft, loader et mods compris).${r.modpacks.length > 1 ? '<br>Les autres modpacks déposés ne sont pas importés : dépose-les un par un.' : ''}`, 'Importer', false)) await impFile(f);
+    }
+  } catch (e) { note(e.message, 'Glisser-déposer'); }
+  finally { DROPBUSY = false; }
+}
+if (!OVL) {
+  document.addEventListener('dragenter', e => { if (!dropHas(e)) return; e.preventDefault(); if (dropDepth++ === 0) dropShow(true); });
+  document.addEventListener('dragover', e => { if (!dropHas(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+  document.addEventListener('dragleave', e => { if (!dropHas(e)) return; if (--dropDepth <= 0) { dropDepth = 0; dropShow(false); } });
+  document.addEventListener('drop', e => { if (!dropHas(e)) return; e.preventDefault(); dropDepth = 0; dropShow(false); onDrop([...e.dataTransfer.files]); });   // sans preventDefault, la fenêtre « ouvrirait » le fichier déposé à la place de l'interface
+}
 hyd.on('game:close', () => { call('srv:sync').then(() => call('srv:saved')).then(x => { saved = x; }).catch(() => {}); playing = null; $('#st').textContent = 'Prêt'; $('#bar').style.width = '0'; refresh(); });
 
 (async () => {
   document.addEventListener('click', e => { const w = e.target.closest('[data-win]'); if (w) call('win', w.dataset.win); });
   pf = await call('platform'); $('#ver').textContent = 'v' + pf.version;
   try { KLM = await navigator.keyboard.getLayoutMap(); } catch (e) {}
-  cfg = await call('set:get'); snaps = !!cfg.snaps; if (!cfg.uiLang) cfg.uiLang = /^en/i.test(navigator.language) ? 'en' : 'fr'; i18nWatch(); document.documentElement.lang = window.UILANG = cfg.uiLang; acc = await call('auth:current').catch(() => null);
+  cfg = await call('set:get'); snaps = !!cfg.snaps; if (!cfg.uiLang) cfg.uiLang = /^en/i.test(navigator.language) ? 'en' : 'fr'; i18nWatch(); document.documentElement.lang = window.UILANG = cfg.uiLang; tosCheck(); acc = await call('auth:current').catch(() => null);
   inst = await call('inst:list'); saved = await call('srv:saved').catch(() => []); vers = await call('versions').catch(() => []);
+  call('friends:status').then(s => frUpdate(s)).catch(() => {});
   if (OVL) { document.body.classList.add('ovl'); if (QS.get('world')) { catT = 'datapack'; CW = QS.get('world'); ovT = 'content'; } if (QS.get('type') === 'resourcepack') { catT = 'resourcepack'; ovT = 'content'; } if (QS.get('addr')) ovT = 'join'; setInterval(() => call('media:get').then(t => { NP = t; const e = $('#ovnp'); if (e) e.innerHTML = ovBar(t); }).catch(() => {}), 4000); page = 'ovl'; hyd.on('ovl:page', o => { const p = typeof o === 'string' ? o : o.page; ovT = p === 'hub' ? 'modules' : p; if (o && o.addr) JADDR = o.addr; if (o && o.world) { catT = 'datapack'; CW = o.world; BR = null; } if (o && o.type === 'resourcepack') { catT = 'resourcepack'; BR = null; } render(); }); document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#modal').hidden) call('ovl:close'); }); render(); return; }
   render(); npPoll(); hrun(); if (!(await call('wiz:state'))) wiz(0); else if (!cfg.tour) setTimeout(tourStart, 700);
 })();

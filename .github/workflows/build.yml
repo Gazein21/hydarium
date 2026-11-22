@@ -40,12 +40,26 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 25 }
       - uses: gradle/actions/setup-gradle@v3
-        with: { gradle-version: '9.5.1' }
+        with: { gradle-version: '9.6.0' }
       - name: Mod Hydarium versions récentes (Fabric 26.x)
         continue-on-error: true
+        shell: pwsh
         run: |
           gradle -p client-mod/fabric-latest build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item client-mod/fabric-latest/build/libs/hydarium-latest.jar build-client/
+          # Le dessin en jeu est compilé « sans faire échouer » le reste : on vérifie ici que ses classes sont bien dans le jar, sinon on le dit clairement.
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [IO.Compression.ZipFile]::OpenRead((Resolve-Path build-client/hydarium-latest.jar).Path)
+          $have = @($zip.Entries | ForEach-Object { $_.FullName }); $zip.Dispose()
+          $need = 'net/hydarium/client/Draw.class', 'net/hydarium/client/HudCanvas.class', 'net/hydarium/client/Gx.class', 'net/hydarium/client/HudScreen.class', 'net/hydarium/client/MenuScreen.class', 'net/hydarium/client/mixin/ServerAddressMixin.class'
+          $missing = @($need | Where-Object { $have -notcontains $_ })
+          # Fiche du jar livré : version du jeu visée + présence du dessin. Le launcher s'en sert pour ne PAS garder ce jar sur une autre version du jeu ou s'il n'a pas de dessin
+          # (il fabrique alors le bon mod sur place, voir src/main/modplan.js).
+          $mc = ((Get-Content client-mod/fabric-latest/gradle.properties | Where-Object { $_ -match '^minecraft_version=' }) -replace '^minecraft_version=', '').Trim()
+          $hasDraw = -not ($missing | Where-Object { $_ -match 'Draw|HudCanvas|Gx' })
+          (@{ mc = $mc; draw = [bool]$hasDraw } | ConvertTo-Json -Compress) | Set-Content -Encoding utf8 build-client/hydarium-latest.json
+          if ($missing.Count -gt 0) { Write-Host "::error title=Mod 26.x - classes absentes::Compilation en échec (voir les lignes « error: » plus haut dans ce journal) : $($missing -join ', ')" } else { Write-Host 'Mod 26.x : HUD, éditeur, menu et code P2P sont bien dans le jar.' }
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 8 }
       - uses: gradle/actions/setup-gradle@v3
@@ -59,7 +73,33 @@ jobs:
       - name: Tests
         continue-on-error: true   # un test en échec est signalé (annotation) mais ne bloque pas la construction de l'installateur
         run: npm test
-      - run: npm run dist:win
+      # Logo : la méthode officielle d'electron-builder (incrustation de l'icône + identité de l'exécutable) est activée ICI, sur le serveur GitHub, où elle marche toujours.
+      # En local (build-windows.bat) elle reste désactivée (elle exige des droits de liens symboliques) et scripts/after-pack.js incruste le logo à la place.
+      - name: Installeur Windows
+        id: dist1
+        continue-on-error: true
+        run: npm run dist:win -- --config.win.signAndEditExecutable=true
+      - name: "Installeur Windows (repli, logo incrusté par after-pack.js)"
+        if: steps.dist1.outcome == 'failure'
+        run: npm run dist:win
+      - name: Vérifier le logo de l'exécutable
+        shell: pwsh
+        run: |
+          $exe = 'dist/win-unpacked/Hydarium.exe'
+          $v = (Get-Item $exe).VersionInfo
+          Write-Host ("Hydarium.exe : ProductName='{0}' FileDescription='{1}' taille={2:N0}" -f $v.ProductName, $v.FileDescription, (Get-Item $exe).Length)
+          if ($v.ProductName -notmatch 'Hydarium') { Write-Host "::error title=Logo / identité de l'exécutable::Hydarium.exe porte encore l'identité d'Electron (ProductName='$($v.ProductName)') : le logo n'a pas été incrusté." }
+          # Comparaison de l'icône extraite de l'exécutable avec build/icon.png (réduite à 32 px) : l'icône d'Electron est très différente de celle d'Hydarium
+          Add-Type -AssemblyName System.Drawing
+          $a = [System.Drawing.Icon]::ExtractAssociatedIcon((Resolve-Path $exe).Path).ToBitmap()
+          $src = [System.Drawing.Image]::FromFile((Resolve-Path 'build/icon.png').Path)
+          $b = New-Object System.Drawing.Bitmap 32, 32; $g = [System.Drawing.Graphics]::FromImage($b); $g.InterpolationMode = 'HighQualityBicubic'; $g.DrawImage($src, 0, 0, 32, 32); $g.Dispose()
+          $a32 = New-Object System.Drawing.Bitmap 32, 32; $g2 = [System.Drawing.Graphics]::FromImage($a32); $g2.DrawImage($a, 0, 0, 32, 32); $g2.Dispose()
+          $diff = 0; $n = 0
+          for ($y = 0; $y -lt 32; $y += 2) { for ($x = 0; $x -lt 32; $x += 2) { $p = $a32.GetPixel($x, $y); $q = $b.GetPixel($x, $y); if ($p.A -gt 128 -or $q.A -gt 128) { $diff += [Math]::Abs($p.R - $q.R) + [Math]::Abs($p.G - $q.G) + [Math]::Abs($p.B - $q.B); $n++ } } }
+          $avg = if ($n) { $diff / $n / 3 } else { 255 }
+          Write-Host ("Écart moyen entre l'icône de Hydarium.exe et le logo : {0:N1} / 255" -f $avg)
+          if ($avg -gt 45) { Write-Host "::error title=Logo non incrusté::L'icône de Hydarium.exe ne ressemble pas au logo d'Hydarium (écart $([int]$avg)/255)." }
       # Le petit installeur télécharge « hydarium-launcher-<version>-x64.nsis.7z » depuis la Release, et le launcher se met à jour grâce à latest.yml :
       # si l’un de ces fichiers manque, on arrête tout ici plutôt que de publier une Release inutilisable.
       - name: Vérifier les fichiers de la Release
