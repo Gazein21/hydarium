@@ -1,6 +1,11 @@
 name: Build Windows
 on:
   workflow_dispatch:
+    inputs:
+      bump:
+        description: "Numéro de version : passer automatiquement à la suivante si l'actuelle est déjà publiée"
+        type: boolean
+        default: true
   push:
     tags: ['v*']
 jobs:
@@ -10,8 +15,24 @@ jobs:
     env: { CSC_IDENTITY_AUTO_DISCOVERY: 'false' }
     steps:
       - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
+      # « Run workflow » : si la version de package.json a déjà une Release (tag vX.Y.Z), on passe automatiquement à la suivante (0.10.74 -> 0.10.75).
+      # Si tu as toi-même mis un nouveau numéro dans package.json, il est gardé tel quel. Décocher « bump » pour ne jamais changer le numéro.
+      - name: Numéro de version automatique
+        id: bump
+        if: github.event_name == 'workflow_dispatch' && inputs.bump
+        shell: pwsh
+        run: |
+          $cur = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          git fetch --tags --quiet
+          if (git tag -l "v$cur") {
+            npm version patch --no-git-tag-version --ignore-scripts | Out-Null
+            $new = (Get-Content package.json -Raw | ConvertFrom-Json).version
+            Write-Host "La version $cur est déjà publiée : on passe à $new."
+            "bumped=true" >> $env:GITHUB_OUTPUT
+          } else { Write-Host "La version $cur n'est pas encore publiée : on la garde." }
       # Mode Hydarium : un jar par époque du jeu. Chaque build est indépendant et « continue-on-error » : si l’un échoue, le launcher est quand même construit
       # (il utilisera alors le HUD externe pour cette version). Les jars n’ont jamais été compilés contre Minecraft avant la première exécution de cette CI : lire les journaux.
       - run: New-Item -ItemType Directory -Force build-client | Out-Null
@@ -121,6 +142,20 @@ jobs:
         run: |
           $ver = (Get-Content package.json -Raw | ConvertFrom-Json).version
           "version=$ver" >> $env:GITHUB_OUTPUT
+      # Si le numéro a changé, on l'enregistre dans le dépôt (commit « Version X ») AVANT de créer la Release, pour que le tag pointe sur ce commit.
+      # Ensuite, dans GitHub Desktop : « Fetch origin » puis « Pull origin » pour récupérer ce commit.
+      - name: Enregistrer le nouveau numéro de version
+        id: save
+        if: steps.bump.outputs.bumped == 'true'
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "Version ${{ steps.v.outputs.version }}"
+          git push origin HEAD:${{ github.ref_name }}
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "sha=$(git rev-parse HEAD)" >> $env:GITHUB_OUTPUT
       - uses: actions/upload-artifact@v4
         with:
           name: Hydarium-Windows
@@ -135,7 +170,7 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.v.outputs.version }}
-          target_commitish: ${{ github.sha }}
+          target_commitish: ${{ steps.save.outputs.sha || github.sha }}
           name: Hydarium ${{ steps.v.outputs.version }}
           generate_release_notes: true
           files: |
