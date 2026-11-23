@@ -4,183 +4,186 @@
 
 <h1 align="center">Hydarium</h1>
 
-<p align="center"><b>Le launcher Minecraft simple, beau et communautaire.</b><br>
-Mods, serveurs, amis et client en jeu : tout au même endroit, en quelques clics.</p>
+<p align="center"><b>The simple, beautiful, community-driven Minecraft launcher.</b><br>
+Mods, servers, friends and an in-game client: everything in one place, in a few clicks.</p>
 
 <p align="center">
-  <a href="README.en.md">English</a> · <b>Français</b>
+  <a href="README.md"><img src="https://img.shields.io/badge/English-2ea8ff?style=for-the-badge" alt="English"></a>
+  <a href="README.fr.md"><img src="https://img.shields.io/badge/Fran%C3%A7ais-374151?style=for-the-badge" alt="Français"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/Gazein21/hydarium/releases/latest"><img src="https://img.shields.io/github/v/release/Gazein21/hydarium?style=for-the-badge&label=version&color=2ea8ff" alt="Dernière version"></a>
-  <a href="https://github.com/Gazein21/hydarium/releases"><img src="https://img.shields.io/github/downloads/Gazein21/hydarium/total?style=for-the-badge&color=3ddc97" alt="Téléchargements"></a>
+  <a href="https://github.com/Gazein21/hydarium/releases/latest"><img src="https://img.shields.io/github/v/release/Gazein21/hydarium?style=for-the-badge&label=version&color=2ea8ff" alt="Latest version"></a>
+  <a href="https://github.com/Gazein21/hydarium/releases"><img src="https://img.shields.io/github/downloads/Gazein21/hydarium/total?style=for-the-badge&color=3ddc97" alt="Downloads"></a>
   <img src="https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white" alt="Windows">
   <img src="https://img.shields.io/badge/Linux-222?style=for-the-badge&logo=linux&logoColor=white" alt="Linux">
-  <img src="https://img.shields.io/badge/aucune%20donn%C3%A9e%20collect%C3%A9e-1f2937?style=for-the-badge" alt="Aucune donnée collectée">
+  <img src="https://img.shields.io/badge/macOS-000?style=for-the-badge&logo=apple&logoColor=white" alt="macOS">
+  <img src="https://img.shields.io/badge/no%20data%20collected-1f2937?style=for-the-badge" alt="No data collected">
 </p>
 
 <p align="center">
-  <a href="https://github.com/Gazein21/hydarium/releases/latest"><b>⬇️ Télécharger Hydarium</b></a> ·
-  <a href="#-toutes-les-fonctionnalités">Fonctionnalités</a> ·
-  <a href="#-questions-fréquentes">FAQ</a> ·
-  <a href="https://github.com/Gazein21/hydarium/issues">Signaler un problème</a> ·
+  <a href="https://github.com/Gazein21/hydarium/releases/latest"><b>⬇️ Download Hydarium</b></a> ·
+  <a href="#-all-features">Features</a> ·
+  <a href="#-faq">FAQ</a> ·
+  <a href="https://github.com/Gazein21/hydarium/issues">Report a problem</a> ·
   <a href="mailto:help.point@hydarium.net">Contact</a>
 </p>
 
 ---
 
-## ✨ Pourquoi Hydarium ?
+## ✨ Why Hydarium?
 
-Jouer à Minecraft avec des mods, retrouver ses amis et héberger un serveur oblige souvent à jongler entre plusieurs outils, des dossiers à fouiller à la main et des réglages obscurs.
+Playing Minecraft with mods, meeting up with friends and hosting a server often means juggling several tools, digging through folders by hand and cryptic settings.
 
-**Hydarium réunit tout dans une seule application**, claire et agréable, où chaque chose se fait en quelques clics :
+**Hydarium puts everything in a single app**, clear and pleasant to use, where each task takes just a few clicks:
 
 | | |
 |---|---|
-| 🎮 **Jouer** | Instances Vanilla, Fabric, Quilt, Forge et NeoForge, connexion Microsoft, Java déjà inclus. |
-| 🧩 **Modder** | Recherche Modrinth / CurseForge, dépendances automatiques, contrôle d'intégrité. |
-| 🖥️ **Héberger** | Ton serveur en un clic, tes amis te rejoignent **sans ouvrir de port**. |
-| 👥 **Jouer ensemble** | Amis, chat, fichiers et appels vocaux en direct, sans serveur central. |
-| 🎯 **Briller en jeu** | Un client Hydarium avec widgets (FPS, CPS, touches…), zoom et luminosité. |
-| 🔒 **Respecter ta vie privée** | Aucune donnée collectée ni vendue. Jamais. |
+| 🎮 **Play** | Vanilla, Fabric, Quilt, Forge and NeoForge instances, Microsoft sign-in, Java included. |
+| 🧩 **Mod** | Modrinth / CurseForge search, automatic dependencies, integrity checks. |
+| 🖥️ **Host** | Your own server in one click; friends join **without any port forwarding**. |
+| 👥 **Play together** | Friends, chat, file sharing and voice calls, direct, with no central server. |
+| 🎯 **Stand out in game** | A Hydarium client with widgets (FPS, CPS, keystrokes…), zoom and brightness. |
+| 🔒 **Respect your privacy** | No data collected or sold. Ever. |
 
-> Hydarium est un projet personnel : pas d'entreprise derrière, pas de publicité, pas de compte à créer chez nous.
-
----
-
-## 🚀 Démarrage en 3 étapes
-
-1. **Télécharge** Hydarium depuis la [page des versions](https://github.com/Gazein21/hydarium/releases/latest) :
-   - **Windows** : `Hydarium-Installer.exe` (ou la version portable).
-   - **Linux** : `Hydarium-Linux.AppImage`. Rends-le exécutable (`chmod +x Hydarium-Linux.AppImage`) puis lance-le, sans installation.
-2. **Lance Hydarium** et connecte ton compte Microsoft. Rien d'autre à installer : Java est embarqué.
-3. **Crée une instance** (ou glisse-dépose un modpack dans la fenêtre) et clique sur **Jouer**.
-
-Les mises à jour se font ensuite **toutes seules**, en arrière-plan.
+> Hydarium is a personal project: no company behind it, no ads, no account to create with us.
 
 ---
 
-## 📖 Toutes les fonctionnalités
+## 🚀 Get started in 3 steps
 
-### 🎮 Jouer et organiser tes instances
+1. **Download** Hydarium from the [releases page](https://github.com/Gazein21/hydarium/releases/latest):
+   - **Windows**: `Hydarium-Installer.exe` (or the portable version).
+   - **Linux**: `Hydarium-Linux.AppImage`. Make it executable (`chmod +x Hydarium-Linux.AppImage`) and run it, no installation needed.
+   - **macOS**: `Hydarium-Mac-AppleSilicon.dmg` (M1 Macs and later) or `Hydarium-Mac-Intel.dmg` (older Macs). Open the DMG and drag Hydarium into *Applications*. Hydarium is not signed by Apple yet, so macOS blocks it the first time: go to *System Settings › Privacy & Security* and click **"Open Anyway"** (macOS 14 and earlier: right-click the app › *Open*). If macOS says the app is "damaged", run this once in Terminal: `xattr -dr com.apple.quarantine /Applications/Hydarium.app`.
+2. **Launch Hydarium** and sign in with your Microsoft account. Nothing else to install: Java is bundled.
+3. **Create an instance** (or drag and drop a modpack into the window) and click **Play**.
 
-Une *instance* est une installation de Minecraft indépendante (sa version, ses mods, ses mondes). Tu en as autant que tu veux, sans qu'elles se mélangent.
-
-- **Connexion Microsoft stable** : tu n'es plus déconnecté au moindre souci réseau ou quand les serveurs de Mojang répondent mal. Le jeton est renouvelé tout seul et les erreurs sont écrites clairement.
-- **Tous les types d'instances** : Vanilla, Fabric, Quilt, Forge et NeoForge. Duplique-les, règle la **mémoire** de chacune.
-- **Des icônes à ton image** : un objet Minecraft dessiné sur le décor de l'instance (au choix ou automatique), l'**image officielle du modpack**, ou **ta propre image**.
-- **Import sans effort** : reprends tes instances depuis **Prism, MultiMC ou le launcher officiel**, ou **glisse-dépose** un modpack (`.mrpack`, `.zip` CurseForge ou Prism) pour créer l'instance.
-- **Code de partage** : envoie une instance à un ami avec un simple code.
-- **Skins** : gère tes skins, avec les skins par défaut de Minecraft que tu peux retirer et restaurer.
-- **Captures d'écran** : retrouve-les directement dans le launcher.
-
-### 🧩 Gérer tes mods sans te prendre la tête
-
-- **Recherche et installation** depuis **Modrinth** (et CurseForge). Les **dépendances** sont installées automatiquement.
-- **Contrôle d'intégrité** : chaque mod est marqué *Vérifié*, *Non vérifié* ou *Manquant*. Les **incompatibilités sont détectées avant le lancement**, avec une correction en un clic.
-- **Choisis la version de chaque mod** : liste des versions compatibles, retour à une version précédente, et une version « figée » n'est pas écrasée par « Mises à jour ».
-- **Filtre instantané** sur tes mods installés.
-- **Des images partout** : même quand un mod n'en fournit pas, Hydarium retrouve son image (dans le jar, ou logo CurseForge) ou en génère une.
-- **Glisser-déposer intelligent** : dépose un mod, un pack de ressources, un shader, un data pack ou un monde dans la fenêtre. Hydarium **reconnaît le fichier par son contenu** et le range au bon endroit.
-- **Crash lisible** : quand le jeu plante, tu as un message clair avec **le mod suspect**, au lieu d'un mur de texte.
-
-### 🖥️ Jouer sur des serveurs, ou héberger le tien
-
-- **Rejoindre en un clic** : Hydarium prépare la bonne version du jeu et les bons mods.
-- **Héberge ton serveur depuis le launcher**, avec une vue épurée. Tes amis te rejoignent par une **invitation privée en connexion directe** : **pas de port à ouvrir, pas d'adresse IP à donner**.
-- **Data packs du serveur** : liste, import `.zip`, glisser-déposer, ajout depuis Modrinth, activation et désactivation.
-- **Assistant de crash serveur** : si ton serveur s'arrête sans prévenir, Hydarium **trouve la cause** (port déjà pris, data pack, mod client, mémoire, Java, monde, licence…), désigne les mods suspects et propose des **réparations qui relancent le serveur**.
-- **Serveur moddé, joueurs sereins** : ceux qui ont Hydarium reçoivent **la liste exacte des mods** de l'hôte, en versions exactes, et peuvent **tout installer d'un coup**. Les mods introuvables sur Modrinth sont signalés pour être installés à la main.
-
-### 👥 Retrouver tes amis *(activable, jamais imposé)*
-
-Tout passe **directement d'un ordinateur à l'autre**. Il n'y a pas de serveur central qui lit tes messages ou garde ta liste d'amis.
-
-- **Amis** : code ami permanent, demandes d'amis, présence *en ligne* ou *en jeu*, mode **« apparaître hors ligne »**, blocage, et **invitation directe** à rejoindre ton serveur.
-- **Chat** privé et de groupe, **partage d'instances**, **envoi de fichiers et d'images** (avec reprise automatique si la connexion coupe).
-- **Appels vocaux** à deux, de PC à PC.
-- **Désactivé par défaut** : une fenêtre t'explique clairement ce que ça change avant que tu l'actives.
-- **Anti-spam** : une demande d'ami n'affiche pas ton pseudo tant que l'autre n'a pas décidé.
-
-### 🎯 Le client Hydarium en jeu
-
-Un mod maison qui ajoute tes outils préférés **directement dans Minecraft**.
-
-- **Widgets** : touches, **CPS**, **FPS**, coordonnées, direction, armure, effets, ping, heure, mémoire, temps de session, **musique en cours**, waypoints…
-- **Éditeur en jeu** : place et règle les widgets (position, taille, opacité, couleur) **sur le vrai écran**, pas dans un menu abstrait.
-- **Zoom** : maintiens une touche, règle le niveau à la molette, avec une caméra cinématique.
-- **Luminosité** : vois dans le noir sans toucher à tes réglages de jeu.
-- **Confort de jeu** : sprint automatique, sneak permanent, marche automatique.
-- **Waypoints** : pose des repères et vois leur direction et leur distance.
-- **Menu par-dessus le jeu** (**Alt + H** par défaut) : change de skin, télécharge un mod ou regarde tes captures **sans quitter la partie**.
-- **Un raccourci pour tout masquer** : une touche cache ou affiche tout le HUD.
-
-> Le client en jeu est proposé pour plusieurs versions (dont 1.8.9, 1.12.2, 1.20.1 et 1.21.x). Sur les autres, le launcher affiche un HUD par-dessus le jeu.
-
-### 🛡️ Pensé pour être à l'aise
-
-- **Mode confidentialité** pour tes vidéos et tes streams : adresses IP, codes d'invitation et code ami sont **floutés par défaut**. Un œil pour afficher, et « Copier » marche sans rien montrer.
-- **Java embarqué** : le joueur n'a rien d'autre à installer.
-- **Mises à jour automatiques** en arrière-plan, sous Windows comme sous Linux.
-- **Interface en français**, avec une traduction anglaise en cours.
-- **Un écran de bienvenue honnête** : la vie privée d'abord, puis les règles, en langage simple.
+Updates then happen **automatically** in the background.
 
 ---
 
-## 🔒 Ta vie privée, noir sur blanc
+## 📖 All features
 
-- **Aucune donnée collectée, aucune donnée vendue.**
-- **Pas de serveur central** pour tes amis ou tes parties : tout est en connexion directe.
-- Les fonctions sociales sont **éteintes tant que tu ne les actives pas**.
-- Le code est ouvert : tu peux **vérifier par toi-même** ce que fait Hydarium.
+### 🎮 Play and organize your instances
+
+An *instance* is an independent Minecraft installation (its own version, mods and worlds). Create as many as you like; they never get mixed up.
+
+- **Reliable Microsoft sign-in**: no more being logged out because of a network hiccup or when Mojang's servers answer badly. The token renews itself and errors are written in plain language.
+- **Every kind of instance**: Vanilla, Fabric, Quilt, Forge and NeoForge. Duplicate them and set the **memory** for each.
+- **Icons that look like you**: a Minecraft item drawn over the instance's backdrop (your choice or automatic), the **official modpack image**, or **your own picture**.
+- **Effortless import**: bring your instances over from **Prism, MultiMC, ATLauncher, CurseForge or the official launcher**, or **drag and drop** a modpack (`.mrpack`, CurseForge or Prism `.zip`) to create the instance.
+- **Share code**: send an instance to a friend with a simple code.
+- **Skins**: manage your skins, including Minecraft's default skins, which you can remove and restore.
+- **Screenshots**: browse them right inside the launcher.
+
+### 🧩 Manage your mods without the headache
+
+- **Search and install** from **Modrinth** (and CurseForge). **Dependencies** are installed automatically.
+- **Integrity check**: every mod is marked *Verified*, *Unverified* or *Missing*. **Incompatibilities are detected before launch**, with a one-click fix.
+- **Pick the version of each mod**: list of compatible versions, roll back to a previous one, and a "pinned" version is never overwritten by "Updates".
+- **Instant filter** on your installed mods.
+- **Images everywhere**: even when a mod ships none, Hydarium finds its image (inside the jar, or the CurseForge logo) or generates one.
+- **Smart drag and drop**: drop a mod, resource pack, shader, data pack or world into the window. Hydarium **recognizes the file by its content** and puts it in the right place.
+- **Readable crashes**: when the game crashes, you get a clear message naming **the suspect mod** instead of a wall of text.
+
+### 🖥️ Join servers, or host your own
+
+- **Join in one click**: Hydarium prepares the right game version and the right mods.
+- **Host your server from the launcher**, with a clean view. Friends join through a **private invitation over a direct connection**: **no port to open, no IP address to hand out**.
+- **Server data packs**: list, `.zip` import, drag and drop, add from Modrinth, enable and disable.
+- **Server crash assistant**: if your server stops unexpectedly, Hydarium **finds the cause** (port already in use, data pack, client mod, memory, Java, world, EULA…), points out suspect mods and offers **repairs that restart the server**.
+- **Modded server, relaxed players**: players who have Hydarium receive the host's **exact mod list**, in exact versions, and can **install everything at once**. Mods not found on Modrinth are flagged so you can install them manually.
+
+### 👥 Find your friends *(opt-in, never forced)*
+
+Everything goes **directly from one computer to another**. There is no central server reading your messages or keeping your friend list.
+
+- **Friends**: permanent friend code, friend requests, *online* or *in game* presence, **"appear offline"** mode, blocking, and **direct invitation** to join your server.
+- **Chat**, private and group, **instance sharing**, **file and image transfers** (resuming automatically if the connection drops).
+- **Voice calls** between two people, PC to PC.
+- **Off by default**: a window explains what it changes before you turn it on.
+- **Anti-spam**: a friend request doesn't reveal your username until the other person has decided.
+
+### 🎯 The Hydarium client in game
+
+A home-made mod that adds your favorite tools **right inside Minecraft**.
+
+- **Widgets**: keystrokes, **CPS**, **FPS**, coordinates, direction, armor, effects, ping, clock, memory, session time, **now-playing music**, waypoints…
+- **In-game editor**: place and tweak widgets (position, size, opacity, color) **on the real screen**, not in an abstract menu.
+- **Zoom**: hold a key, adjust the level with the scroll wheel, with a cinematic camera.
+- **Brightness**: see in the dark without touching your game settings.
+- **Quality of life**: auto-sprint, permanent sneak, auto-walk.
+- **Waypoints**: drop markers and see their direction and distance.
+- **Overlay menu** (**Alt + H** by default): change skin, download a mod or browse your screenshots **without leaving the game**.
+- **One shortcut to hide everything**: a single key hides or shows the whole HUD.
+
+> The in-game client is available for several versions (including 1.8.9, 1.12.2, 1.20.1 and 1.21.x). On the others, the launcher shows a HUD on top of the game.
+
+### 🛡️ Built to feel comfortable
+
+- **Privacy mode** for your videos and streams: IP addresses, invitation codes and friend code are **blurred by default**. An eye icon reveals them, and "Copy" works without showing anything.
+- **Bundled Java**: players have nothing else to install.
+- **Automatic updates** in the background, on Windows and Linux alike. On macOS, the launcher notifies you and points to the download page.
+- **Interface in English and French.**
+- **An honest welcome screen**: privacy first, then the rules, in plain language.
 
 ---
 
-## ❓ Questions fréquentes
+## 🔒 Your privacy, in black and white
 
-**Hydarium est-il gratuit ?**
-Oui. C'est un projet personnel, sans publicité.
-
-**Il me faut un compte Minecraft ?**
-Oui, un compte Microsoft avec Minecraft Java Edition pour jouer en ligne, comme avec n'importe quel launcher.
-
-**Je dois installer Java ?**
-Non, Java est fourni avec Hydarium.
-
-**Sur quels systèmes ça marche ?**
-**Windows** (installeur ou portable) et **Linux** (AppImage). Windows reste la plateforme la mieux testée ; macOS viendra plus tard.
-
-**Mes amis doivent-ils ouvrir des ports pour rejoindre mon serveur ?**
-Non. L'invitation privée passe en connexion directe, sans ouvrir de port ni révéler ton IP.
-
-**Puis-je reprendre mes instances actuelles ?**
-Oui : import depuis **Prism, MultiMC et le launcher officiel**.
+- **No data collected, no data sold.**
+- **No central server** for your friends or your games: everything is a direct connection.
+- Social features stay **off until you turn them on**.
+- The code is public: you can **check for yourself** what Hydarium does. It is not open source, so please don't redistribute or resell it.
 
 ---
 
-## 🗺️ Où en est le projet ?
+## ❓ FAQ
 
-Hydarium évolue vite et chaque version ajoute de nouvelles fonctions. Le suivi détaillé est dans [`docs/A-FAIRE.md`](docs/A-FAIRE.md) et [`docs/FICHE-DE-REPRISE.md`](docs/FICHE-DE-REPRISE.md).
+**Is Hydarium free?**
+Yes. It's a personal project, with no ads.
 
-**Prochaines pistes** : une interface plus « Minecraft » (angles carrés, boutons façon jeu) et, plus tard, une version « ultra optimisée » proposée à la création d'une instance.
+**Do I need a Minecraft account?**
+Yes, a Microsoft account with Minecraft Java Edition to play online, like with any launcher.
 
-## 💬 Aide et contact
+**Do I need to install Java?**
+No, Java comes with Hydarium.
 
-Un bug, une idée, une suggestion ? Ouvre une [issue](https://github.com/Gazein21/hydarium/issues) ou écris-nous à **[help.point@hydarium.net](mailto:help.point@hydarium.net)**. Chaque retour compte.
+**Which systems does it run on?**
+**Windows** (installer or portable), **Linux** (AppImage) and **macOS** (DMG, Intel and Apple Silicon). Windows remains the best-tested platform; macOS is brand new: not yet signed by Apple (see the getting-started steps above) and not yet tested on a real Mac.
 
----
+**Do my friends need to open ports to join my server?**
+No. The private invitation uses a direct connection, without opening any port or revealing your IP.
 
-## 🛠️ Pour les curieux et les développeurs
-
-Hydarium est une application [Electron](https://www.electronjs.org/) : interface web (`src/renderer/`) et processus principal Node (`src/main/`), plus un mod client écrit en Java (`client-mod/`).
-
-- Lancer en développement : `npm install` puis `npm start` (Node.js 20+ et Java 21), ou `lancer-dev.bat` sous Windows.
-- Lancer les tests : `npm test`.
-- Fabriquer l'installeur : `build-windows.bat` (ou `npm run dist:win`) ; Linux : `npm run dist:linux`.
-- Publier une version : `npm run release -- X.Y.Z`, voir [`docs/PUBLIER-SUR-GITHUB.md`](docs/PUBLIER-SUR-GITHUB.md).
-- Architecture, pièges et prochaines étapes : [`docs/FICHE-DE-REPRISE.md`](docs/FICHE-DE-REPRISE.md).
-- Le mod client : [`docs/HYDARIUM-CLIENT.md`](docs/HYDARIUM-CLIENT.md).
+**Can I bring my existing instances?**
+Yes: import from **Prism, MultiMC, ATLauncher, CurseForge and the official launcher**.
 
 ---
 
-<p align="center"><sub>Hydarium n'est ni affilié, ni approuvé par Mojang ou Microsoft. Minecraft est une marque de Mojang Studios.</sub></p>
+## 🗺️ Project status
+
+Hydarium moves fast, and each version adds new features. Detailed tracking is in [`docs/A-FAIRE.md`](docs/A-FAIRE.md) and [`docs/FICHE-DE-REPRISE.md`](docs/FICHE-DE-REPRISE.md) (in French).
+
+**Next ideas**: a more "Minecraft-style" interface (square corners, in-game-looking buttons) and, later, an "ultra optimized" version offered when creating an instance.
+
+## 💬 Help and contact
+
+A bug, an idea, a suggestion? Open an [issue](https://github.com/Gazein21/hydarium/issues), or write to us at **[help.point@hydarium.net](mailto:help.point@hydarium.net)**. Every piece of feedback counts.
+
+---
+
+## 🛠️ For the curious and for developers
+
+Hydarium is an [Electron](https://www.electronjs.org/) application: a web interface (`src/renderer/`) and a Node main process (`src/main/`), plus a client mod written in Java (`client-mod/`).
+
+- Run in development: `npm install` then `npm start` (Node.js 20+ and Java 21), or `lancer-dev.bat` on Windows.
+- Run the tests: `npm test`.
+- Build the installer: `build-windows.bat` (or `npm run dist:win`); Linux: `npm run dist:linux`; macOS: `npm run dist:mac` (run it on a Mac).
+- Publish a release: `npm run release -- X.Y.Z`, see [`docs/PUBLIER-SUR-GITHUB.md`](docs/PUBLIER-SUR-GITHUB.md).
+- Architecture, pitfalls and next steps: [`docs/FICHE-DE-REPRISE.md`](docs/FICHE-DE-REPRISE.md).
+- The client mod: [`docs/HYDARIUM-CLIENT.md`](docs/HYDARIUM-CLIENT.md).
+
+---
+
+<p align="center"><sub>Hydarium is not affiliated with or endorsed by Mojang or Microsoft. Minecraft is a trademark of Mojang Studios.</sub></p>

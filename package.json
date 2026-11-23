@@ -120,7 +120,19 @@
       "artifactName": "Hydarium-Portable-${version}.exe"
     },
     "mac": {
-      "target": "dmg"
+      "icon": "build/icon.png",
+      "target": "dmg",
+      "category": "public.app-category.games",
+      "identity": null,
+      "hardenedRuntime": false,
+      "artifactName": "Hydarium-${version}-${arch}.${ext}",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Hydarium utilise le micro pour les appels vocaux avec tes amis.",
+        "NSAppleEventsUsageDescription": "Hydarium lit la musique en cours (Spotify) pour l'afficher en jeu."
+      }
+    },
+    "dmg": {
+      "title": "Hydarium ${version}"
     },
     "linux": {
       "target": "AppImage",

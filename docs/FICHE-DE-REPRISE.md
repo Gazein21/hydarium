@@ -19,7 +19,7 @@ Version 0.11.0 · Windows en priorité, structure prête pour macOS et Linux · 
 - **Développement** : Node.js 20+, `npm install`, `npm start` (Java 21 requis sur le PC de dev) ; ou `lancer-dev.bat` sous Windows (télécharge un Node portable si besoin).
 - **Tests** : `npm test` (une cinquantaine de fichiers dans `test/`). Quand on ajoute un fichier de test, **l'ajouter à la liste du script `test` de `package.json`**, sinon la CI ne le lance pas.
 - **Installeur Windows** : `build-windows.bat` (écran de progression lisible, détails dans `build.log`) ou GitHub → Actions → « Build Windows et Linux » (le job Linux, lancé après le job Windows, ajoute `Hydarium-Linux.AppImage` + `latest-linux.yml` à la même Release ; la mise à jour automatique AppImage est déjà gérée par `updater.js`). Java 21 est téléchargé par `scripts/fetch-jre.js` et embarqué. Le joueur reçoit un **petit installeur web** (`Hydarium-Setup-X.exe`, ≈ 180 Ko) qui télécharge le vrai programme (`.7z`) depuis la Release GitHub ; une version portable existe aussi. L'exe n'est pas signé : Windows affiche un avertissement.
-- **macOS / Linux** : `npm run dist:mac` / `dist:linux`, à lancer sur le système concerné. Seul `platform.js` dépend de l'OS.
+- **Linux** : `npm run dist:linux`, à lancer sous Linux. **macOS** : `npm run dist:mac -- --arm64` (ou `--x64`) sur un Mac, avec `HYDARIUM_ARCH=arm64|x64` pour que `fetch-jre.js` télécharge le Java de la même architecture (le dossier `build-jre/` doit être supprimé entre deux architectures). La CI (job `mac`, `macos-latest`) fabrique les deux DMG et les ajoute à la Release (`Hydarium-Mac-AppleSilicon.dmg`, `Hydarium-Mac-Intel.dmg`). Pas de compte développeur Apple : signature « ad hoc » seulement (`scripts/after-pack.js`), app non notarisée → avertissement Gatekeeper au premier lancement (voir README), et pas de mise à jour automatique (mode « manuel » d'`updater.js`). `NSMicrophoneUsageDescription` (package.json › build › mac › extendInfo) est obligatoire pour le vocal. Jamais essayé sur un vrai Mac. Seul `platform.js` dépend de l'OS.
 - **Publier** : `npm run release -- X.Y.Z` (vérifie la version, la section de cette fiche, la branche, le tag ; lance les tests ; commit, tag, push). Le tag doit s'appeler `vX.Y.Z` et la Release doit contenir l'installeur, le `.7z` et `latest.yml` (lu par la mise à jour automatique). Le dépôt doit être **public**. Détails : `PUBLIER-SUR-GITHUB.md`.
 - **⚠️ Règle de version** : le numéro vient d'un seul endroit, `package.json` (`version`). À chaque livraison, le même numéro doit figurer dans `package.json`, `package-lock.json` (2 champs), le titre de la **dernière** section `## x.y.z` de cette fiche, la ligne « Mise à jour » d'`A-FAIRE.md` et le nom de l'archive. `test/version.test.js` vérifie `package.json` ↔ fiche ↔ pastille `v…` de la barre de titre. **Cette fiche doit toujours se terminer par une section `## x.y.z`** (voir tout en bas).
 
@@ -49,7 +49,7 @@ src/main/        processus principal (Node) : toute la logique
 src/preload.js   pont sécurisé : liste blanche des canaux IPC et des événements
 src/renderer/    interface (HTML/CSS/JS), AUCUN accès direct à Node ; app.js (tout), i18n.js (anglais), scene.js (décors pixel-art)
 client-mod/      core (Java commun, testé) · fabric-120 · fabric-121 · fabric-latest (26.x) · forge-189 · forge-gen (générateur Forge)
-scripts/         build.js, build-mods.js, fetch-jre.js, release.js…        .github/workflows/build.yml  CI Windows
+scripts/         build.js, build-mods.js, fetch-jre.js, release.js…        .github/workflows/build.yml  CI Windows + Linux + macOS
 ```
 
 **Règle d'architecture** : l'interface ne fait que demander ; le processus principal décide et **revérifie tout** (noms, versions, identifiants, adresses, chemins). Un chemin de fichier vient toujours d'un sélecteur système ou d'un glisser-déposer, jamais d'un texte saisi.
@@ -180,3 +180,5 @@ Voir [`A-FAIRE.md`](A-FAIRE.md). En résumé : première CI Windows complète et
 - Passage de la 0.10.75 à la **0.11.0** : aucune fonction changée, seulement le numéro (`package.json`, `package-lock.json`, cette fiche, `A-FAIRE.md`).
 - Fiche de reprise condensée (210 Ko → quelques Ko) et README GitHub refait.
 - Publier : `npm run release -- 0.11.0`.
+- **DMG macOS** ajouté à la CI (Intel + Apple Silicon, non signé Apple) : voir §« macOS » plus haut. Aucune fonction du launcher changée.
+- **Interface cubique** : bloc `FORMES CUBIQUES` à la fin de `src/renderer/style.css` : style moderne d'origine, mais aucun coin arrondi. Pour revenir aux coins arrondis, supprimer ce bloc. Non essayé dans le vrai Electron.

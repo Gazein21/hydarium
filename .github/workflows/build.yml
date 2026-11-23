@@ -1,4 +1,4 @@
-name: Build Windows et Linux
+name: Build Windows, Linux et macOS
 on:
   workflow_dispatch:
   push:
@@ -196,3 +196,55 @@ jobs:
             dist/Hydarium-Linux.AppImage
             dist/Hydarium-*.AppImage
             dist/latest-linux.yml
+
+  # Version macOS : deux DMG (Intel et Apple Silicon), fabriqués l'un après l'autre sur le même Mac (macos-latest) : le Java embarqué change d'architecture (HYDARIUM_ARCH).
+  # Lancée APRÈS le job Windows, comme Linux : elle reprend ses jars du mod. Pas de compte développeur Apple → app non notarisée (signature « ad hoc » faite par scripts/after-pack.js).
+  # Pas de mise à jour automatique sous macOS (elle exige une app signée) : le launcher prévient et renvoie vers la page de téléchargement (voir updater.js).
+  mac:
+    needs: win
+    runs-on: macos-latest
+    permissions: { contents: write }
+    env: { CSC_IDENTITY_AUTO_DISCOVERY: 'false' }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Récupérer les jars du mod (construits par le job Windows)
+        continue-on-error: true   # sans eux, le launcher fonctionne quand même (HUD externe) et fabrique le mod sur place
+        uses: actions/download-artifact@v4
+        with:
+          name: Hydarium-Mods
+          path: build-client
+      - run: mkdir -p build-client
+      - run: npm install
+      - name: DMG macOS Apple Silicon (arm64)
+        run: |
+          rm -rf build-jre
+          HYDARIUM_ARCH=arm64 npm run dist:mac -- --arm64
+      - name: DMG macOS Intel (x64)
+        run: |
+          rm -rf build-jre
+          HYDARIUM_ARCH=x64 npm run dist:mac -- --x64
+      - name: Vérifier les fichiers de la Release
+        id: v
+        run: |
+          ls -lh dist
+          ls dist/Hydarium-*-arm64.dmg dist/Hydarium-*-x64.dmg || { echo "::error::DMG absent"; exit 1; }
+          # Copies aux noms FIXES, pour des liens qui ne changent jamais : .../releases/latest/download/Hydarium-Mac-AppleSilicon.dmg (et -Intel)
+          cp dist/Hydarium-*-arm64.dmg dist/Hydarium-Mac-AppleSilicon.dmg
+          cp dist/Hydarium-*-x64.dmg dist/Hydarium-Mac-Intel.dmg
+          echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Hydarium-macOS
+          path: dist/*.dmg
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.v.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: Hydarium ${{ steps.v.outputs.version }}
+          files: |
+            dist/Hydarium-Mac-AppleSilicon.dmg
+            dist/Hydarium-Mac-Intel.dmg
+            dist/Hydarium-*-arm64.dmg
+            dist/Hydarium-*-x64.dmg

@@ -1,7 +1,18 @@
 /* Incruste le logo dans Hydarium.exe (barre des tâches, raccourcis du bureau, explorateur).
    electron-builder le fait normalement, mais « signAndEditExecutable: false » (nécessaire sans droits de création de liens symboliques) désactive cette étape. */
 const path = require('path'), fs = require('fs');
+/* macOS : sans compte développeur Apple on ne peut pas signer « officiellement », mais une signature « ad hoc » (identité « - ») est indispensable sur les Mac Apple Silicon :
+   sans elle, l'app modifiée par electron-builder est déclarée « endommagée » et ne s'ouvre pas du tout. Ne dispense pas de l'avertissement « développeur non identifié » (voir README). */
+function adHocSign(ctx) {
+  if (process.platform !== 'darwin') return console.warn('  • macOS : signature ad hoc ignorée (codesign n\'existe que sous macOS)');
+  const app = path.join(ctx.appOutDir, ctx.packager.appInfo.productFilename + '.app');
+  try {
+    require('child_process').execFileSync('codesign', ['--force', '--deep', '--sign', '-', app], { stdio: 'inherit' });
+    console.log('  • signature ad hoc appliquée à ' + path.basename(app));
+  } catch (e) { console.log('::warning title=Signature macOS::échec de codesign (' + e.message + ') : l\'app pourrait être refusée sur Apple Silicon'); }
+}
 exports.default = async function afterPack(ctx) {
+  if (ctx.electronPlatformName === 'darwin') return adHocSign(ctx);
   if (ctx.electronPlatformName !== 'win32') return;
   const exe = path.join(ctx.appOutDir, ctx.packager.appInfo.productFilename + '.exe'), ico = path.join(ctx.packager.projectDir, 'build', 'icon.ico');
   const bad = msg => { console.warn('  • logo : ' + msg); console.log('::error title=Logo non incrusté::' + msg + ' : l\'exécutable gardera l\'icône d\'Electron'); }; // « ::error:: » = annotation rouge visible sur GitHub Actions, sans faire échouer la construction

@@ -2,7 +2,8 @@
    Utilisable en ligne de commande (npm run dist:win) ou comme module : fetchJre({ onProgress(octets, total), onStep(texte) }). */
 const fs = require('fs'), path = require('path'), os = require('os'), { execFileSync } = require('child_process');
 const { download, fmtMB } = require('./util');
-const osName = { win32: 'windows', darwin: 'mac', linux: 'linux' }[process.platform], arch = process.arch === 'arm64' ? 'aarch64' : 'x64';
+/* HYDARIUM_ARCH=x64|arm64 impose l'architecture du Java embarqué (sert à fabriquer le DMG Intel depuis une machine Apple Silicon, et inversement) */
+const osName = { win32: 'windows', darwin: 'mac', linux: 'linux' }[process.platform], arch = (process.env.HYDARIUM_ARCH || process.arch) === 'arm64' ? 'aarch64' : 'x64';
 const out = path.join(__dirname, '..', 'build-jre'), dest = path.join(out, 'jre');
 
 async function fetchJre({ onProgress, onStep } = {}) {
@@ -15,7 +16,7 @@ async function fetchJre({ onProgress, onStep } = {}) {
   const x = path.join(tmp, 'x'); fs.mkdirSync(x);
   execFileSync('tar', ['-xf', file, '-C', x]);
   fs.mkdirSync(out, { recursive: true });
-  fs.cpSync(path.join(x, fs.readdirSync(x)[0]), dest, { recursive: true });
+  fs.cpSync(path.join(x, fs.readdirSync(x).filter(n => !n.startsWith('.'))[0]), dest, { recursive: true });
   try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) {}
   const rel = fs.readFileSync(path.join(dest, fs.existsSync(path.join(dest, 'release')) ? 'release' : 'Contents/Home/release'), 'utf8');
   const v = (rel.match(/JAVA_VERSION="?(\d+)/) || [])[1];
