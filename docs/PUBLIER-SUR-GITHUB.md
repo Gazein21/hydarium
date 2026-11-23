@@ -30,7 +30,7 @@ Une fenêtre du navigateur s'ouvre pour te connecter à GitHub (c'est normal, c'
 > Si le dossier contient déjà un `.git` d'un ancien essai, supprime-le d'abord.
 
 ## 2. Construire et publier (dépôt encore privé : c'est le bon moment pour tester)
-1. Sur GitHub : onglet **Actions** → « Build Windows » → **Run workflow** (branche `main`).
+1. Sur GitHub : onglet **Actions** → « Build Windows et Linux » → **Run workflow** (branche `main`).
 2. Attends 10 à 20 minutes. Les étapes « Tests » et « Mod Hydarium … » peuvent afficher une erreur sans rien bloquer : elles sont volontairement tolérantes. Seule la construction de l'installeur compte.
 3. À la fin, une **Release** « Hydarium 0.10.52 » (tag `v0.10.52`, créé automatiquement) apparaît à droite de la page d'accueil du dépôt, rubrique **Releases**. Elle contient :
    - **`Hydarium-Installer.exe`** : le fichier à donner aux joueurs (nom fixe, lien permanent `https://github.com/Gazein21/hydarium/releases/latest/download/Hydarium-Installer.exe`) ;
@@ -38,6 +38,7 @@ Une fenêtre du navigateur s'ouvre pour te connecter à GitHub (c'est normal, c'
    - `hydarium-launcher-0.10.52-x64.nsis.7z` : le programme complet, téléchargé par le petit installeur ;
    - `Hydarium-Portable-0.10.52.exe` : version sans installation ;
    - `latest.yml` : lu par la mise à jour automatique.
+   - **`Hydarium-Linux.AppImage`** : la version Linux (nom fixe, lien permanent `https://github.com/Gazein21/hydarium/releases/latest/download/Hydarium-Linux.AppImage`), plus sa copie versionnée `Hydarium-0.10.52-x64.AppImage` et `latest-linux.yml` (mise à jour automatique). Elle est construite par un second job, lancé après celui de Windows (il en réutilise les jars du mod). Sous Linux : `chmod +x Hydarium-Linux.AppImage` puis double-clic.
 4. Relancer pour la même version **remplace** les fichiers de cette Release : pratique pour corriger et réessayer.
 
 Tant que le dépôt est privé, seuls les membres du dépôt voient la Release.

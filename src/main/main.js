@@ -8,7 +8,7 @@ process.on('uncaughtException', e => log.error('uncaughtException', e));
 process.on('unhandledRejection', e => log.error('unhandledRejection', e));
 if (!app.requestSingleInstanceLock()) app.quit();
 
-let win, friends = null, chat = null;
+let win, friends = null, chat = null, xfer = null, voice = null;
 const send = (c, d) => {
   if ((c === 'game:started' || c === 'game:close') && friends) { const t = setTimeout(() => friends.refresh(), 1500); if (t.unref) t.unref(); }   // les amis voient tout de suite « en jeu » / « en ligne »
   if (win && !win.isDestroyed()) {
@@ -60,6 +60,8 @@ app.whenReady().then(async () => {
   /* YouTube refuse (erreur 153) d'être intégré dans une page sans Referer, ce qui est le cas des pages locales file:// : on en fournit un pour la vidéo d'aide */
   try { electronSession.defaultSession.webRequest.onBeforeSendHeaders({ urls: ['https://www.youtube-nocookie.com/*', 'https://www.youtube.com/embed/*'] }, (d, cb) => { const h = { ...d.requestHeaders }; h['Referer'] = 'https://hydarium.net/'; cb({ requestHeaders: h }); }); } catch (e) { log.error('referer youtube', e); }
   store.init(plat.dataDir()); log.rotate(logDays());
+  /* Notifications : par défaut, seulement celles des amis (messages, appels, demandes). Les autres (lancement, plantages, captures, téléchargements, serveur) sont désactivées une fois ; la personne peut les réactiver dans Paramètres. */
+  { const st = store.get().settings; if (!st.notifFriendsOnly) { for (const k of ['notifLaunch', 'notifCrash', 'notifShot', 'notifDone', 'notifServer']) if (st[k] === undefined) st[k] = false; st.notifFriendsOnly = true; store.save(); } }
   log.info(`Démarrage Hydarium ${app.getVersion()} · ${plat.id} ${process.arch} · Electron ${process.versions.electron} · Node ${process.versions.node}`);
   plat.javas(store.get().settings.javas).then(l => log.info('Java détectés :', l.map(j => `Java ${j.major} (${j.version}, ${j.vendor}, ${j.is64 ? 64 : 32} bits) ${j.path}`)));
   notify.onClick(a => { if (a === 'friends:open') { focus(); send('friends:open'); } else if (a && a.startsWith('chat:')) { focus(); send('friends:open', { conv: a.slice(5) }); } else if (a === 'update:open') { focus(); send('update:open'); } else if (a === 'crash') { focus(); send('game:crash-open'); } else if (a && a.startsWith('file:')) shell.showItemInFolder(a.slice(5)); else if (a && a.startsWith('shot:')) shell.openPath(a.slice(5)); else if (a && a.startsWith('ovl:join:')) { const c = session.current(); overlay.open('join', c && c.id, { addr: a.slice(9) }); } else if (a && a.startsWith('ovl:datapack:')) { const c = session.current(); overlay.open('content', c && c.id, { world: a.slice(13) }); } else focus(); });
@@ -70,7 +72,7 @@ app.whenReady().then(async () => {
   on('win', a => { if (a === 'min') win.minimize(); else if (a === 'max') win.isMaximized() ? win.unmaximize() : win.maximize(); else if (a === 'close') win.close(); });
   on('set:get', () => store.get().settings);
   on('set:set', async o => {
-    const s = store.get().settings, T = { uiScale: 'number', notif: 'boolean', minimize: 'boolean', autostart: 'boolean', wall: 'string', theme: 'string', mem: 'number', java: 'string', accent: 'string', view: 'string', dl: 'number', favMods: 'object', srvMods: 'object', favContent: 'object', snaps: 'boolean', defJvm: 'string', defResMode: 'string', defW: 'number', defH: 'number', defOptim: 'boolean', gameLang: 'string', langSync: 'boolean', cProfiles: 'object', uiLang: 'string', spotifyId: 'string', notifLaunch: 'boolean', notifCrash: 'boolean', notifShot: 'boolean', notifDone: 'boolean', notifServer: 'boolean', notifQuiet: 'boolean', logDays: 'number', cfKey: 'string', tour: 'boolean', music: 'string', overlayKey: 'string', autoJava: 'boolean', showLog: 'boolean', cfClean: 'boolean', autoUpdate: 'boolean', autoInstall: 'boolean', inGameMenu: 'boolean', privacy: 'boolean', tosAccepted: 'number', tosAt: 'number' };
+    const s = store.get().settings, T = { uiScale: 'number', notif: 'boolean', minimize: 'boolean', autostart: 'boolean', wall: 'string', theme: 'string', mem: 'number', java: 'string', accent: 'string', view: 'string', dl: 'number', favMods: 'object', srvMods: 'object', favContent: 'object', snaps: 'boolean', defJvm: 'string', defResMode: 'string', defW: 'number', defH: 'number', defOptim: 'boolean', gameLang: 'string', langSync: 'boolean', cProfiles: 'object', uiLang: 'string', spotifyId: 'string', notifLaunch: 'boolean', notifCrash: 'boolean', notifShot: 'boolean', notifDone: 'boolean', notifServer: 'boolean', notifFriends: 'boolean', notifQuiet: 'boolean', logDays: 'number', cfKey: 'string', tour: 'boolean', music: 'string', overlayKey: 'string', autoJava: 'boolean', showLog: 'boolean', cfClean: 'boolean', autoUpdate: 'boolean', autoInstall: 'boolean', inGameMenu: 'boolean', privacy: 'boolean', tosAccepted: 'number', tosAt: 'number' };
     for (const [k, v] of Object.entries(o || {})) {
       if (typeof v !== T[k]) continue;
       if (k === 'cProfiles') { s.cProfiles = (Array.isArray(v) ? v : []).slice(0, 12).map(p => ({ name: String((p && p.name) || '').slice(0, 24), modules: cleanModules((p && p.modules) || {}) })).filter(p => p.name); continue; }
@@ -131,19 +133,21 @@ app.whenReady().then(async () => {
     return r;
   });
   auth.onChange(a => send('auth:state', a));   // connexion rétablie en arrière-plan, ou refusée pour de bon
+  const fnote = (t, b, c) => { const st = store.get().settings; if (st.notif !== false && st.notifFriends !== false) notify.show(t, b, c); };   // messages, appels et demandes d'amis
   /* Amis P2P (désactivés tant que la personne ne les a pas activés ; voir friends.js) */
   const { safeStorage } = require('electron'), encOk = () => { try { return safeStorage.isEncryptionAvailable(); } catch (e) { return false; } };
   friends = require('./friends').create({
     store, log, DHT: require('hyperdht'),
-    onMessage: (k, m) => { if (chat) chat.onMessage(k, m); }, onOnline: k => { if (chat) chat.onOnline(k); },   // chat.js : messages d'amis et envoi de ce qui attendait la reconnexion
+    onStream: (k, sock, m) => { if (m && m.t === 'vstream') { if (voice) voice.serve(k, sock, m); else sock.destroy(); } else if (xfer) xfer.serve(k, sock, m); else sock.destroy(); },   // un ami ouvre l'audio d'un appel (voice.js) ou demande des fichiers qu'on lui a proposés (xfer.js)
+    onMessage: (k, m) => { if (m && m.t === 'vc') { if (voice) voice.onMessage(k, m); } else if (chat) chat.onMessage(k, m); }, onOnline: k => { if (chat) chat.onOnline(k); },   // voice.js : sonnerie des appels ; chat.js : messages d'amis et envoi de ce qui attendait la reconnexion
     profile: () => { let c = null; try { c = require('./game').isRunning() ? session.current() : null; } catch (e) { /* pas de jeu */ } const i = c ? store.get().instances.find(x => x.id === c.id) : null; return { name: auth.name() || 'Joueur', st: c ? 'playing' : 'online', what: i ? 'Minecraft ' + i.version : '' }; },
     seal: s => (encOk() ? 'e:' + safeStorage.encryptString(s).toString('base64') : 'p:' + s), unseal: s => (String(s).startsWith('e:') ? safeStorage.decryptString(Buffer.from(String(s).slice(2), 'base64')) : String(s).slice(2)),
     notify: (kind, d) => {
       if (kind === 'changed') { if (chat) chat.sync(); return send('friends:changed', {}); }
-      if (kind === 'invite') { send('friends:invite', d); if (chat) chat.record(d.key, { mine: false, card: { k: 'srv', n: d.name, code: d.code } }); notify.show('Invitation de ' + d.from, 'Rejoindre « ' + d.name + ' »', 'friends:open'); }
-      else if (kind === 'request') notify.show('Demande d’ami', d.name + ' veut être ton ami.', 'friends:open');
-      else if (kind === 'friend') notify.show('Nouvel ami', d.name + ' est maintenant ton ami.', 'friends:open');
-      else if (kind === 'removed') notify.show('Ami retiré', d.name + ' t’a retiré de ses amis.', 'friends:open');
+      if (kind === 'invite') { send('friends:invite', d); if (chat) chat.record(d.key, { mine: false, card: { k: 'srv', n: d.name, code: d.code } }); fnote('Invitation de ' + d.from, 'Rejoindre « ' + d.name + ' »', 'friends:open'); }
+      else if (kind === 'request') fnote('Demande d’ami', d.name + ' veut être ton ami.', 'friends:open');
+      else if (kind === 'friend') fnote('Nouvel ami', d.name + ' est maintenant ton ami.', 'friends:open');
+      else if (kind === 'removed') fnote('Ami retiré', d.name + ' t’a retiré de ses amis.', 'friends:open');
     },
   });
   /* Chat : messages, cartes de partage, groupes. Créé avant le démarrage des amis pour ne rater aucun message. */
@@ -153,11 +157,29 @@ app.whenReady().then(async () => {
     focused: () => !!(win && !win.isDestroyed() && win.isFocused() && !win.isMinimized() && win.isVisible()),
     notify: (kind, d) => {
       if (kind === 'changed') { if (!chatPing) chatPing = setTimeout(() => { chatPing = null; send('chat:changed', d); }, 60); }
-      else if (kind === 'msg') notify.show(d.name, (d.from && d.from !== d.name ? d.from + ' : ' : '') + String(d.text).slice(0, 120), 'chat:' + d.conv);
-      else if (kind === 'group-invite') notify.show('Invitation dans un groupe', d.from + ' t’invite dans « ' + d.name + ' ».', 'friends:open');
-      else if (kind === 'group-removed') notify.show('Groupe quitté', 'Tu ne fais plus partie de « ' + d.name + ' ».', 'friends:open');
+      else if (kind === 'msg') fnote(d.name, (d.from && d.from !== d.name ? d.from + ' : ' : '') + String(d.text).slice(0, 120), 'chat:' + d.conv);
+      else if (kind === 'group-invite') fnote('Invitation dans un groupe', d.from + ' t’invite dans « ' + d.name + ' ».', 'friends:open');
+      else if (kind === 'group-removed') fnote('Groupe quitté', 'Tu ne fais plus partie de « ' + d.name + ' ».', 'friends:open');
     },
   });
+  xfer = require('./xfer').create({ dir: plat.dataDir(), friends, log, notify: (kind, d) => send('chat:xfer', d) });
+  /* Chat vocal (voice.js) : l'interface capte / joue le son ; le processus principal transporte des paquets de 20 ms par un flux direct chiffré */
+  voice = require('./voice').create({
+    friends, log, note: (k, t) => chat.note(k, t),
+    notify: (kind, d) => {
+      if (kind === 'changed') send('voice:changed', d);
+      else if (kind === 'rx') { if (win && !win.isDestroyed()) win.webContents.send('voice:rx', d); }
+      else if (kind === 'ring') fnote('Appel vocal', d.name + ' t’appelle.', 'chat:' + d.key);
+      else if (kind === 'ended' && d.reason === 'missed') fnote('Appel manqué', d.name + ' a essayé de t’appeler.', 'chat:' + d.key);
+    },
+  });
+  /* Micro : accordé seulement à l'interface d'Hydarium (page locale), audio seul ; tout autre contenu est refusé */
+  try {
+    const ownPage = wc => !!(win && !win.isDestroyed() && wc === win.webContents);
+    const audioOnly = d => !d || !d.mediaTypes || (d.mediaTypes.length > 0 && d.mediaTypes.every(t => t === 'audio'));
+    electronSession.defaultSession.setPermissionRequestHandler((wc, perm, cb, d) => cb(perm === 'media' && ownPage(wc) && audioOnly(d)));
+    electronSession.defaultSession.setPermissionCheckHandler((wc, perm, origin, d) => perm === 'media' && ownPage(wc) && (!d || d.mediaType !== 'video'));
+  } catch (e) { log.error('permissions micro', e); }
   chat.sync();
   if (friends.config().on) friends.start().catch(e => log.warn('amis : démarrage impossible', e.message));
   const KEYRE = /^[0-9a-f]{64}$/, key = k => { k = String(k || ''); if (!KEYRE.test(k)) throw new Error('Ami invalide.'); return k; };
@@ -199,13 +221,18 @@ app.whenReady().then(async () => {
     const i = store.get().instances.find(x => x.id === id); if (!i) throw new Error('Instance introuvable.');
     const p = i.pack, byRef = p && (p.src === 'modrinth' || p.src === 'curseforge') && typeof p.pid === 'string';
     if (byRef) return { card: { k: 'pack', n: i.name, src: p.src, pid: p.pid, v: i.version }, skipped: 0, thumb: thumbOf(id) };
-    const s = mods.share(id); return { card: { k: 'inst', n: i.name, v: i.version, l: i.loader, m: s.count, code: s.code }, skipped: s.skipped, thumb: thumbOf(id) };
+    const s = mods.share(id); return { card: { k: 'inst', n: i.name, v: i.version, l: i.loader, lv: s.lv, m: s.count, code: s.code }, skipped: s.skipped, thumb: thumbOf(id) };
   };
   const dlBusy = new Set();
   on('chat:list', () => chat.list());
-  on('chat:messages', c => chat.messages(conv(c)));
+  on('chat:messages', c => chat.messages(conv(c)).map(m => (m.c && m.c.k === 'files' && !m.mine && !(m.dl && m.dl.s === 'done') ? { ...m, part: xfer.partial(m.c.tid) } : m)));   // « part » : fichiers déjà reçus d'un envoi interrompu (reprise possible)
   on('chat:thumb', h => chat.thumb(String(h || '')));
   on('chat:send', (c, t) => chat.send(conv(c), t));
+  on('chat:edit', (c, mid, t) => chat.edit(conv(c), String(mid || ''), t));   // ses propres messages texte seulement (chat.js vérifie)
+  on('chat:del', (c, mid) => { const card = chat.remove(conv(c), String(mid || '')); if (card && card.tid && TIDRE.test(card.tid)) xfer.forget(card.tid); return true; });   // un envoi de fichiers / une image supprimés ne sont plus proposés
+  on('chat:hide', (c, mid) => chat.hide(conv(c), String(mid || '')));   // masqué chez soi seulement : rien n'est envoyé
+  on('chat:clear', c => chat.clear(conv(c)));   // discussion vidée chez soi seulement
+  on('chat:mod', (c, mid) => { const card = chat.moderate(conv(c), String(mid || '')); if (card && card.tid && TIDRE.test(card.tid)) { try { xfer.discard(card.tid); } catch (e) { /* rien n'avait été reçu */ } } return true; });   // administrateur d'un groupe : supprime le message d'un autre pour tous (chat.js vérifie)
   on('chat:read', c => chat.read(conv(c)));
   on('chat:active', c => chat.setActive(c ? conv(c) : null));
   on('chat:share', (c, instId) => { const t = (Array.isArray(c) ? c : [c]).slice(0, 10).map(conv), s = shareCard(String(instId || '')); for (const x of t) chat.sendCard(x, s.card, s.thumb); return { sent: t.length, skipped: s.skipped, kind: s.card.k }; });   // l'envoi est la confirmation : la personne a choisi à qui
@@ -216,16 +243,83 @@ app.whenReady().then(async () => {
       if (card.k === 'inst') { const r = await mods.importCode(card.code); r.inst.name = String(card.n).slice(0, 40); store.save(); out = { kind: 'inst', id: r.inst.id, name: r.inst.name, failed: r.failed.length }; }
       else if (card.k === 'pack') { const r = await require('./packs').install('modpack', card.pid, card.src, null, p => send('import:progress', p)); out = { kind: 'pack', id: r.id, name: r.name, failed: (r.bad || []).length }; }
       else if (card.k === 'srv') { const r = await joinFriendSrv(card.code, card.n); out = { kind: 'srv', addr: r.addr, name: card.n }; }
+      else if (card.k === 'img') {   // image entière : récupérée puis vérifiée par son contenu avant d'être montrée
+        const r = await xfer.fetch(chat.author(c, mid), card.tid, { count: 1, size: card.size }), f = path.join(r.dir, r.items[0]);
+        if (!imgOk(f, card.size)) { fs.rmSync(r.dir, { recursive: true, force: true }); throw new Error('Cette image est refusée (format ou taille anormaux).'); } out = { kind: 'img' };
+      }
+      else if (card.k === 'files') { const r = await xfer.fetch(chat.author(c, mid), card.tid, { count: card.cnt, size: card.size }); out = { kind: 'files', count: r.count, total: r.total }; }   // reçu dans un dossier d'attente : rien n'est rangé sans second clic
       else throw new Error('Carte inconnue.');
       if (card.k !== 'srv') chat.setDl(c, mid, { s: 'done', id: out.id, t: Date.now() });
       return out;
     } finally { dlBusy.delete(bk); }
   });
+  /* envoi de fichiers : la personne les choisit dans le sélecteur système (jamais un chemin venu de l'interface) ; ils restent chez elle, seule une carte part */
+  const PICK = { files: ['Choisir les fichiers à envoyer', ['openFile', 'multiSelections'], ''], folder: ['Choisir un dossier à envoyer (un monde…)', ['openDirectory', 'multiSelections'], ''], mods: ['Choisir des mods à envoyer', ['openFile', 'multiSelections'], 'mods'], worlds: ['Choisir des mondes à envoyer', ['openDirectory', 'multiSelections'], 'saves'], packs: ['Choisir des packs de ressources à envoyer', ['openFile', 'multiSelections'], 'resourcepacks'] };
+  on('chat:xsend', async (c, how, instId) => {
+    c = conv(c); const P = PICK[String(how)]; if (!P) throw new Error('Choix inconnu.'); const to = chat.friendTargets(c); if (!to.length) throw new Error('Aucun ami joignable dans cette discussion : les fichiers ne partent qu’à tes amis.');
+    const base = P[2] && store.get().instances.some(x => x.id === instId) ? path.join(plat.dataDir(), 'instances', String(instId), P[2]) : '', r = await dialog.showOpenDialog(win, { title: P[0], properties: P[1], ...(base && fs.existsSync(base) ? { defaultPath: base } : {}) });
+    if (r.canceled || !r.filePaths.length) return { sent: 0 };
+    const names = r.filePaths.map(f => path.basename(f)), name = names.length > 1 ? (names[0] + ' + ' + (names.length - 1)).slice(0, 40) : names[0], o = xfer.offer(to, name, r.filePaths);
+    chat.sendCard(c, { k: 'files', n: name, tid: o.tid, cnt: o.count, size: o.size, jar: o.jar, top: o.top }, ''); return { sent: 1, count: o.count, size: o.size };
+  });
+  /* ----- images dans le chat : miniature (≤ 12 Ko) dans la carte, image entière envoyée par xfer.js quand l'ami clique ----- */
+  const imgsafe = require('./imgsafe'), sentDir = path.join(plat.dataDir(), 'sent');
+  try { for (const n of fs.readdirSync(sentDir)) { const f = path.join(sentDir, n); if (Date.now() - fs.statSync(f).mtimeMs > 8 * 86400e3) fs.rmSync(f, { force: true }); } } catch (e) { /* pas de dossier */ }
+  const head = (f, n = 262144) => { const fd = fs.openSync(f, 'r'); try { const b = Buffer.alloc(n), k = fs.readSync(fd, b, 0, n, 0); return b.subarray(0, k); } finally { fs.closeSync(fd); } };
+  const imgOk = (f, size) => { try { const st = fs.statSync(f); return st.isFile() && st.size === size && st.size <= imgsafe.MAX_BYTES && !!imgsafe.info(head(f)); } catch (e) { return false; } };
+  const thumbFit = buf => {   // miniature qui garde les proportions : 256 px au plus, ≤ 11,5 Ko
+    try {
+      const img = nativeImage.createFromBuffer(buf); if (img.isEmpty()) return ''; const { width: w, height: h } = img.getSize();
+      for (const mx of [256, 192, 144, 110]) { const k = Math.min(1, mx / Math.max(w, h)), t = k < 1 ? img.resize({ width: Math.max(1, Math.round(w * k)), height: Math.max(1, Math.round(h * k)), quality: 'good' }) : img; for (const q of [70, 50, 35]) { const b = t.toJPEG(q).toString('base64'); if (b.length <= 11500) return b; } }
+    } catch (e) { log.warn('miniature d’image', e.message); }
+    return '';
+  };
+  const sendImage = (c, file) => {   // file : chemin d'un fichier choisi par la personne, ou écrit par nous (collage, capture)
+    const to = chat.friendTargets(c); if (!to.length) throw new Error('Aucun ami joignable dans cette discussion.');
+    const st = fs.statSync(file); if (!st.isFile() || st.size > imgsafe.MAX_BYTES) throw new Error('Image trop lourde (15 Mo au plus).'); const info = imgsafe.info(head(file)); if (!info) throw new Error('Image non reconnue : PNG, JPEG, GIF ou WebP.');
+    const o = xfer.offer(to, path.basename(file), [file]); return chat.sendCard(c, { k: 'img', n: path.basename(file), tid: o.tid, size: st.size, w: info.w, h: info.h }, thumbFit(fs.readFileSync(file)));
+  };
+  on('chat:imgsend', async (c, how, arg) => {
+    c = conv(c);
+    if (how === 'pick') { const r = await dialog.showOpenDialog(win, { title: 'Choisir une image à envoyer', properties: ['openFile'], filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }] }); if (r.canceled || !r.filePaths[0]) return { sent: 0 }; sendImage(c, r.filePaths[0]); return { sent: 1 }; }
+    if (how === 'paste') {   // image collée (Ctrl+V) : on l'écrit chez nous sous un nom neutre
+      const b = Buffer.isBuffer(arg) ? arg : arg && arg.byteLength ? Buffer.from(arg) : null, info = b && b.length <= imgsafe.MAX_BYTES ? imgsafe.info(b) : null; if (!info) throw new Error('Image non reconnue ou trop lourde (15 Mo au plus).');
+      fs.mkdirSync(sentDir, { recursive: true }); const f = path.join(sentDir, 'image-' + require('crypto').randomBytes(4).toString('hex') + '.' + info.ext); fs.writeFileSync(f, b); sendImage(c, f); return { sent: 1 };
+    }
+    if (how === 'shot') { const p = require('./shots').pathOf(String(arg && arg.inst), String(arg && arg.file)); sendImage(c, p); return { sent: 1 }; }   // capture de la page Captures : chemin vérifié par shots.js
+    throw new Error('Choix inconnu.');
+  });
+  const imgFile = (c, mid) => {   // fichier d'une carte image : le nôtre (envoyé) ou celui reçu ; null si pas (ou plus) là
+    c = conv(c); const card = chat.card(c, String(mid || '')); if (card.k !== 'img') throw new Error('Pas une image.');
+    let mine = false; try { chat.author(c, String(mid)); } catch (e) { mine = true; }   // author() refuse nos propres messages
+    const off = mine ? xfer.offers()[card.tid] : null, f = off ? off.files[0].a : (() => { const r = mine ? null : xfer.received(card.tid); return r && r.items.length === 1 ? r.items[0] : null; })();
+    return f && imgOk(f, card.size) ? { f, card } : null;
+  };
+  on('chat:imgget', (c, mid) => { const r = imgFile(c, mid); if (!r) throw new Error('Image introuvable : elle a peut-être été supprimée. Clique pour la recevoir de nouveau.'); const b = fs.readFileSync(r.f); return 'data:' + imgsafe.info(b).mime + ';base64,' + b.toString('base64'); });
+  on('chat:imgsave', async (c, mid) => { const r = imgFile(c, mid); if (!r) throw new Error('Image introuvable.'); const d = await dialog.showSaveDialog(win, { title: 'Enregistrer l’image', defaultPath: path.join(app.getPath('pictures'), r.card.n) }); if (d.canceled || !d.filePath) return false; fs.copyFileSync(r.f, d.filePath); return true; });
+  const TIDRE = /^[0-9a-f]{24}$/;
+  on('chat:xcancel', tid => { tid = String(tid || ''); if (!TIDRE.test(tid)) throw new Error('Envoi invalide.'); return xfer.cancel(tid) || xfer.discard(tid); });   // en cours : on arrête ; interrompu : on abandonne ce qui avait été reçu
+  on('chat:xopen', tid => { if (!TIDRE.test(String(tid))) throw new Error('Envoi invalide.'); const r = xfer.received(String(tid)); if (!r) throw new Error('Ces fichiers ont été supprimés (au bout de 14 jours).'); shell.openPath(r.dir); return true; });
+  on('chat:xapply', (c, mid, instId) => {   // range ce qui a été reçu dans une instance : même tri par contenu que le glisser-déposer
+    const card = chat.card(conv(c), String(mid || '')); if (card.k !== 'files') throw new Error('Pas un envoi de fichiers.'); if (!store.get().instances.some(x => x.id === instId)) throw new Error('Instance introuvable.');
+    const r = xfer.received(card.tid); if (!r) throw new Error('Les fichiers reçus ont été supprimés (au bout de 14 jours) : demande à ton ami de les renvoyer.');
+    return require('./drop').run(String(instId), r.items.slice(0, 60));
+  });
+  /* ===== Chat vocal (voice.js) : appel à deux avec un ami ===== */
+  on('voice:state', () => voice.state());
+  on('voice:start', (c, caps) => { c = String(c || ''); if (!KEYRE.test(c)) throw new Error('Les appels vocaux se font pour l’instant avec un seul ami (pas dans un groupe).'); return voice.start(c, caps); });
+  on('voice:accept', (id, caps) => voice.accept(String(id || ''), caps));
+  on('voice:decline', id => voice.decline(String(id || '')));
+  on('voice:hangup', () => voice.hangup());
+  on('voice:mute', m => voice.setMute(!!m));
+  on('voice:micaccess', async () => { if (process.platform !== 'darwin') return true; const { systemPreferences } = require('electron'); try { return (await systemPreferences.askForMediaAccess('microphone')) === true; } catch (e) { return false; } });   // macOS : autorisation système du micro
+  ipcMain.on('voice:pcm', (e, p) => { if (win && !win.isDestroyed() && e.sender === win.webContents && voice) voice.audio(p); });   // un paquet audio : sans réponse, jeté si le réseau ne suit pas
   on('chat:gnew', (name, ks) => chat.createGroup(String(name || ''), keys(ks)));
   on('chat:gadd', (c, ks) => chat.groupAdd(conv(c), keys(ks)));
   on('chat:gkick', (c, k) => chat.groupKick(conv(c), key(k)));
   on('chat:gaccept', c => chat.groupAccept(conv(c)));
   on('chat:gleave', c => chat.groupLeave(conv(c)));
+  on('chat:grename', (c, name) => chat.groupRename(conv(c), String(name || '')));
   on('auth:current', auth.current); on('auth:login', auth.login); on('auth:logout', auth.logout);
   on('versions', game.versions);
   on('inst:list', () => store.get().instances);
@@ -444,6 +538,5 @@ app.whenReady().then(async () => {
   setTimeout(() => { host.closeLegacyPorts().catch(e => log.warn('closeLegacyPorts', e.message)); }, 4000); // anciennes versions : ports ouverts sur la box (UPnP) refermés une fois
   app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
 });
-app.on('before-quit', () => { setTimeout(() => app.exit(0), 5000);   /* filet de sécurité : si une fermeture traîne (réseau P2P, serveur…), le processus ne reste jamais en arrière-plan et ne bloque plus l'installeur */
-  host.stopAll(); playit.stop(); require('./p2p').stopAll().catch(() => {}); if (chat) chat.flush(); if (friends) friends.stop().catch(() => {}); });
+app.on('before-quit', () => { host.stopAll(); playit.stop(); require('./p2p').stopAll().catch(() => {}); if (chat) chat.flush(); if (friends) friends.stop().catch(() => {}); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

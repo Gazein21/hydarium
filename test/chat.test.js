@@ -67,7 +67,7 @@ test('un inconnu ne peut rien injecter ; un ami ne peut pas forcer, inonder ni �
 
 test('cartes : seuls les champs connus passent, miniatures bornées (bombe de décompression refusée), code gardé côté launcher', async () => {
   const good = { k: 'inst', n: 'Mon pack', v: '1.20.1', l: 'fabric', m: 2, code: CODE };
-  assert.deepStrictEqual(C.cleanCard({ ...good, evil: '<script>', th: '' }), { k: 'inst', n: 'Mon pack', v: '1.20.1', l: 'fabric', m: 2, code: CODE, th: '' });
+  assert.deepStrictEqual(C.cleanCard({ ...good, evil: '<script>', th: '' }), { k: 'inst', n: 'Mon pack', v: '1.20.1', l: 'fabric', lv: '', m: 2, code: CODE, th: '' });
   for (const bad of [null, 'x', {}, { ...good, l: 'forge' }, { ...good, v: '1.20<img>' }, { ...good, code: 'HYD1.' + 'a'.repeat(20001) }, { ...good, code: 'http://evil' }, { ...good, n: '  ' }, { k: 'pack', n: 'P', src: 'modrinth', pid: 'zz' }, { k: 'pack', n: 'P', src: 'curseforge', pid: 'AANobbMI' }, { k: 'pack', n: 'P', src: 'evil', pid: 'AANobbMI' }, { k: 'srv', n: 'S', code: 'nimporte' }]) assert.strictEqual(C.cleanCard(bad), null, JSON.stringify(bad).slice(0, 60));
   assert.deepStrictEqual(C.cleanCard({ k: 'pack', n: 'Better MC', src: 'modrinth', pid: 'shFhR8Vx', v: '1.20.1' }), { k: 'pack', n: 'Better MC', src: 'modrinth', pid: 'shFhR8Vx', v: '1.20.1', th: '' }); assert.ok(C.cleanCard({ k: 'pack', n: 'CF', src: 'curseforge', pid: 'cf123' }));
   const ok = jpeg(96, 96); assert.strictEqual(C.okThumb(ok), ok); assert.deepStrictEqual(C.jpegSize(Buffer.from(ok, 'base64')), { w: 96, h: 96 });

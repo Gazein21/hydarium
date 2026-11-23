@@ -7,7 +7,8 @@
    • Un inconnu ne peut QUE déposer une demande (ou répondre à une demande que nous avons faite) ; tout autre message le fait couper. Limites : 20 inconnus par minute, 30 demandes en attente.
    • PRÉSENCE : entre amis, une connexion directe (ouverte par celui dont la clé est la plus petite) échange pseudo et état (en ligne / en jeu) ; « apparaître hors ligne » refuse les connexions des amis.
    • INVITATION à rejoindre un serveur : l'ami reçoit le code d'invitation privée, à confirmer. Une connexion directe montre l'adresse IP à l'ami connecté (dit à l'activation).
-   Messages : lignes JSON (2 Ko au plus). Tout ce qui vient d'un pair est validé avant usage. */
+   • CHAT : les messages d'amis que ce fichier ne connaît pas sont confiés à chat.js (onMessage) ; onOnline lui dit quand un ami se connecte. Un ami peut envoyer des lignes de 32 Ko (cartes de partage).
+   Messages : lignes JSON (2 Ko au plus pour un inconnu). Tout ce qui vient d'un pair est validé avant usage. */
 const crypto = require('crypto');
 
 const ALPHA = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';   // base 32 de Crockford
@@ -47,13 +48,14 @@ exports.create = (o = {}) => {
     let buf = '', last = Date.now(); const st = { sock, key, seen: 0, name: '', status: '', what: '', friend: false, invites: [] };
     const kill = () => { try { sock.destroy(); } catch (e) { /* déjà fermée */ } };
     const guard = setTimeout(() => { if (!friendOf(key) && !outgoing) kill(); }, 6000);   // un inconnu a 6 s pour déposer sa demande
-    const alive = setInterval(() => { if (Date.now() - last > T.deadMs && friendOf(key)) kill(); }, Math.max(200, T.deadMs / 3));
+    const alive = setInterval(() => { if (!st.raw && Date.now() - last > T.deadMs && friendOf(key)) kill(); }, Math.max(200, T.deadMs / 3));
     sock.on('error', () => {});
     sock.on('close', () => { clearTimeout(guard); clearInterval(alive); if (conns.get(key) === st) { conns.delete(key); changed(); } });
     sock.on('data', d => {
-      last = Date.now(); buf += d.toString('utf8'); const lim = friendOf(key) ? FRIEND_LINE : MAXLINE;   // un ami peut envoyer une carte de partage (chat) ; un inconnu reste limité à 2 Ko
+      last = Date.now(); if (st.raw) return;   // connexion confiée à xfer.js (envoi de fichiers) : plus de lignes JSON
+      buf += d.toString('utf8'); const lim = friendOf(key) ? FRIEND_LINE : MAXLINE;   // un ami peut envoyer une carte de partage (chat) ; un inconnu reste limité à 2 Ko
       if (buf.length > lim * 4) return kill();
-      let i; while ((i = buf.indexOf('\n')) >= 0) { const line = buf.slice(0, i); buf = buf.slice(i + 1); if (line.length > lim) return kill(); let m; try { m = JSON.parse(line); } catch (e) { return kill(); } if (!m || typeof m !== 'object') return kill(); handle(st, m); if (sock.destroyed) return; }
+      let i; while ((i = buf.indexOf('\n')) >= 0) { const line = buf.slice(0, i); buf = buf.slice(i + 1); if (line.length > lim) return kill(); let m; try { m = JSON.parse(line); } catch (e) { return kill(); } if (!m || typeof m !== 'object') return kill(); handle(st, m); if (sock.destroyed || st.raw) return; }
     });
     return st;
   }
@@ -76,6 +78,7 @@ exports.create = (o = {}) => {
         notify('invite', { key, from: fr.name, name: cleanName(m.name, 'Serveur'), code });
       } else if (m.t === 'bye') { f.list = f.list.filter(x => x.key !== key); stopLoop(key); save(); try { st.sock.destroy(); } catch (e) { /* fini */ } changed(); notify('removed', { name: fr.name }); }
       else if (m.t === 'accept') send(st.sock, { t: 'ack' });
+      else if ((m.t === 'xget' || m.t === 'vstream') && o.onStream) { st.raw = true; try { o.onStream(key, st.sock, m); } catch (e) { log.warn('amis : flux', e && e.message); try { st.sock.destroy(); } catch (x) { /* fermée */ } } }   // un ami demande des fichiers qu'on lui a proposés (xfer.js) ou ouvre l'audio d'un appel (voice.js, 'vstream') : onStream prend la connexion
       else if (o.onMessage && st.seen) { try { o.onMessage(key, m); } catch (e) { log.warn('amis : message', e && e.message); } }   // chat : seulement après la poignée de main de présence
       return;
     }
@@ -186,6 +189,8 @@ exports.create = (o = {}) => {
     },
     /** envoie un message (objet JSON) à un ami connecté en ce moment ; false = pas joignable (le chat le garde alors en attente) */
     sendTo(key, msg) { const c = conns.get(key); if (!running || !c || !friendOf(key) || c.sock.destroyed || Date.now() - c.seen >= T.deadMs) return false; send(c.sock, msg); return true; },
+    /** connexion directe vers un ami (pour un transfert de fichiers) ; l'appelant la ferme */
+    openStream(key) { if (!running || !friendOf(key)) throw new Error('Cet ami n’est pas joignable.'); return dht.connect(Buffer.from(key, 'hex'), { keyPair: kp }); },
     isFriend: key => !!friendOf(key),
     isOnline(key) { const c = conns.get(key); return !!c && !!friendOf(key) && Date.now() - c.seen < T.deadMs; },
     friendName: key => { const f = friendOf(key); return f ? f.name : ''; },

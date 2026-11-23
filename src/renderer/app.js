@@ -201,7 +201,7 @@ function lazyThumbs() {
 }
 async function shotModal(n) {
   const s = SH[n]; if (!s) return closeModal(); SH.cur = n;
-  openModal(`<div class="shv"><div class="shimg"><div class="spin"></div></div><div class="row between" style="margin-top:10px"><div class="row"><button class="btn sec sm" data-a="shNav" data-v="-1" ${n ? '' : 'disabled'}>${ic('back', 13)}</button><button class="btn sec sm" data-a="shNav" data-v="1" ${n < SH.length - 1 ? '' : 'disabled'}>${ic('chev', 13)}</button><span class="mu">${n + 1} / ${SH.length}</span></div><div class="row"><button class="btn sm" data-a="shAnn">${ic('edit', 13)} Annoter</button><button class="btn sec sm" data-a="shOp" data-op="copy">${ic('copy', 13)} Copier</button><button class="btn sec sm" data-a="shOp" data-op="reveal">${ic('folder', 13)} Dossier</button><button class="btn sec sm" data-a="shOp" data-op="open">Ouvrir</button><button class="btn dg sm" data-a="shOp" data-op="delete">${ic('trash', 13)}</button><button class="btn sm" data-a="mclose">Fermer</button></div></div><small style="margin-top:6px">${esc(s.name)} · ${esc(s.file)} · ${new Date(s.mtime).toLocaleString('fr-FR')} · ${mo(s.size)}</small></div>`, true);
+  openModal(`<div class="shv"><div class="shimg"><div class="spin"></div></div><div class="row between" style="margin-top:10px"><div class="row"><button class="btn sec sm" data-a="shNav" data-v="-1" ${n ? '' : 'disabled'}>${ic('back', 13)}</button><button class="btn sec sm" data-a="shNav" data-v="1" ${n < SH.length - 1 ? '' : 'disabled'}>${ic('chev', 13)}</button><span class="mu">${n + 1} / ${SH.length}</span></div><div class="row"><button class="btn sm" data-a="shAnn">${ic('edit', 13)} Annoter</button><button class="btn sec sm" data-a="chShotSend">${ic('chat', 13)} À un ami</button><button class="btn sec sm" data-a="shOp" data-op="copy">${ic('copy', 13)} Copier</button><button class="btn sec sm" data-a="shOp" data-op="reveal">${ic('folder', 13)} Dossier</button><button class="btn sec sm" data-a="shOp" data-op="open">Ouvrir</button><button class="btn dg sm" data-a="shOp" data-op="delete">${ic('trash', 13)}</button><button class="btn sm" data-a="mclose">Fermer</button></div></div><small style="margin-top:6px">${esc(s.name)} · ${esc(s.file)} · ${new Date(s.mtime).toLocaleString('fr-FR')} · ${mo(s.size)}</small></div>`, true);
   const f = await call('shots:full', s.inst, s.file).catch(() => null); const box = $('.shimg'); if (box && SH.cur === n) box.innerHTML = f && f.src ? `<img src="${f.src}" alt="">` : '<span class="mu">Impossible d’afficher cette image.</span>';
 }
 
@@ -449,7 +449,7 @@ async function setView() {
     ${defOptsHtml()}
     <div class="sh"><h3>Menu en jeu</h3></div><div class="card" style="display:block"><div class="sw"><div style="flex:1"><b>Raccourci du menu en jeu</b><small>Ouvre skins, téléchargements, captures et musique par-dessus Minecraft (fenêtré ou plein écran fenêtré). « off » pour désactiver.</small></div>${accelBtn()}</div>
 </div>`;
-  if (st === 'notif') b = `<div class="card" style="display:block">${swd('notif', 'Notifications du système', 'Interrupteur général : désactive tout ce qui suit.')}${swd('notifLaunch', 'Lancement du jeu', 'Quand Minecraft démarre.')}${swd('notifCrash', 'Plantages', 'Cause probable et accès au détail.')}${swd('notifShot', 'Captures d’écran', '« Capture enregistrée » : un clic ouvre l’image.')}${swd('notifServer', 'Mon serveur', 'Serveur en ligne, joueurs qui rejoignent.')}${swd('notifDone', 'Téléchargements terminés', 'Modpacks importés, Java installé…')}${sw('notifQuiet', 'Ne pas déranger pendant le jeu', 'Aucune notification pendant que Minecraft tourne, sauf les plantages.')}</div><div class="row" style="margin-top:12px"><button class="btn g" data-a="ntest">Envoyer une notification de test</button></div>`;
+  if (st === 'notif') b = `<div class="card" style="display:block">${swd('notif', 'Notifications du système', 'Interrupteur général : désactive tout ce qui suit.')}${swd('notifFriends', 'Amis : messages et appels', 'Nouveaux messages, appels vocaux, demandes d’ami et invitations.')}${swd('notifLaunch', 'Lancement du jeu', 'Quand Minecraft démarre.')}${swd('notifCrash', 'Plantages', 'Cause probable et accès au détail.')}${swd('notifShot', 'Captures d’écran', '« Capture enregistrée » : un clic ouvre l’image.')}${swd('notifServer', 'Mon serveur', 'Serveur en ligne, joueurs qui rejoignent.')}${swd('notifDone', 'Téléchargements terminés', 'Modpacks importés, Java installé…')}${sw('notifQuiet', 'Ne pas déranger pendant le jeu', 'Aucune notification pendant que Minecraft tourne, sauf les plantages.')}</div><div class="row" style="margin-top:12px"><button class="btn g" data-a="ntest">Envoyer une notification de test</button></div>`;
   if (st === 'music') b = `<div class="card" style="display:block"><div class="sw"><div style="flex:1"><b>Source de musique</b><small>Affichée en bas du launcher et dans le menu en jeu.</small></div><select data-set="music">${[['auto', 'Automatique (Spotify ou YouTube Music)'], ['spotify', 'Spotify'], ['youtube', 'YouTube Music'], ['off', 'Désactivée']].map(([k, l]) => `<option value="${k}" ${(cfg.music || 'auto') === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div></div>
     <div class="sh"><h3>Spotify</h3></div><div class="card col"><b>${SPS.connected ? 'Compte Spotify connecté ✓' : 'Connexion directe à ton compte Spotify'}</b><small>Lecture du morceau en cours pour tous les comptes ; pause / suivant / précédent demandent Spotify Premium. Il faut un « Client ID » gratuit (developer.spotify.com › Create app) avec cette adresse de redirection : <b>${esc(SPS.redirect || '')}</b></small>
     <div class="row" style="margin-top:8px"><input data-set="spotifyId" value="${esc(cfg.spotifyId || '')}" placeholder="Client ID Spotify" style="flex:1;width:auto">${SPS.connected ? '<button class="btn g" data-a="splogout">Déconnecter</button>' : '<button class="btn" data-a="spconn">Connecter Spotify</button>'}</div></div>
@@ -1533,13 +1533,14 @@ const ACT = {
 };
 /* ===== Chat entre amis (voir src/main/chat.js) : page « Amis », cartes de partage, groupes ===== */
 Object.assign(P, { chat: '<path d="M4 5h16v11H9l-5 4z"/>', users: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.5 2.7-6 6-6s6 2.5 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14c3 0 5 2 5 5"/>' });
-const CH = { conv: null, list: { convs: {}, groups: [], unread: 0 }, msgs: [], th: {}, draft: {}, busy: new Set(), wasOn: null, stick: true, loaded: false };
+const CH = { xp: {}, conv: null, list: { convs: {}, groups: [], unread: 0 }, msgs: [], th: {}, draft: {}, busy: new Set(), wasOn: null, stick: true, loaded: false };
 const chG = id => String(id).startsWith('g:');
 const chLetter = n => ([...String(n || '?')][0] || '?').toUpperCase();
 const chLoc = () => (window.UILANG === 'en' ? 'en-GB' : 'fr-FR');
 const chTime = ts => new Date(ts).toLocaleTimeString(chLoc(), { hour: '2-digit', minute: '2-digit' });
 const chDay = ts => new Date(ts).toLocaleDateString(chLoc(), { weekday: 'long', day: 'numeric', month: 'long' });
-const chInstMeta = i => `${i.loader && i.loader !== 'vanilla' ? i.loader[0].toUpperCase() + i.loader.slice(1) : 'Vanilla'} ${i.version} · ${(i.mods || []).length} mod${(i.mods || []).length > 1 ? 's' : ''}`;
+const CHL = { vanilla: 'Vanilla', fabric: 'Fabric', quilt: 'Quilt', forge: 'Forge', neoforge: 'NeoForge' };
+const chInstMeta = i => `${CHL[i.loader] || 'Vanilla'} ${i.version} · ${(i.mods || []).length} mod${(i.mods || []).length > 1 ? 's' : ''}`;
 /** toutes les discussions possibles : chaque ami + chaque groupe, les plus récentes d'abord */
 function chConvs() {
   const L = CH.list, out = [];
@@ -1576,13 +1577,31 @@ function chatPaintList() {
 function chatPaintHead() {
   const n = $('#chhd'); if (!n) return; const c = chCur(); n.hidden = !c; if (!c) { n.innerHTML = ''; return; }
   n.innerHTML = c.kind === 'group'
-    ? `<div class="cha g">${ic('users', 16)}</div><div style="flex:1;min-width:0"><b data-notr>${esc(c.name)}</b><small data-notr>${c.g.members.map(m => esc(m.me ? 'Toi' : m.n)).join(', ')}</small></div><button class="btn g sm" data-a="chManage">Gérer le groupe</button>`
-    : `<div class="cha">${esc(chLetter(c.name))}${frDot(c)}</div><div style="flex:1"><b data-notr>${esc(c.name)}</b><small>${c.online ? frWhat(c) : 'hors ligne · il recevra tes messages à sa connexion'}</small></div>`;
+    ? `<div class="cha g">${ic('users', 16)}</div><div style="flex:1;min-width:0"><b data-notr>${esc(c.name)}</b><small data-notr>${c.g.members.map(m => esc(m.me ? 'Toi' : m.n)).join(', ')}</small></div><button class="ib" data-a="chClear" title="Vider la discussion pour moi" aria-label="Vider la discussion pour moi">${ic('trash', 15)}</button><button class="btn g sm" data-a="chManage">Gérer le groupe</button>`
+    : `<div class="cha">${esc(chLetter(c.name))}${frDot(c)}</div><div style="flex:1"><b data-notr>${esc(c.name)}</b><small>${c.online ? frWhat(c) : 'hors ligne · il recevra tes messages à sa connexion'}</small></div>${c.online && !VC.st ? `<button class="ib" data-a="vcCall" title="Appel vocal" aria-label="Appel vocal">${ic('phone', 15)}</button>` : ''}<button class="ib" data-a="chClear" title="Vider la discussion pour moi" aria-label="Vider la discussion pour moi">${ic('trash', 15)}</button>`;
   trNode(n);
 }
+const chSize = n => (n >= 2 ** 30 ? (n / 2 ** 30).toFixed(1).replace('.', ',') + ' Go' : mo(n));
+/** carte « fichiers » : une proposition (les fichiers restent chez l'expéditeur) ; progression en direct ; une fois reçus, rangement dans une instance au clic */
+function chFilesCard(m) {
+  const cc = m.c, k = CH.conv + '|' + m.id, xp = CH.xp[cc.tid], busy = CH.busy.has(k), done = m.dl && m.dl.s === 'done', pct = xp && xp.total ? Math.min(100, Math.round(xp.done / xp.total * 100)) : 0;
+  const bar = `<div class="xbar"><i data-xp="${esc(cc.tid)}" style="width:${pct}%"></i></div><small data-xpt="${esc(cc.tid)}">${xp && xp.st === 'run' ? pct + ' % · ' + chSize(xp.done) + ' / ' + chSize(xp.total) : 'Connexion…'}</small>`;
+  const act = m.mine ? (xp && xp.role === 'send' && xp.st === 'run' ? bar : '<small>Envoyé : ton ami le reçoit directement de ton PC, tant que ton launcher est ouvert (7 jours).</small>')
+    : busy ? `${bar}<div class="row" style="margin-top:4px"><button class="btn g sm" data-a="chXCancel" data-t="${esc(cc.tid)}">Annuler</button></div>`
+    : done ? `<span class="bd ok" style="margin:0">✔ Reçu</span> <button class="btn sm" data-a="chApplyOpen" data-m="${esc(m.id)}">Ajouter à une instance</button> <button class="btn g sm" data-a="chXOpen" data-t="${esc(cc.tid)}">Ouvrir le dossier</button>`
+    : m.part ? `<small>Transfert interrompu</small> <small data-notr>· ${Math.min(99, Math.round(m.part.done / (m.part.total || 1) * 100))} % · ${chSize(m.part.done)} / ${chSize(m.part.total)}</small><div class="row" style="margin-top:4px;gap:6px"><button class="btn sm" data-a="chDl" data-m="${esc(m.id)}">${ic('dl', 12)} Reprendre</button><button class="btn g sm" data-a="chXCancel" data-t="${esc(cc.tid)}">Abandonner</button></div>`
+    : `<button class="btn sm" data-a="chDl" data-m="${esc(m.id)}">${ic('dl', 12)} Recevoir</button>`;
+  return `<div class="chcard"><div class="chct">${tile(null, cc.n, '#3a4a66')}</div><div class="chci"><b data-notr>${esc(cc.n)}</b><small>Fichiers · ${cc.cnt} fichier${cc.cnt > 1 ? 's' : ''} · ${chSize(cc.size)}</small>${cc.top.length ? `<small data-notr>${cc.top.map(esc).join(', ')}${cc.cnt > cc.top.length ? '…' : ''}</small>` : ''}${cc.jar && !m.mine && !done ? '<div class="chwarn">⚠ Contient des mods (.jar) : ce sont des programmes. Ne les reçois que d’un ami de confiance.</div>' : ''}<div style="margin-top:6px">${act}</div></div></div>`;
+}
+function chImgCard(m) {
+  const cc = m.c, busy = CH.busy.has(CH.conv + '|' + m.id), ar = `${cc.w || 1}/${cc.h || 1}`;
+  return `<div class="chimg" data-a="chImg" data-m="${esc(m.id)}" title="Voir en grand"><div class="chimt" style="aspect-ratio:${ar};max-width:256px">${cc.th ? `<img data-th="${esc(cc.th)}" alt="" style="visibility:hidden">` : '<span class="mu">Image</span>'}${busy ? '<div class="spin"></div>' : ''}</div><small>${esc(cc.n)} · ${chSize(cc.size)}${cc.w ? ' · ' + cc.w + '×' + cc.h : ''}${!m.mine && !(m.dl && m.dl.s === 'done') ? ' · clique pour la recevoir' : ''}</small></div>`;
+}
 function chCard(m) {
+  if (m.c.k === 'img') return chImgCard(m);
+  if (m.c.k === 'files') return chFilesCard(m);
   const cc = m.c, k = CH.conv + '|' + m.id, busy = CH.busy.has(k), done = m.dl && m.dl.s === 'done';
-  const meta = cc.k === 'inst' ? `Instance · ${cc.l === 'vanilla' ? 'Vanilla' : cc.l[0].toUpperCase() + cc.l.slice(1)} ${esc(cc.v)} · ${cc.m} mod${cc.m > 1 ? 's' : ''}` : cc.k === 'pack' ? `Modpack ${cc.src === 'curseforge' ? 'CurseForge' : 'Modrinth'}${cc.v ? ' · ' + esc(cc.v) : ''}` : 'Invitation à un serveur';
+  const meta = cc.k === 'inst' ? `Instance · ${CHL[cc.l] || esc(cc.l)}${cc.lv ? ' ' + esc(cc.lv) : ''} · Minecraft ${esc(cc.v)} · ${cc.m} mod${cc.m > 1 ? 's' : ''}` : cc.k === 'pack' ? `Modpack ${cc.src === 'curseforge' ? 'CurseForge' : 'Modrinth'}${cc.v ? ' · ' + esc(cc.v) : ''}` : 'Invitation à un serveur';
   const act = m.mine ? `<small>${cc.k === 'srv' ? 'Invitation envoyée' : 'Envoyé'}</small>` : done ? `<span class="bd ok" style="margin:0">✔ Ajouté</span> <button class="btn g sm" data-a="chOpenInst" data-id="${esc((m.dl && m.dl.id) || '')}">Ouvrir</button>`
     : `<button class="btn sm" data-a="chDl" data-m="${esc(m.id)}" ${busy ? 'disabled' : ''}>${busy ? 'Téléchargement…' : cc.k === 'srv' ? ic('play', 12) + ' Rejoindre' : ic('dl', 12) + ' Télécharger'}</button>`;
   return `<div class="chcard"><div class="chct">${tile(null, cc.n)}${cc.th ? `<img data-th="${esc(cc.th)}" alt="" style="visibility:hidden">` : ''}</div><div class="chci"><b data-notr>${esc(cc.n)}</b><small>${meta}</small><div class="row" style="margin-top:6px;gap:6px">${act}</div></div></div>`;
@@ -1591,13 +1610,16 @@ function chMsg(m, prev, grp) {
   if (m.k === 's') return `<div class="chsys" data-notr>${esc(m.x)}</div>`;
   const first = !prev || prev.k === 's' || prev.from !== m.from || m.ts - prev.ts > 300000;
   const st = !m.mine ? '' : m.st === 'wait' ? '<span title="En attente : la personne n’est pas connectée, elle le recevra à sa connexion">🕓</span>' : m.st === 'fail' ? '<span class="er" title="Pas remis en 14 jours">non remis</span>' : '<span title="Reçu">✓</span>';
-  const body = m.c ? chCard(m) : m.bad ? '<i class="mu">Message non pris en charge : mets Hydarium à jour.</i>' : `<span data-notr>${esc(m.x)}</span>`;
-  return `<div class="chr ${m.mine ? 'me' : ''}">${!m.mine && grp && first ? `<div class="chw" data-notr>${esc(m.who)}</div>` : ''}<div class="chb ${m.c ? 'cd' : ''}">${body}<small class="cht">${chTime(m.ts)} ${st}</small></div></div>`;
+  const body = m.del ? `<i class="mu">🚫 Message supprimé${m.dby ? ' par l’administrateur' : ''}</i>` : m.c ? chCard(m) : m.bad ? '<i class="mu">Message non pris en charge : mets Hydarium à jour.</i>' : `<span data-notr>${esc(m.x)}</span>`;
+  const own = m.mine && !m.del ? `${!m.c && !m.bad ? `<button class="ib" data-a="chEdit" data-m="${esc(m.id)}" title="Modifier" aria-label="Modifier">${ic('edit', 12)}</button>` : ''}<button class="ib" data-a="chDel" data-m="${esc(m.id)}" title="Supprimer pour tout le monde" aria-label="Supprimer">${ic('trash', 12)}</button>` : '';
+  const mod = CH.adm && !m.mine && !m.del ? `<button class="ib" data-a="chMod" data-m="${esc(m.id)}" title="Supprimer pour tout le monde (administrateur)" aria-label="Supprimer pour tout le monde (administrateur)">${ic('trash', 12)}</button>` : '';   // réservé à l'administrateur du groupe
+  const acts = `<span class="chact">${own}${mod}<button class="ib" data-a="chHide" data-m="${esc(m.id)}" title="Masquer pour moi" aria-label="Masquer pour moi">${ic('eye', 12)}</button></span>`;   // masquer : chez soi seulement
+  return `<div class="chr ${m.mine ? 'me' : ''}">${!m.mine && grp && first ? `<div class="chw" data-notr>${esc(m.who)}</div>` : ''}<div class="chb ${m.c ? 'cd' : ''} ${m.c && m.c.k === 'img' ? 'im' : ''} ${m.del ? 'dl' : ''}">${acts}${body}<small class="cht">${chTime(m.ts)}${m.ed && !m.del ? ' <span title="Ce message a été modifié">(modifié)</span>' : ''} ${m.del ? '' : st}</small></div></div>`;
 }
 function chatPaintMsgs() {
   const n = $('#chms'); if (!n) return;
   if (!CH.conv) { n.innerHTML = `<div class="chempty"><b>Choisis une discussion</b><small>Écris à un ami, crée un groupe, ou partage une instance : ouvre-la dans « Instances » puis « Envoyer à un ami ».</small></div>`; trNode(n); return; }
-  let h = '', day = '', prev = null; const grp = chG(CH.conv);
+  let h = '', day = '', prev = null; const grp = chG(CH.conv), cur = grp ? chCur() : null; CH.adm = !!(cur && cur.g && cur.g.admin);
   for (const m of CH.msgs) { const d = new Date(m.ts).toDateString(); if (d !== day) { day = d; prev = null; h += `<div class="chday">${esc(chDay(m.ts))}</div>`; } h += chMsg(m, prev, grp); prev = m; }
   n.innerHTML = h || `<div class="chempty"><b>Dis bonjour 👋</b><small>Les messages et les partages arrivent en direct, ou dès que la personne se connecte.</small></div>`;
   if (CH.stick) n.scrollTop = n.scrollHeight;
@@ -1610,7 +1632,7 @@ function chatPaintBar() {
   if (c.kind === 'group' && c.g.st === 'invited') { n.dataset.c = ''; n.innerHTML = `<small style="flex:1">Tu es invité dans ce groupe : tu peux lire, mais pas écrire tant que tu n’as pas rejoint.</small><button class="btn sm" data-a="chGAccept">Rejoindre</button><button class="btn g sm" data-a="chGLeave">Refuser</button>`; trNode(n); return; }
   if (n.dataset.c === c.id && $('#chin')) return;   // la zone de saisie reste en place : ce qui est tapé n'est jamais perdu
   n.dataset.c = c.id;
-  n.innerHTML = `<button class="ib" data-a="chPick" title="Partager une instance" aria-label="Partager une instance">${ic('cube', 15)}</button><textarea id="chin" rows="1" maxlength="1000" placeholder="Écrire un message…"></textarea><button class="btn" data-a="chSend">Envoyer</button>`;
+  n.innerHTML = `<button class="ib" data-a="chPick" title="Partager une instance" aria-label="Partager une instance">${ic('cube', 15)}</button><button class="ib" data-a="chFiles" title="Envoyer des fichiers" aria-label="Envoyer des fichiers">${ic('plus', 15)}</button><button class="ib" data-a="chImgPick" title="Envoyer une image (ou colle-la avec Ctrl+V)" aria-label="Envoyer une image">${ic('cam', 15)}</button><textarea id="chin" rows="1" maxlength="1000" placeholder="Écrire un message…"></textarea><button class="btn" data-a="chSend">Envoyer</button>`;
   const t = $('#chin'); t.value = CH.draft[c.id] || ''; chatGrow(t); trNode(n);
 }
 async function chatRefresh(conv) {
@@ -1640,16 +1662,16 @@ async function chShareModal(id) {
   const i = byId(id); if (!i) return;
   if (!FR || !FR.on) { friendsModal(); return; }
   if (!FR.friends.length) return note('Ajoute d’abord un ami (page Amis › ⚙) pour lui envoyer des instances.', 'Amis');
-  await chatLoadList(); const gs = CH.list.groups.filter(g => g.st === 'member'), nope = ['forge', 'neoforge'].includes(i.loader) && !i.pack;
+  await chatLoadList(); const gs = CH.list.groups.filter(g => g.st === 'member'), exp = ['forge', 'neoforge'].includes(i.loader) && !i.pack;
   openModal(`<h3>Envoyer à un ami</h3><div class="chcard"><div class="chct">${tile(null, i.name)}</div><div class="chci"><b data-notr>${esc(i.name)}</b><small>${esc(chInstMeta(i))}</small></div></div>
     <p class="mu" style="margin:10px 0">Ton ami reçoit une carte dans le chat et choisit de la télécharger. <b>Aucun fichier ne part de ton PC</b> : ses mods sont retéléchargés depuis Modrinth${i.pack ? ' (modpack du catalogue : version d’origine)' : ''}.</p>
-    ${nope ? '<div class="alert">Les instances Forge et NeoForge ne se partagent pas encore par carte. Un modpack installé depuis le catalogue, lui, se partage.</div>' : `<div class="sh" style="margin:12px 0 6px"><h3>Amis</h3></div><div class="chpick">${chFriendBoxes('data-chs')}</div>${gs.length ? `<div class="sh" style="margin:12px 0 6px"><h3>Groupes</h3></div><div class="chpick">${gs.map(g => `<label class="ml ckb"><input type="checkbox" data-chs="${esc(g.id)}">${ic('users', 14)}<b data-notr>${esc(g.name)}</b><small style="margin-left:auto">${g.members.length} membres</small></label>`).join('')}</div>` : ''}`}
-    <div class="row end" style="margin-top:14px"><button class="btn sec" data-a="mclose">Annuler</button>${nope ? '' : `<button class="btn" data-a="chShareGo" data-id="${esc(id)}">Envoyer</button>`}</div>`, false);
+    ${exp ? `<small>${CHL[i.loader]} : ton ami recevra la même version du loader (${esc(i.loaderVer || '?')}), installée à son premier lancement. Le support de Forge et NeoForge reste expérimental dans Hydarium.</small>` : ''}<div class="sh" style="margin:12px 0 6px"><h3>Amis</h3></div><div class="chpick">${chFriendBoxes('data-chs')}</div>${gs.length ? `<div class="sh" style="margin:12px 0 6px"><h3>Groupes</h3></div><div class="chpick">${gs.map(g => `<label class="ml ckb"><input type="checkbox" data-chs="${esc(g.id)}">${ic('users', 14)}<b data-notr>${esc(g.name)}</b><small style="margin-left:auto">${g.members.length} membres</small></label>`).join('')}</div>` : ''}
+    <div class="row end" style="margin-top:14px"><button class="btn sec" data-a="mclose">Annuler</button><button class="btn" data-a="chShareGo" data-id="${esc(id)}">Envoyer</button></div>`, false);
 }
 async function chShareDone(r) { closeModal(); flash('Envoyé ✓'); if (r.skipped) note(r.skipped + ' mod(s) ne viennent pas de Modrinth : ils ne sont pas inclus dans la carte.', 'Partage'); CH.stick = true; await chatRefresh(); }
 function chManageModal() {
   const c = chCur(); if (!c || c.kind !== 'group') return; const g = c.g, addable = FR.friends.filter(f => !g.members.some(m => m.k === f.key));
-  openModal(`<div class="row between"><h3 style="margin:0" data-notr>${esc(g.name)}</h3><button class="ib" data-a="mclose">${ic('x', 14)}</button></div><div class="sh"><h3>Membres (${g.members.length})</h3></div>
+  openModal(`<div class="row between"><h3 style="margin:0" data-notr>${esc(g.name)}</h3><button class="ib" data-a="mclose">${ic('x', 14)}</button></div>${g.admin && g.st === 'member' ? `<div class="row" style="gap:8px;margin-top:10px"><input id="chgr" class="in" maxlength="32" value="${esc(g.name)}" placeholder="Nom du groupe" style="flex:1" autocomplete="off"><button class="btn sm" data-a="chGRename">Renommer</button></div>` : ''}<div class="sh"><h3>Membres (${g.members.length})</h3></div>
     ${g.members.map(m => `<div class="ml"><div style="flex:1"><b data-notr>${esc(m.me ? 'Toi' : m.n)}</b>${m.k === g.adminKey ? ' <span class="bd">admin</span>' : ''}${!m.me && !m.friend ? '<br><small>pas dans tes amis : tes messages lui arrivent par l’admin</small>' : ''}</div>${g.admin && !m.me ? `<button class="btn g sm" data-a="chGKick" data-k="${esc(m.k)}" data-n="${esc(m.n)}">Retirer</button>` : ''}</div>`).join('')}
     ${g.admin && addable.length ? `<div class="sh"><h3>Ajouter un ami</h3></div><div class="row" style="gap:8px"><select id="chga" class="in" style="flex:1">${addable.map(f => `<option value="${esc(f.key)}">${esc(f.name)}</option>`).join('')}</select><button class="btn sm" data-a="chGAdd">Ajouter</button></div>` : ''}
     <small style="margin-top:10px">${g.admin ? 'Tu administres ce groupe : toi seul peux ajouter ou retirer des membres, et seulement parmi tes amis.' : 'Seul l’administrateur peut ajouter ou retirer des membres.'}</small>
@@ -1658,18 +1680,65 @@ function chManageModal() {
 Object.assign(ACT, {
   chOpen: async d => { CH.conv = d.c; CH.stick = true; await chatLoadMsgs(); chatPaintList(); chatPaintHead(); chatPaintMsgs(); chatPaintBar(); chatActiveSync(); const t = $('#chin'); if (t) t.focus(); },
   chSend: () => chatSend(),
+  chEdit: d => { const m = CH.msgs.find(x => x.id === d.m); if (!m || !m.mine || m.c || m.del) return; CH.editing = { conv: CH.conv, id: d.m }; openModal(`<h3>Modifier le message</h3><textarea id="chedt" class="in" rows="4" maxlength="1000" style="width:100%;margin:8px 0;resize:vertical"></textarea><small>Les personnes de la discussion verront « modifié » à côté de ton message.</small><div class="row end" style="margin-top:12px"><button class="btn sec" data-a="mclose">Annuler</button><button class="btn" data-a="chEditGo">Enregistrer</button></div>`); const t = $('#chedt'); if (t) { t.value = m.x; t.focus(); t.setSelectionRange(t.value.length, t.value.length); } },
+  chEditGo: async () => { const t = $('#chedt'), e = CH.editing; if (!t || !e) return; const x = t.value.trim(); if (!x) return flash('Le message ne peut pas être vide'); try { await call('chat:edit', e.conv, e.id, x); } catch (err) { return flash('Erreur : ' + err.message); } CH.editing = null; closeModal(); await chatRefresh(e.conv); },
+  chDel: async d => {
+    if (!(await ask('Supprimer ce message ?', 'Il disparaît pour tout le monde dans cette discussion. Les personnes hors ligne le verront disparaître à leur connexion.', 'Supprimer', true))) return;
+    try { await call('chat:del', CH.conv, d.m); } catch (e) { return flash('Erreur : ' + e.message); } await chatRefresh(CH.conv);
+  },
+  chHide: async d => { try { await call('chat:hide', CH.conv, d.m); } catch (e) { return flash('Erreur : ' + e.message); } await chatRefresh(CH.conv); },
+  chMod: async d => {
+    if (!(await ask('Supprimer ce message pour tout le monde ?', 'En tant qu’administrateur du groupe, tu supprimes le message de quelqu’un d’autre. Tous les membres verront « Message supprimé par l’administrateur ».', 'Supprimer', true))) return;
+    try { await call('chat:mod', CH.conv, d.m); } catch (e) { return flash('Erreur : ' + e.message); } await chatRefresh(CH.conv);
+  },
+  chClear: async () => {
+    if (!CH.conv) return; if (!(await ask('Vider cette discussion pour toi ?', 'Les messages disparaissent seulement de ton écran. Les autres personnes les gardent.', 'Vider', true))) return;
+    try { await call('chat:clear', CH.conv); } catch (e) { return flash('Erreur : ' + e.message); } await chatRefresh(CH.conv);
+  },
+  chGRename: async () => { const n = (($('#chgr') || {}).value || '').trim(); if (!n) return flash('Donne un nom au groupe'); try { await call('chat:grename', CH.conv, n); } catch (e) { return flash('Erreur : ' + e.message); } await chatRefresh(CH.conv); chManageModal(); },
   chShare: d => chShareModal(d.id),
   chShareGo: async d => { const to = chChecked('data-chs'); if (!to.length) return flash('Choisis au moins un destinataire'); await chShareDone(await call('chat:share', to, d.id)); },
   chPick: () => openModal(`<h3>Partager une instance</h3><p class="mu">Une carte part dans cette discussion ; aucun fichier n’est envoyé.</p>${inst.map(i => `<div class="ml"><div style="flex:1"><b data-notr>${esc(i.name)}</b><br><small>${esc(chInstMeta(i))}</small></div><button class="btn sm" data-a="chPickGo" data-id="${esc(i.id)}">Envoyer</button></div>`).join('') || '<p class="mu">Aucune instance.</p>'}<div class="row end" style="margin-top:12px"><button class="btn sec" data-a="mclose">Fermer</button></div>`),
   chPickGo: async d => { await chShareDone(await call('chat:share', [CH.conv], d.id)); },
   chDl: async d => {
     const cv = CH.conv, m = CH.msgs.find(x => x.id === d.m); if (!m || !m.c) return;
+    if (m.c.k === 'files' && m.c.jar && !(await ask('Recevoir des mods ?', `Cet envoi contient des mods (.jar). Ce sont des programmes qui s’exécutent dans le jeu : ne continue que si tu fais confiance à <b>${esc(m.who)}</b> et à ce qu’il t’envoie. Rien n’est ajouté à une instance tant que tu ne le demandes pas.`, 'Recevoir', false))) return;
     if (m.c.k === 'srv' && !(await ask('Rejoindre ce serveur ?', `Tu vas rejoindre « ${esc(m.c.n)} », le serveur d’un ami. Une connexion directe lui montre ton adresse IP.`, 'Rejoindre', false))) return;
     const k = cv + '|' + d.m; CH.busy.add(k); chatPaintMsgs(); let srv = null;
-    try { const r = await call('chat:dl', cv, d.m); if (r.kind === 'srv') srv = r; else flash(r.failed ? 'Ajouté · ' + r.failed + ' mod(s) n’ont pas pu être installés' : 'Instance ajoutée ✓'); }
+    try { const r = await call('chat:dl', cv, d.m); if (r.kind === 'srv') srv = r; else if (r.kind === 'files') flash('Reçu ✓ · ' + r.count + ' fichier' + (r.count > 1 ? 's' : '')); else flash(r.failed ? 'Ajouté · ' + r.failed + ' mod(s) n’ont pas pu être installés' : 'Instance ajoutée ✓'); }
     catch (e) { note(e.message, 'Téléchargement impossible'); }
     finally { CH.busy.delete(k); inst = await call('inst:list').catch(() => inst); await chatLoadMsgs(); chatPaintMsgs(); }
     if (srv) { saved = await call('srv:saved').catch(() => saved); await smartJoin(srv.addr); }
+  },
+  chImgPick: async () => { const r = await call('chat:imgsend', CH.conv, 'pick'); if (r.sent) { CH.stick = true; await chatRefresh(CH.conv); } },
+  chImg: async d => {   // clic sur une image : on la reçoit si besoin (une seule fois), puis on l'affiche en grand
+    const cv = CH.conv, m = CH.msgs.find(x => x.id === d.m); if (!m || !m.c) return; const k = cv + '|' + d.m;
+    if (!m.mine && !(m.dl && m.dl.s === 'done')) {
+      if (CH.busy.has(k)) return; CH.busy.add(k); chatPaintMsgs();
+      try { await call('chat:dl', cv, d.m); } catch (e) { return note(e.message, 'Image'); } finally { CH.busy.delete(k); await chatLoadMsgs(); chatPaintMsgs(); }
+    }
+    let src = ''; try { src = await call('chat:imgget', cv, d.m); } catch (e) { return note(e.message, 'Image'); }
+    CH.img = { conv: cv, mid: d.m }; openModal(`<div class="shv"><div class="shimg"><img src="${src}" alt=""></div><div class="row between" style="margin-top:10px"><small data-notr>${esc(m.who || '')} · ${esc(m.c.n)}</small><div class="row"><button class="btn sec sm" data-a="chImgSave">Enregistrer sous…</button><button class="btn sm" data-a="mclose">Fermer</button></div></div></div>`, true);
+  },
+  chImgSave: async () => { if (CH.img && await call('chat:imgsave', CH.img.conv, CH.img.mid)) flash('Image enregistrée ✓'); },
+  chImgGo: async () => { const b = CH.paste; if (!b) return; CH.paste = null; closeModal(); try { await call('chat:imgsend', CH.conv, 'paste', b); flash('Image envoyée ✓'); CH.stick = true; await chatRefresh(CH.conv); } catch (e) { note(e.message, 'Image'); } },
+  chShotSend: async () => {   // depuis la page Captures
+    const s = SH[SH.cur]; if (!s) return; if (!FR || !FR.on || !FR.friends.length) { closeModal(); return note('Active les amis et ajoute un ami pour lui envoyer des captures.', 'Amis'); } await chatLoadList(); const gs = CH.list.groups.filter(g => g.st === 'member');
+    CH.shot = s; openModal(`<h3>Envoyer cette capture</h3><p class="mu" data-notr>${esc(s.file)}</p><div class="chpick">${chFriendBoxes('data-chs')}${gs.map(g => `<label class="ml ckb"><input type="checkbox" data-chs="${esc(g.id)}">${ic('users', 14)}<b data-notr>${esc(g.name)}</b></label>`).join('')}</div><div class="row end" style="margin-top:14px"><button class="btn sec" data-a="mclose">Annuler</button><button class="btn" data-a="chShotGo">Envoyer</button></div>`);
+  },
+  chShotGo: async () => { const to = chChecked('data-chs'), s = CH.shot; if (!to.length) return flash('Choisis au moins un destinataire'); let n = 0, err = ''; for (const c of to) { try { await call('chat:imgsend', c, 'shot', { inst: s.inst, file: s.file }); n++; } catch (e) { err = e.message; } } closeModal(); if (n) flash('Capture envoyée ✓'); if (err) note(err, 'Capture'); },
+  chXCancel: async d => { try { await call('chat:xcancel', d.t); } catch (e) { flash('Erreur : ' + e.message); } await chatLoadMsgs(); chatPaintMsgs(); },
+  chXOpen: d => call('chat:xopen', d.t),
+  chFiles: () => openModal(`<h3>Envoyer des fichiers</h3><p class="mu">Les fichiers <b>restent sur ton PC</b> : ton ami les reçoit directement de toi, quand il clique sur « Recevoir » (ton launcher doit être ouvert, 7 jours au plus). Les programmes (.exe, .bat, .dll…) sont refusés ; 4 Go et 3 000 fichiers au plus.</p>
+    <div class="row" style="gap:8px;flex-wrap:wrap;margin:10px 0"><button class="btn" data-a="chFilesGo" data-how="files">Des fichiers…</button><button class="btn" data-a="chFilesGo" data-how="folder">Un dossier…</button></div>
+    ${inst.length ? `<div class="sh" style="margin:14px 0 6px"><h3>Depuis une instance</h3></div><div class="row" style="gap:8px;flex-wrap:wrap"><select id="chfi" class="in">${inst.map(i => `<option value="${esc(i.id)}">${esc(i.name)}</option>`).join('')}</select><button class="btn g sm" data-a="chFilesGo" data-how="mods">Ses mods…</button><button class="btn g sm" data-a="chFilesGo" data-how="worlds">Ses mondes…</button><button class="btn g sm" data-a="chFilesGo" data-how="packs">Ses packs de ressources…</button></div>` : ''}
+    ${chG(CH.conv) ? '<small style="margin-top:10px">Dans un groupe, seuls les membres qui sont tes amis peuvent recevoir les fichiers.</small>' : ''}<div class="row end" style="margin-top:14px"><button class="btn sec" data-a="mclose">Fermer</button></div>`),
+  chFilesGo: async d => { const r = await call('chat:xsend', CH.conv, d.how, ($('#chfi') || {}).value || ''); if (!r.sent) return; closeModal(); flash('Proposé ✓'); CH.stick = true; await chatRefresh(CH.conv); },
+  chApplyOpen: d => openModal(`<h3>Ajouter à une instance</h3><p class="mu">Chaque élément est reconnu par son contenu (mod, pack de ressources, shader, monde…) et rangé au bon endroit. Les mods ajoutés seront « non vérifiés ».</p>${inst.length ? `<div class="row" style="gap:8px"><select id="chai" class="in" style="flex:1">${inst.map(i => `<option value="${esc(i.id)}">${esc(i.name)} · ${esc(chInstMeta(i))}</option>`).join('')}</select><button class="btn" data-a="chApplyGo" data-m="${esc(d.m)}">Ajouter</button></div>` : '<p class="mu">Crée d’abord une instance.</p>'}<div class="row end" style="margin-top:14px"><button class="btn sec" data-a="mclose">Annuler</button></div>`),
+  chApplyGo: async d => {
+    const r = await call('chat:xapply', CH.conv, d.m, ($('#chai') || {}).value); closeModal(); inst = await call('inst:list').catch(() => inst);
+    const N = { mod: 'mod', resourcepack: 'pack de ressources', shader: 'shader', datapack: 'data pack', world: 'monde' }, parts = Object.entries(r.counts).filter(([, n]) => n).map(([k, n]) => n + ' ' + N[k] + (n > 1 && k !== 'shader' ? 's' : n > 1 ? 's' : ''));
+    note((parts.length ? 'Ajouté : ' + parts.join(', ') + '.' : 'Rien n’a pu être ajouté.') + (r.modpacks.length ? ' Un modpack était inclus : importe-le depuis « Nouvelle instance ».' : '') + (r.skipped.length ? ' Ignoré (type inconnu) : ' + r.skipped.slice(0, 3).join(', ') + '.' : '') + (r.errors.length ? ' Erreurs : ' + r.errors.slice(0, 2).map(e => e.name + ' (' + e.msg + ')').join(' ; ') : ''), 'Fichiers reçus');
   },
   chOpenInst: d => { if (byId(d.id)) goInst(d.id); else { page = 'inst'; render(); } },
   chGroup: () => { if (!FR || !FR.on || !FR.friends.length) return note('Ajoute d’abord des amis pour créer un groupe.', 'Groupes'); openModal(`<h3>Nouveau groupe</h3><p class="mu">Seulement des personnes déjà dans tes amis. Chacune reçoit une invitation et décide de rejoindre (même hors ligne : l’invitation arrive à sa connexion).</p><input id="chgn" class="in" maxlength="32" placeholder="Nom du groupe" style="width:100%;margin:6px 0 10px" autocomplete="off"><div class="chpick">${chFriendBoxes('data-chg')}</div><div class="row end" style="margin-top:14px"><button class="btn sec" data-a="mclose">Annuler</button><button class="btn" data-a="chGNew">Créer le groupe</button></div>`); },
@@ -1680,8 +1749,132 @@ Object.assign(ACT, {
   chGAccept: async () => { await call('chat:gaccept', CH.conv); await chatRefresh(CH.conv); const t = $('#chin'); if (t) t.focus(); },
   chGLeave: async () => { const c = chCur(); if (!c || c.kind !== 'group') return; if (c.g.st === 'member' && !(await ask(c.g.admin ? 'Dissoudre ce groupe ?' : 'Quitter ce groupe ?', c.g.admin ? 'Le groupe disparaît pour tous ses membres.' : 'Tu ne recevras plus ses messages.', c.g.admin ? 'Dissoudre' : 'Quitter', true))) return; await call('chat:gleave', CH.conv); CH.conv = null; closeModal(); await chatRefresh(); chatActiveSync(); },
 });
+document.addEventListener('paste', e => {   // image collée : aperçu, puis envoi après confirmation
+  if (!e.target || e.target.id !== 'chin' || !CH.conv) return; const it = [...(e.clipboardData ? e.clipboardData.items : [])].find(i => i.kind === 'file' && /^image\//.test(i.type)); if (!it) return; e.preventDefault();
+  const f = it.getAsFile(); if (!f || f.size > 15 * 2 ** 20) return flash('Image trop lourde (15 Mo au plus)');
+  f.arrayBuffer().then(buf => { CH.paste = new Uint8Array(buf); const u = URL.createObjectURL(f); openModal(`<h3>Envoyer cette image ?</h3><div class="shimg" style="max-height:300px"><img src="${u}" alt="" style="max-width:100%;max-height:300px"></div><div class="row end" style="margin-top:14px"><button class="btn sec" data-a="mclose">Annuler</button><button class="btn" data-a="chImgGo">Envoyer</button></div>`); });
+});
 document.addEventListener('keydown', e => { if (e.target && e.target.id === 'chin' && e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); chatSend(); } });
 document.addEventListener('input', e => { if (e.target && e.target.id === 'chin') { CH.draft[CH.conv] = e.target.value; chatGrow(e.target); } });
+/* ===== Chat vocal (voir src/main/voice.js) : appel à deux avec un ami ===== */
+/* Le processus principal transporte des paquets de 20 ms ; ici : micro → encodage → paquets, et paquets → décodage → haut-parleurs.
+   Format « opus » (WebCodecs, ~24 kb/s) si le système le sait, sinon « pcm » (16 bits, 16 kHz, ~256 kb/s). L'annulation d'écho, la réduction de bruit et le gain automatique sont ceux de Chromium (contraintes du micro). */
+Object.assign(P, {
+  phone: '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z"/>',
+  hang: '<path d="M3 14c5-4 13-4 18 0l-1 3-4-1v-2a10 10 0 00-8 0v2l-4 1z"/>',
+  mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/>',
+  micoff: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3M3 3l18 18"/>',
+});
+const VR = 16000, VN = 320;   // 16 kHz ; 20 ms = 320 échantillons
+const VC = { st: null, eng: null, starting: false, caps: null, tick: null, lvl: 0, peer: 0, ring: null };
+async function vcCaps() {
+  if (VC.caps) return VC.caps; const c = [];
+  try {
+    if (window.AudioEncoder && window.AudioDecoder) {
+      const e = await AudioEncoder.isConfigSupported({ codec: 'opus', sampleRate: VR, numberOfChannels: 1, bitrate: 24000 }), d = await AudioDecoder.isConfigSupported({ codec: 'opus', sampleRate: VR, numberOfChannels: 1 });
+      if (e.supported && d.supported) c.push('opus');
+    }
+  } catch (e) { /* pas de WebCodecs : PCM */ }
+  c.push('pcm'); return (VC.caps = c);
+}
+const vcRms = f => { let s = 0; for (let i = 0; i < f.length; i++) s += f[i] * f[i]; return Math.sqrt(s / (f.length || 1)); };
+
+/** micro + haut-parleurs ; renvoie { stop } ; échoue (refus du micro, pas de micro…) avec un message lisible */
+async function vcEngineStart(codec) {
+  try { await call('voice:micaccess'); } catch (e) { /* hors macOS : rien à demander */ }
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 }, video: false }); }
+  catch (e) { throw new Error(e && e.name === 'NotFoundError' ? 'Aucun micro détecté.' : 'Micro refusé : autorise-le dans les réglages de ton système (confidentialité › microphone).'); }
+  const ctx = new AudioContext({ sampleRate: VR, latencyHint: 'interactive' }); await ctx.resume();
+  const E = { stream, ctx, codec, next: 0, ts: 0, rts: 0, acc: new Float32Array(VN), fill: 0, enc: null, dec: null, nodes: [], dead: false };
+  const out = ctx.createGain(); out.gain.value = 1; out.connect(ctx.destination); E.out = out;
+  const sendPkt = b => { if (!E.dead && b.length && b.length <= 1200) hyd.send('voice:pcm', b); };
+  const onFrame = f => {   // 320 échantillons du micro
+    VC.lvl = vcRms(f); if (E.dead || (VC.st && VC.st.muted) || !VC.st || VC.st.st !== 'live') return;
+    if (E.enc) { if (E.enc.encodeQueueSize > 6) return; const ad = new AudioData({ format: 'f32', sampleRate: VR, numberOfFrames: VN, numberOfChannels: 1, timestamp: E.ts, data: f }); E.ts += 20000; try { E.enc.encode(ad); } finally { ad.close(); } }
+    else { const p = new Int16Array(VN); for (let i = 0; i < VN; i++) p[i] = Math.max(-1, Math.min(1, f[i])) * 32767; sendPkt(new Uint8Array(p.buffer)); }
+  };
+  const feed = c => { let i = 0; while (i < c.length) { const n = Math.min(VN - E.fill, c.length - i); E.acc.set(c.subarray(i, i + n), E.fill); E.fill += n; i += n; if (E.fill === VN) { onFrame(E.acc.slice()); E.fill = 0; } } };
+  const play = f => {   // petit tampon d'écoute (60 ms) ; si on prend trop de retard, on se resynchronise
+    if (E.dead || !f.length) return; VC.peer = vcRms(f);
+    const b = ctx.createBuffer(1, f.length, VR); b.copyToChannel(f, 0); const s = ctx.createBufferSource(); s.buffer = b; s.connect(out);
+    const t = ctx.currentTime; if (E.next < t + 0.02 || E.next - t > 0.4) E.next = t + 0.06; s.start(E.next); E.next += b.duration;
+  };
+  if (codec === 'opus') {
+    E.enc = new AudioEncoder({ output: ch => { const b = new Uint8Array(ch.byteLength); ch.copyTo(b); sendPkt(b); }, error: () => {} });
+    E.enc.configure({ codec: 'opus', sampleRate: VR, numberOfChannels: 1, bitrate: 24000, opus: { frameDuration: 20000, useinbandfec: true, packetlossperc: 10 } });
+    E.dec = new AudioDecoder({ output: ad => { try { const f = new Float32Array(ad.numberOfFrames); ad.copyTo(f, { planeIndex: 0, format: 'f32-planar' }); play(f); } finally { ad.close(); } }, error: () => {} });
+    E.dec.configure({ codec: 'opus', sampleRate: VR, numberOfChannels: 1 });
+  }
+  E.rx = u8 => {   // paquet reçu de l'ami
+    if (E.dead || !(u8 && u8.length)) return;
+    if (E.dec) { if (E.dec.decodeQueueSize > 10) return; try { E.dec.decode(new EncodedAudioChunk({ type: 'key', timestamp: E.rts, data: u8 })); E.rts += 20000; } catch (e) { /* paquet invalide : jeté */ } }
+    else if (u8.length === VN * 2) { const v = new DataView(u8.buffer, u8.byteOffset, u8.byteLength), f = new Float32Array(VN); for (let i = 0; i < VN; i++) f[i] = v.getInt16(i * 2, true) / 32768; play(f); }
+  };
+  // capture : AudioWorklet (module chargé depuis un Blob) ; à défaut ScriptProcessor, plus ancien mais universel
+  const src = ctx.createMediaStreamSource(stream), mute = ctx.createGain(); mute.gain.value = 0; mute.connect(ctx.destination);   // le graphe doit aboutir à la sortie pour être exécuté
+  try {
+    const url = URL.createObjectURL(new Blob(["class C extends AudioWorkletProcessor{process(i){const c=i[0]&&i[0][0];if(c)this.port.postMessage(c.slice(0));return true}}registerProcessor('hyd-cap',C)"], { type: 'text/javascript' }));
+    try { await ctx.audioWorklet.addModule(url); } finally { URL.revokeObjectURL(url); }
+    const w = new AudioWorkletNode(ctx, 'hyd-cap', { numberOfInputs: 1, numberOfOutputs: 1, channelCount: 1 }); w.port.onmessage = e => feed(e.data); src.connect(w); w.connect(mute); E.nodes.push(w);
+  } catch (e) {
+    const sp = ctx.createScriptProcessor(1024, 1, 1); sp.onaudioprocess = e => feed(e.inputBuffer.getChannelData(0)); src.connect(sp); sp.connect(mute); E.nodes.push(sp);
+  }
+  E.nodes.push(src, mute);
+  E.stop = () => {
+    E.dead = true; for (const n of E.nodes) { try { n.disconnect(); if (n.port) n.port.onmessage = null; if ('onaudioprocess' in n) n.onaudioprocess = null; } catch (e) { /* déjà détaché */ } }
+    try { stream.getTracks().forEach(t => t.stop()); } catch (e) { /* arrêté */ } try { if (E.enc && E.enc.state !== 'closed') E.enc.close(); if (E.dec && E.dec.state !== 'closed') E.dec.close(); } catch (e) { /* fermé */ } try { ctx.close(); } catch (e) { /* fermé */ }
+  };
+  return E;
+}
+function vcRing(kind) {   // sonnerie : « in » (on t'appelle) ou « out » (ça sonne chez l'ami) ; null = silence
+  if (VC.ring && VC.ring.kind === kind) return;
+  if (VC.ring) { clearInterval(VC.ring.t); try { VC.ring.ctx.close(); } catch (e) { /* fermé */ } VC.ring = null; } if (!kind) return;
+  try {
+    const ctx = new AudioContext(), beep = () => { const g = ctx.createGain(), t = ctx.currentTime, vol = kind === 'in' ? 0.12 : 0.06; g.connect(ctx.destination); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.03); g.gain.setValueAtTime(vol, t + 0.35); g.gain.linearRampToValueAtTime(0, t + 0.4);
+      for (const f of kind === 'in' ? [880, 660] : [440]) { const o = ctx.createOscillator(); o.frequency.value = f; o.connect(g); o.start(t); o.stop(t + 0.42); } };
+    beep(); VC.ring = { kind, ctx, t: setInterval(beep, 2000) };
+  } catch (e) { VC.ring = null; }
+}
+const vcTime = ms => { const s = Math.max(0, Math.floor(ms / 1000)); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
+function vcPaint() {
+  let n = document.getElementById('vcbar'); const s = VC.st;
+  if (!s) { if (n) n.remove(); clearInterval(VC.tick); VC.tick = null; return; }
+  if (!n) { n = document.createElement('div'); n.id = 'vcbar'; document.body.appendChild(n); }
+  const name = `<b data-notr>${esc(s.name)}</b>`, live = s.st === 'live';
+  n.className = s.st === 'ring' && s.role === 'in' ? 'in' : '';
+  n.innerHTML = `<div class="vcl"><span class="vcp ${live ? 'on' : ''}" id="vcpeer">${ic('phone', 16)}</span><div>${s.st === 'ring' ? (s.role === 'in' ? `${name}<small>t’appelle…</small>` : `${name}<small>Ça sonne…</small>`) : live ? `${name}<small><span id="vcdur">${vcTime(Date.now() - s.t0)}</span>${s.peerMuted ? ' · micro coupé' : ''}</small>` : `${name}<small>Connexion…</small>`}</div></div>
+    <div class="row" style="gap:6px">${s.st === 'ring' && s.role === 'in' ? `<button class="btn sm" data-a="vcAccept">${ic('phone', 13)} Décrocher</button><button class="btn dg sm" data-a="vcDecline">Refuser</button>`
+      : `${live ? `<button class="ib ${s.muted ? 'off' : ''}" data-a="vcMute" title="${s.muted ? 'Rétablir le micro' : 'Couper le micro'}" aria-label="${s.muted ? 'Rétablir le micro' : 'Couper le micro'}">${ic(s.muted ? 'micoff' : 'mic', 15)}</button>` : ''}<button class="btn dg sm" data-a="vcHang">${ic('hang', 13)} ${s.st === 'ring' ? 'Annuler' : 'Raccrocher'}</button>`}</div>`;
+  trNode(n);
+  if (!VC.tick) VC.tick = setInterval(() => { const s2 = VC.st; if (!s2) return; const d = document.getElementById('vcdur'); if (d && s2.t0) d.textContent = vcTime(Date.now() - s2.t0); const p = document.getElementById('vcpeer'); if (p) p.classList.toggle('talk', s2.st === 'live' && VC.peer > 0.015); VC.peer *= 0.6; }, 250);
+}
+/** état de l'appel reçu du launcher (null = pas d'appel) */
+function vcOnState(s) {
+  const was = VC.st; VC.st = s || null;
+  if (!s) { if (VC.eng) { VC.eng.stop(); VC.eng = null; } VC.starting = false; vcRing(null); vcPaint(); if (was && page === 'friends') chatRefresh(was.key).catch(() => {}); return; }
+  vcRing(s.st === 'ring' ? (s.role === 'in' ? 'in' : 'out') : null);
+  // le micro s'ouvre quand la personne a décidé d'appeler / de décrocher (le format est alors connu)
+  if ((s.st === 'conn' || s.st === 'live') && !VC.eng && !VC.starting) {
+    VC.starting = true;
+    vcEngineStart(s.codec).then(E => { if (!VC.st || VC.st.id !== s.id) { E.stop(); return; } VC.eng = E; VC.starting = false; }).catch(e => { VC.starting = false; flash('Erreur : ' + e.message); call('voice:hangup').catch(() => {}); });
+  }
+  vcPaint();
+}
+hyd.on('voice:changed', s => { vcOnState(s); if (page === 'friends' && $('#chhd')) chatPaintHead(); });
+hyd.on('voice:rx', b => { if (VC.eng) VC.eng.rx(b instanceof Uint8Array ? b : new Uint8Array(b)); });
+call('voice:state').then(vcOnState).catch(() => {});
+Object.assign(ACT, {
+  vcCall: async () => { if (!CH.conv || chG(CH.conv)) return; const caps = await vcCaps(); vcOnState(await call('voice:start', CH.conv, caps)); },
+  vcAccept: async () => { if (!VC.st) return; vcOnState(await call('voice:accept', VC.st.id, await vcCaps())); },
+  vcDecline: async () => { if (VC.st) await call('voice:decline', VC.st.id); },
+  vcHang: async () => { await call('voice:hangup'); },
+  vcMute: async () => { if (VC.st) await call('voice:mute', !VC.st.muted); },
+});
+hyd.on('chat:xfer', d => {   // progression d'un envoi ou d'une réception : on ne redessine que la barre ; fin ou erreur : on redessine les cartes
+  if (OVL) return; if (d.st === 'run') { CH.xp[d.tid] = d; const pct = d.total ? Math.min(100, Math.round(d.done / d.total * 100)) : 0, b = document.querySelector(`[data-xp="${d.tid}"]`), t = document.querySelector(`[data-xpt="${d.tid}"]`); if (b) b.style.width = pct + '%'; if (t) t.textContent = pct + ' % · ' + chSize(d.done) + ' / ' + chSize(d.total); if (!b && page === 'friends') chatPaintMsgs(); return; }
+  delete CH.xp[d.tid]; if (d.role === 'send') { chatLoadMsgs().then(() => { if (page === 'friends') chatPaintMsgs(); }); if (d.st === 'err') flash('Envoi interrompu : ' + (d.error || '')); }
+});
 hyd.on('chat:changed', d => { if (OVL) return; chatRefresh(d && d.conv).catch(() => {}); });
 document.addEventListener('click', guard(async e => {
   if (e.target.dataset && e.target.dataset.bd) return call('ovl:close');

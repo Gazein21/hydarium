@@ -218,19 +218,18 @@ exports.status = id => {
 /* « faire confiance » à un mod : plus d’avertissement « non vérifié » pour lui au lancement */
 exports.trust = (id, pid, on) => { const i = find(id), m = i.mods.find(x => x.pid === pid); if (!m) throw new Error('Mod introuvable.'); if (on) m.trusted = true; else delete m.trusted; store.save(); };
 /* code de partage : pas de fichier, seulement version + loader + liste de mods (code court = serveur, plus tard) */
-exports.code = id => { const i = find(id); return 'HYD1.' + zlib.deflateSync(JSON.stringify({ v: i.version, t: i.type, l: i.loader, m: i.mods.filter(m => !m.auto).map(m => m.pid) })).toString('base64url'); };
-/** recette partageable d'une instance pour une carte de chat : { code, count, skipped }. Seuls les mods Modrinth peuvent être refaits par l'ami ; skipped = ceux qui ne le seront pas. */
+const recipe = require('./recipe');
+exports.code = id => { const i = find(id); return recipe.encode({ version: i.version, type: i.type, loader: i.loader, loaderVer: i.loaderVer, pids: i.mods.filter(m => !m.auto && /^[A-Za-z0-9]{8}$/.test(String(m.pid))).map(m => m.pid) }); };   // les mods hors Modrinth ne peuvent pas être refaits : ils ne font pas échouer tout le code
+/** recette partageable d'une instance pour une carte de chat : { code, count, skipped, lv }. Seuls les mods Modrinth peuvent être refaits par l'ami ; skipped = ceux qui ne le seront pas. Forge / NeoForge : la version du loader voyage avec le code. */
 exports.share = id => {
-  const i = find(id); if (!['vanilla', 'fabric', 'quilt'].includes(i.loader)) throw new Error('Les instances Forge et NeoForge ne se partagent pas encore par code. Un modpack du catalogue, lui, se partage.');
+  const i = find(id), forge = i.loader === 'forge' || i.loader === 'neoforge';
+  if (forge && !/^[\w.+-]{1,40}$/.test(i.loaderVer || '')) throw new Error('La version de ' + i.loader + ' de cette instance est inconnue : on ne peut pas la partager.');
   const list = i.mods.filter(m => !m.auto), ok = list.filter(m => /^[A-Za-z0-9]{8}$/.test(String(m.pid)));
-  return { code: 'HYD1.' + zlib.deflateSync(JSON.stringify({ v: i.version, t: i.type, l: i.loader, m: ok.map(m => m.pid) })).toString('base64url'), count: ok.length, skipped: list.length - ok.length };
+  return { code: recipe.encode({ version: i.version, type: i.type, loader: i.loader, loaderVer: i.loaderVer, pids: ok.map(m => m.pid) }), count: ok.length, skipped: list.length - ok.length, lv: forge ? i.loaderVer : '' };
 };
 exports.importCode = async code => {
-  code = String(code).trim();
-  if (!/^HYD1\.[\w-]{1,20000}$/.test(code)) throw new Error('Code de modpack invalide.');
-  let d; try { d = JSON.parse(zlib.inflateSync(Buffer.from(code.slice(5), 'base64url'), { maxOutputLength: 100000 }).toString()); } catch (e) { throw new Error('Code de modpack illisible.'); }
-  if (typeof d.v !== 'string' || !['vanilla', 'fabric', 'quilt'].includes(d.l) || !Array.isArray(d.m) || d.m.length > 200 || !d.m.every(x => /^[A-Za-z0-9]{8}$/.test(x))) throw new Error('Code de modpack invalide.');
-  const inst = store.addInstance({ name: 'Pack importé', version: d.v, type: d.t === 'snapshot' ? 'snapshot' : 'release', loader: d.l }), failed = [];
+  const d = recipe.decode(code), inst = store.addInstance({ name: 'Pack importé', version: d.v, type: d.t, loader: d.l }), failed = [];
+  if (d.lv) { inst.loaderVer = d.lv; store.save(); }   // Forge / NeoForge : installé au premier lancement avec cette version
   for (const pid of d.m) { try { await addMod(inst, pid, false); } catch (e) { failed.push(pid); } }
   return { inst, failed };
 };

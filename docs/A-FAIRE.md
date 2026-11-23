@@ -1,6 +1,6 @@
 # À faire (liste de souhaits, du plus simple au plus dur)
 
-Mise à jour : 0.10.74. ✅ = fait · 🔜 = prochain · ⬜ = plus tard.
+Mise à jour : 0.11.0. ✅ = fait · 🔜 = prochain · ⬜ = plus tard.
 
 | # | Fonction | État |
 |---|----------|------|
@@ -23,6 +23,7 @@ Mise à jour : 0.10.74. ✅ = fait · 🔜 = prochain · ⬜ = plus tard.
 | 17 | **Connexion Microsoft stable** : plus de déconnexions sur un souci passager (réseau, serveurs surchargés), jeton Minecraft renouvelé à la demande, identité conservée si Mojang répond mal, erreurs lisibles | ✅ 0.10.68 |
 
 ## Notes de conception
+- **⚠️ À CHAQUE LIVRAISON : changer le numéro de version PARTOUT, y compris dans le launcher.** Le numéro vient de `package.json` (`version`) ; c'est lui qui s'affiche dans le launcher (pastille `v…` de la barre de titre, `app.getVersion()`), dans le nom de l'exe, dans `latest.yml` et dans le tag `v…`. Vérifier que le même numéro apparaît dans : `package.json`, `package-lock.json` (les deux champs `version`), le titre de la dernière section de `docs/FICHE-DE-REPRISE.md` (+ sa première ligne), la ligne « Mise à jour » de ce fichier, le nom de l'archive livrée. Puis lancer `node test/version.test.js` (il vérifie `package.json`, la fiche et l'affichage dans l'interface).
 - **Ton des règles et textes** : Hydarium n'a pas de structure (pas d'entreprise, pas de société). On dit « Hydarium » ou « l'auteur », jamais « notre société » ; on n'a pas non plus à préciser que ce n'est pas une entreprise.
 - **Amis (10)** : demande sans pseudo à l'envoi (anti-spam), pseudo visible côté destinataire ; réinitialiser le code ami efface tous les contacts ; le code ami doit être flouté par défaut (mode confidentialité).
 - **Mods d'un serveur hébergé (9)** : seulement vers les joueurs qui ont le launcher ; liste des mods + téléchargement automatique (Modrinth / CurseForge quand possible).

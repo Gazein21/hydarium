@@ -7,6 +7,7 @@ const where = (id, file) => {
   if (!okId(id) || file !== path.basename(String(file)) || !IMG.test(file)) throw new Error('Capture invalide.');
   const p = path.join(game.dirOf(id), 'screenshots', file); if (!fs.existsSync(p)) throw new Error('Capture introuvable.'); return p;
 };
+exports.pathOf = where;   // chemin d'une capture (vérifié) : envoi à un ami
 exports.list = () => {
   const out = [];
   for (const i of store.get().instances) {

@@ -297,6 +297,8 @@ input.privin:focus{-webkit-text-security:none}
 .chb{background:var(--p3);border-radius:4px 14px 14px 14px;padding:7px 11px;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere}
 .chr.me .chb{background:rgba(61,220,132,.18);border:1px solid rgba(61,220,132,.3);border-radius:14px 4px 14px 14px}
 .chb.cd{padding:8px;white-space:normal}
+.chb{position:relative}.chb.dl{background:transparent!important;border:1px dashed var(--ln)!important;opacity:.75}.chb.dl .mu{font-size:12.5px}
+.chact{position:absolute;top:-13px;right:6px;display:none;gap:2px;background:var(--p2);border:1px solid var(--ln);border-radius:8px;padding:1px 3px;z-index:2}.chb:hover>.chact,.chb:focus-within>.chact{display:flex}.chact .ib{width:24px;height:24px;padding:0}
 .cht{display:inline-block;margin-left:8px;font-size:10.5px;opacity:.7;white-space:nowrap}.cht .er{color:var(--er)}
 .chsys{align-self:center;font-size:11.5px;color:var(--mu);padding:4px 0}
 .chday{align-self:center;font-size:11px;color:var(--mu);margin:10px 0 4px;text-transform:capitalize}
@@ -308,3 +310,17 @@ input.privin:focus{-webkit-text-security:none}
 .chempty{margin:auto;text-align:center;max-width:300px}.chempty b{display:block;font-size:15px;margin-bottom:4px}
 .chpick{max-height:220px;overflow-y:auto}
 :root[data-theme=light] .chat{background:rgba(255,255,255,.9)}:root[data-theme=light] .chl{background:rgba(240,242,247,.8)}
+
+.xbar{height:6px;border-radius:9px;background:var(--p3);overflow:hidden;margin-top:6px}.xbar i{display:block;height:100%;background:var(--ac);width:0;transition:width .2s}
+.chwarn{font-size:11.5px;color:var(--wa);margin-top:4px;line-height:1.35}
+
+.chb.im{padding:6px;background:transparent;border:0}.chr.me .chb.im{background:transparent;border:0}
+.chimg{cursor:zoom-in}.chimg small{display:block;margin-top:4px}
+.chimt{position:relative;width:256px;max-width:100%;border-radius:10px;overflow:hidden;background:var(--p3);display:grid;place-items:center}.chimt img{width:100%;height:100%;object-fit:cover;display:block}.chimt .spin{position:absolute}
+
+/* ===== Chat vocal ===== */
+#vcbar{position:fixed;top:44px;right:16px;z-index:80;display:flex;align-items:center;gap:14px;justify-content:space-between;min-width:300px;max-width:min(460px,calc(100vw - 32px));padding:10px 14px;background:var(--p2);border:1px solid var(--ln);border-left:3px solid var(--ac);border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.4)}
+#vcbar.in{border-color:var(--ac);animation:vcr 1.4s ease-in-out infinite}@keyframes vcr{50%{box-shadow:0 0 0 4px rgba(61,220,132,.25),0 8px 28px rgba(0,0,0,.4)}}
+#vcbar .vcl{display:flex;align-items:center;gap:10px;min-width:0}#vcbar b,#vcbar small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#vcbar small{color:var(--mu);font-size:12px}
+.vcp{width:34px;height:34px;border-radius:50%;background:var(--p3);display:grid;place-items:center;flex:none;color:var(--mu);border:2px solid transparent;transition:border-color .12s}.vcp svg{fill:none;stroke:currentColor;stroke-width:1.8}.vcp.on{color:var(--ac)}.vcp.talk{border-color:var(--ac)}
+#vcbar .ib.off{color:var(--er);border-color:rgba(239,83,80,.5)}

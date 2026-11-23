@@ -1,5 +1,14 @@
 /* Traduction de l’interface : français (langue d’origine) → anglais. Le texte est traduit à l’affichage ; les phrases non listées restent en français. */
-const I18N_RAW = `Accueil|Home
+const I18N_RAW = `Appel vocal|Voice call
+t’appelle…|is calling…
+Ça sonne…|Ringing…
+Connexion…|Connecting…
+Décrocher|Answer
+Raccrocher|Hang up
+Couper le micro|Mute microphone
+Rétablir le micro|Unmute microphone
+micro coupé|microphone muted
+Accueil|Home
 Instances|Instances
 Catalogue Modrinth|Modrinth catalog
 Catalogue|Catalog
@@ -628,6 +637,59 @@ hors ligne · il recevra tes messages à sa connexion|offline · he will get you
 Choisis au moins un destinataire|Pick at least one recipient
 Choisis au moins un ami|Pick at least one friend
 Envoyé à un ami|Sent to a friend
+Envoyer des fichiers|Send files
+Des fichiers…|Files…
+Un dossier…|A folder…
+Ses mods…|Its mods…
+Ses mondes…|Its worlds…
+Ses packs de ressources…|Its resource packs…
+Depuis une instance|From an instance
+Recevoir|Receive
+✔ Reçu|✔ Received
+Ouvrir le dossier|Open folder
+Ajouter à une instance|Add to an instance
+Recevoir des mods ?|Receive mods?
+Proposé ✓|Offered ✓
+Connexion…|Connecting…
+Annuler|Cancel
+⚠ Contient des mods (.jar) : ce sont des programmes. Ne les reçois que d’un ami de confiance.|⚠ Contains mods (.jar): these are programs. Only receive them from a friend you trust.
+Envoyé : ton ami le reçoit directement de ton PC, tant que ton launcher est ouvert (7 jours).|Sent: your friend gets it straight from your PC, as long as your launcher is open (7 days).
+Fichiers reçus|Received files
+Envoyer une image|Send an image
+Image envoyée ✓|Image sent ✓
+Capture envoyée ✓|Screenshot sent ✓
+Envoyer cette image ?|Send this image?
+Envoyer cette capture|Send this screenshot
+Enregistrer sous…|Save as…
+Image enregistrée ✓|Image saved ✓
+Voir en grand|View full size
+clique pour la recevoir|click to receive it
+Modifier le message|Edit message
+Modifier|Edit
+Enregistrer|Save
+Supprimer ce message ?|Delete this message?
+Supprimer|Delete
+Supprimer pour tout le monde|Delete for everyone
+🚫 Message supprimé|🚫 Message deleted
+(modifié)|(edited)
+Ce message a été modifié|This message was edited
+Le message ne peut pas être vide|The message can’t be empty
+Il disparaît pour tout le monde dans cette discussion. Les personnes hors ligne le verront disparaître à leur connexion.|It disappears for everyone in this conversation. People who are offline will see it disappear when they reconnect.
+Les personnes de la discussion verront « modifié » à côté de ton message.|People in the conversation will see “edited” next to your message.
+Renommer|Rename
+Donne un nom au groupe|Give the group a name
+Transfert interrompu|Transfer interrupted
+Reprendre|Resume
+Abandonner|Discard
+🚫 Message supprimé par l’administrateur|🚫 Message deleted by the administrator
+Masquer pour moi|Hide for me
+Supprimer pour tout le monde (administrateur)|Delete for everyone (administrator)
+Supprimer ce message pour tout le monde ?|Delete this message for everyone?
+En tant qu’administrateur du groupe, tu supprimes le message de quelqu’un d’autre. Tous les membres verront « Message supprimé par l’administrateur ».|As the group administrator, you are deleting someone else’s message. All members will see “Message deleted by the administrator”.
+Vider la discussion pour moi|Clear conversation for me
+Vider cette discussion pour toi ?|Clear this conversation for you?
+Les messages disparaissent seulement de ton écran. Les autres personnes les gardent.|Messages only disappear from your screen. The other people keep them.
+Vider|Clear
 `;
 const I18N = I18N_RAW.split('\n').map(l => l.split('|')).filter(p => p.length === 2 && p[0] && p[0] !== p[1]).sort((a, b) => b[0].length - a[0].length);
 const i18nOn = () => window.UILANG === 'en';
