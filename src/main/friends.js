@@ -24,6 +24,12 @@ const decode = str => {
 };
 const hex = b => Buffer.from(b).toString('hex'), KEY = /^[0-9a-f]{64}$/;
 const cleanName = (s, d = 'Joueur') => { s = String(s == null ? '' : s).replace(/[\u0000-\u001f\u007f<>&"']/g, '').trim().slice(0, 32); return s || d; };
+/** adresse de serveur partageable : nom d'hôte ou IP PUBLIQUE (avec port facultatif). Les adresses locales (127.x, 10.x, 192.168.x, localhost…) ne servent à rien à un ami et ne sont jamais envoyées ni acceptées. */
+const cleanSrv = s => {
+  s = String(s == null ? '' : s).trim().toLowerCase().slice(0, 80); if (!/^[a-z0-9._-]+(:\d{1,5})?$/.test(s)) return '';
+  const h = s.replace(/:\d+$/, ''); if (!h || h === 'localhost' || h.endsWith('.local') || h.endsWith('.localhost') || /^(0|10|127)\./.test(h) || /^192\.168\./.test(h) || /^169\.254\./.test(h) || /^172\.(1[6-9]|2\d|3[01])\./.test(h)) return '';
+  return s;
+};
 const MAXLINE = 2048, FRIEND_LINE = 32768, MAX_INBOX = 30, MAX_OUT = 30, MAX_FRIENDS = 100, OUT_TTL = 14 * 86400e3, UNKNOWN_PER_MIN = 20;
 
 /** opts : store { get, save }, DHT (classe hyperdht), bootstrap, log, profile() → { name, st: 'online' | 'playing', what }, seal / unseal (chiffrement de la graine), notify(kind, data),
@@ -36,7 +42,7 @@ exports.create = (o = {}) => {
   let dht = null, server = null, kp = null, myKey = '', running = false, retryT = null, hiT = null; const conns = new Map(), loops = new Map(), unknownHits = []; let closing = false;
 
   const seedOf = () => { const f = cfg(); if (f.seed) { try { const s = Buffer.from(unseal(f.seed), 'hex'); if (s.length === 32) return s; } catch (e) { log.warn('amis : graine illisible, nouvelle identité'); } } const s = crypto.randomBytes(32); f.seed = seal(s.toString('hex')); save(); return s; };
-  const me = () => { const p = profile() || {}; return { name: cleanName(p.name), st: p.st === 'playing' ? 'playing' : 'online', what: cleanName(p.what || '', '').slice(0, 40) }; };
+  const me = () => { const p = profile() || {}; return { name: cleanName(p.name), st: p.st === 'playing' ? 'playing' : 'online', what: cleanName(p.what || '', '').slice(0, 40), srv: p.st === 'playing' ? cleanSrv(p.srv) : '' }; };
   const friendOf = key => cfg().list.find(f => f.key === key);
   const changed = () => { try { notify('changed', {}); } catch (e) { /* affichage seulement */ } };
   const send = (c, m) => { try { c.write(JSON.stringify(m) + '\n'); } catch (e) { /* connexion fermée */ } };
@@ -45,7 +51,7 @@ exports.create = (o = {}) => {
 
   /* ----- une connexion (entrante ou sortante) ----- */
   function attach(sock, key, outgoing) {
-    let buf = '', last = Date.now(); const st = { sock, key, seen: 0, name: '', status: '', what: '', friend: false, invites: [] };
+    let buf = '', last = Date.now(); const st = { sock, key, seen: 0, name: '', status: '', what: '', srv: '', friend: false, invites: [] };
     const kill = () => { try { sock.destroy(); } catch (e) { /* déjà fermée */ } };
     const guard = setTimeout(() => { if (!friendOf(key) && !outgoing) kill(); }, 6000);   // un inconnu a 6 s pour déposer sa demande
     const alive = setInterval(() => { if (!st.raw && Date.now() - last > T.deadMs && friendOf(key)) kill(); }, Math.max(200, T.deadMs / 3));
@@ -69,9 +75,9 @@ exports.create = (o = {}) => {
     const key = st.key, fr = friendOf(key), f = cfg();
     if (fr) {   // ----- ami -----
       if (m.t === 'hi') {
-        const was = st.seen, before = st.status + '|' + st.what + '|' + st.name; st.seen = Date.now(); st.name = cleanName(m.name, fr.name); st.status = m.st === 'playing' ? 'playing' : 'online'; st.what = cleanName(m.what || '', '').slice(0, 40); fr.name = st.name;
+        const was = st.seen, before = st.status + '|' + st.what + '|' + st.name + '|' + st.srv; st.seen = Date.now(); st.name = cleanName(m.name, fr.name); st.status = m.st === 'playing' ? 'playing' : 'online'; st.what = cleanName(m.what || '', '').slice(0, 40); st.srv = st.status === 'playing' ? cleanSrv(m.srv) : ''; fr.name = st.name;
         if (conns.get(key) !== st) { const old = conns.get(key); conns.set(key, st); if (old && old !== st) { try { old.sock.destroy(); } catch (e) { /* remplacée */ } } }
-        if (!was) { send(st.sock, { t: 'hi', ...me() }); save(); changed(); if (o.onOnline) { try { o.onOnline(key); } catch (e) { log.warn('amis : onOnline', e && e.message); } } } else if (before !== st.status + '|' + st.what + '|' + st.name) changed();   // un simple battement de présence ne change rien à l'écran
+        if (!was) { send(st.sock, { t: 'hi', ...me() }); save(); changed(); if (o.onOnline) { try { o.onOnline(key); } catch (e) { log.warn('amis : onOnline', e && e.message); } } } else if (before !== st.status + '|' + st.what + '|' + st.name + '|' + st.srv) changed();   // un simple battement de présence ne change rien à l'écran
       } else if (m.t === 'invite') {
         const now = Date.now(); st.invites = st.invites.filter(x => now - x < 60000); if (st.invites.length >= 5) return; st.invites.push(now);
         const code = require('./p2p').normalize(m.code); if (!code) return;   // un code d'invitation valide, rien d'autre
@@ -184,7 +190,7 @@ exports.create = (o = {}) => {
     status() {
       const f = cfg(), now = Date.now();
       return { on: !!f.on && running, enabled: !!f.on, hidden: !!f.hidden, code: running ? encode(kp.publicKey) : '', name: me().name,
-        friends: f.list.map(x => { const c = conns.get(x.key); return { key: x.key, name: x.name, since: x.since, online: !!c && now - c.seen < T.deadMs, st: c ? c.status : '', what: c ? c.what : '', pendingAccept: !!x.pendingAccept }; }).sort((a, b) => (b.online - a.online) || a.name.localeCompare(b.name)),
+        friends: f.list.map(x => { const c = conns.get(x.key); return { key: x.key, name: x.name, since: x.since, online: !!c && now - c.seen < T.deadMs, st: c ? c.status : '', what: c ? c.what : '', srv: c ? c.srv : '', pendingAccept: !!x.pendingAccept }; }).sort((a, b) => (b.online - a.online) || a.name.localeCompare(b.name)),
         inbox: f.inbox.map(x => ({ key: x.key, name: x.name, at: x.at })), out: f.out.map(x => ({ key: x.key, at: x.at, delivered: !!x.d })), blocked: f.blocked.length, blockedKeys: f.blocked.slice() };
     },
     /** envoie un message (objet JSON) à un ami connecté en ce moment ; false = pas joignable (le chat le garde alors en attente) */
@@ -206,4 +212,4 @@ exports.create = (o = {}) => {
 const PKCS8 = Buffer.from('302e020100300506032b657004220420', 'hex'), SPKI = Buffer.from('302a300506032b6570032100', 'hex');
 /** vérifie une signature produite par sign() ; clé = 64 caractères hexadécimaux, jamais d'exception */
 exports.verify = (keyHex, data, sigHex) => { try { if (!KEY.test(keyHex) || !/^[0-9a-f]{128}$/.test(sigHex)) return false; return crypto.verify(null, Buffer.from(data), crypto.createPublicKey({ key: Buffer.concat([SPKI, Buffer.from(keyHex, 'hex')]), format: 'der', type: 'spki' }), Buffer.from(sigHex, 'hex')); } catch (e) { return false; } };
-exports.encode = encode; exports.decode = decode; exports.cleanName = cleanName;
+exports.cleanSrv = cleanSrv; exports.encode = encode; exports.decode = decode; exports.cleanName = cleanName;

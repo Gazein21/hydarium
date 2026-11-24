@@ -16,7 +16,7 @@ async function fetchJre({ onProgress, onStep } = {}) {
   const x = path.join(tmp, 'x'); fs.mkdirSync(x);
   execFileSync('tar', ['-xf', file, '-C', x]);
   fs.mkdirSync(out, { recursive: true });
-  fs.cpSync(path.join(x, fs.readdirSync(x).filter(n => !n.startsWith('.'))[0]), dest, { recursive: true });
+  fs.cpSync(path.join(x, fs.readdirSync(x).filter(n => !n.startsWith('.'))[0]), dest, { recursive: true, verbatimSymlinks: true });   // verbatimSymlinks : sans ça, les liens relatifs du JRE Linux/macOS (legal/…) deviennent des chemins absolus vers le dossier temporaire, supprimé juste après → liens cassés
   try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) {}
   const rel = fs.readFileSync(path.join(dest, fs.existsSync(path.join(dest, 'release')) ? 'release' : 'Contents/Home/release'), 'utf8');
   const v = (rel.match(/JAVA_VERSION="?(\d+)/) || [])[1];

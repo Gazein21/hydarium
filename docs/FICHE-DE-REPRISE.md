@@ -1,6 +1,6 @@
 # Hydarium Launcher : fiche de reprise
 
-Version 0.11.0 · Windows en priorité, structure prête pour macOS et Linux · Électron (interface web + processus principal Node) · mod client en Java (`client-mod/`).
+Version 0.11.1 · Windows en priorité, structure prête pour macOS et Linux · Électron (interface web + processus principal Node) · mod client en Java (`client-mod/`).
 
 > Cette fiche est la version **condensée** : elle garde ce que fait le launcher, pourquoi, les décisions du propriétaire et les pièges. L'historique détaillé version par version (0.9.0 → 0.10.75) a été retiré ; il reste dans Git. La liste des envies est dans [`A-FAIRE.md`](A-FAIRE.md), le mod client dans [`HYDARIUM-CLIENT.md`](HYDARIUM-CLIENT.md) et [`MODE-CLIENT-IN-GAME.md`](MODE-CLIENT-IN-GAME.md), la publication dans [`PUBLIER-SUR-GITHUB.md`](PUBLIER-SUR-GITHUB.md).
 
@@ -175,10 +175,20 @@ scripts/         build.js, build-mods.js, fetch-jre.js, release.js…        .gi
 
 Voir [`A-FAIRE.md`](A-FAIRE.md). En résumé : première CI Windows complète et essai sur un Windows propre, vérifier les mods en vrai (1.8.9, 1.20.1, 1.21, 26.x), appels vocaux avec un vrai micro, deux PC réels pour les invitations et amis, vocal de groupe, interface plus « Minecraft », signature de l'exe, LICENSE, version « ultra optimisée » (idée).
 
-## 0.11.0 — version actuelle
+## 0.11.0
 
 - Passage de la 0.10.75 à la **0.11.0** : aucune fonction changée, seulement le numéro (`package.json`, `package-lock.json`, cette fiche, `A-FAIRE.md`).
 - Fiche de reprise condensée (210 Ko → quelques Ko) et README GitHub refait.
 - Publier : `npm run release -- 0.11.0`.
 - **DMG macOS** ajouté à la CI (Intel + Apple Silicon, non signé Apple) : voir §« macOS » plus haut. Aucune fonction du launcher changée.
 - **Interface cubique** : bloc `FORMES CUBIQUES` à la fin de `src/renderer/style.css` : style moderne d'origine, mais aucun coin arrondi. Pour revenir aux coins arrondis, supprimer ce bloc. Non essayé dans le vrai Electron.
+
+## 0.11.1 — version actuelle
+
+- **Voix** : Opus à 48 kHz / 48 kb/s (le PCM de secours reste à 16 kHz), réduction de bruit et gain automatique coupés ; seule l'annulation d'écho est gardée (réglage « Appels vocaux : annulation d'écho », lu à l'ouverture du micro). Compatible avec les versions précédentes. Non écouté avec un vrai micro.
+- **Têtes des joueurs** (`headAv()` / `avatarSrc()` dans `app.js`) à la place des initiales : barre d'appel, discussions, en-tête, groupes, fenêtre Amis. `avatarSrc()` est le point d'entrée prévu pour un futur avatar personnalisé (`cfg.avatars`).
+- **Chat** : bulles refaites (largeur adaptée au message, heure en bas à droite, fond plein), bouton Copier, confirmation avant « Supprimer chez moi ».
+- **Premier lancement** : écran de choix de la langue (français, English ; español grisé « Bientôt »).
+- **Accueil › Amis en ligne** refait (cartes, tête, Message, Appel) ; **serveur joué par les amis** avec bouton Rejoindre, désactivable (`friendSrv`, Paramètres › Général et fenêtre Amis : coupe l'affichage ET le partage). `friends.cleanSrv` écarte les adresses locales. Le serveur vient de `stats.currentServer()`.
+- **CI Linux** : `fetch-jre.js` copie maintenant le JRE avec `verbatimSymlinks: true` (liens relatifs cassés sinon) et l'étape AppImage a `DEBUG=electron-builder`. Cause réelle de l'échec Linux **non confirmée** : il faut le log GitHub Actions.
+- Publier : `npm run release -- 0.11.1`.

@@ -690,6 +690,26 @@ Vider la discussion pour moi|Clear conversation for me
 Vider cette discussion pour toi ?|Clear this conversation for you?
 Les messages disparaissent seulement de ton écran. Les autres personnes les gardent.|Messages only disappear from your screen. The other people keep them.
 Vider|Clear
+Supprimer ce message chez toi ?|Delete this message for you?
+Il disparaît seulement de ton écran. Les autres personnes le gardent.|It only disappears from your screen. The other people keep it.
+Supprimer chez moi|Delete for me
+Copier le message|Copy message
+Message copié ✓|Message copied ✓
+Copie impossible|Copy failed
+Envoyer un message|Send a message
+Aucun ami en ligne pour le moment.|No friends online right now.
+en ligne sur|online out of
+non affiché|not shown
+Ouvrir le chat|Open chat
+Pas encore d’amis ici|No friends here yet
+Ajoute un ami avec son code : tu le verras en ligne, pourras lui écrire, l’appeler et le rejoindre sur son serveur.|Add a friend with their code: you will see them online, and can message them, call them and join them on their server.
+Ajouter un ami|Add a friend
+Amis : voir le serveur où ils jouent|Friends: see the server they play on
+Tes amis voient le serveur où tu joues, et tu vois le leur avec un bouton « Rejoindre ». Désactivé : tu ne vois rien et tu ne partages rien. Les adresses locales ne sont jamais envoyées.|Your friends see the server you play on, and you see theirs with a “Join” button. Off: you see nothing and share nothing. Local addresses are never sent.
+Appels vocaux : annulation d’écho|Voice calls: echo cancellation
+Évite que ton ami s’entende dans tes haut-parleurs. Coupe-la si tu portes un casque : la voix reste alors totalement naturelle.|Stops your friend from hearing themselves through your speakers. Turn it off with a headset: the voice then stays completely natural.
+Voir et partager le serveur où l’on joue|See and share the server being played on
+Voir le serveur de mes amis, et leur montrer le mien|See my friends’ server, and show them mine
 `;
 const I18N = I18N_RAW.split('\n').map(l => l.split('|')).filter(p => p.length === 2 && p[0] && p[0] !== p[1]).sort((a, b) => b[0].length - a[0].length);
 const i18nOn = () => window.UILANG === 'en';

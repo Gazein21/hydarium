@@ -171,6 +171,7 @@ jobs:
       - run: mkdir -p build-client
       - run: npm install
       - name: AppImage Linux
+        env: { DEBUG: electron-builder }   # log détaillé : si le build Linux échoue, la cause exacte est dans ce journal
         run: npm run dist:linux
       - name: Vérifier les fichiers de la Release
         run: |

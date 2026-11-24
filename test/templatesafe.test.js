@@ -68,7 +68,7 @@ for (const f of files) test('aucun code dans le texte des gabarits : ' + path.ba
 test('Paramètres › Général : tous les réglages sont produits, aucun code affiché', async () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8').replace(/\r\n/g, '\n');
   const a = src.indexOf("if (st === 'gen') b = `"), z = src.indexOf("if (st === 'new') b = `", a); assert.ok(a > 0 && z > a, 'bloc Général introuvable');
-  const body = src.slice(a, z), swSrc = /const sw = [^\n]*/.exec(src)[0];
+  const body = src.slice(a, z), swSrc = /const sw = [^\n]*/.exec(src)[0] + '\n' + /const swd = [^\n]*/.exec(src)[0];
   const run = async (drawErr) => new Function('cfg', 'esc', 'pf', 'srvModsCard', 'call', 'updCard', 'st', 'UPS', 'return (async () => { let UPS2 = UPS; ' + swSrc + '\nlet b = "";\n' + body.replace(/UPS = await/g, 'UPS2 = await') + '\nreturn b; })();')(
     { privacy: true }, x => String(x), { version: '0.10.61', id: 'win32', arch: 'x64' }, () => '<div class="card">MODS-DES-SERVEURS</div>', async ch => (ch === 'client:drawerr' ? drawErr : { status: 'idle' }), () => '<div id="updc">CARTE-MAJ</div>', 'gen', null);
   const h = await run('');

@@ -437,6 +437,7 @@ async function setView() {
   if (st === 'gen') b += `
     <div class="sh"><h3>Importer</h3></div><div class="card"><div><b>Depuis un autre launcher</b><small>Choisis le dossier d’une instance, d’un launcher (Prism, MultiMC…) ou un dossier .minecraft.</small></div><button class="btn g" data-a="impman">Choisir un dossier…</button></div>
     <div class="card"><div><b>Langue de l’interface</b><small>Français ou English (les phrases longues peuvent rester en français).</small></div><select data-set="uiLang"><option value="fr" ${cfg.uiLang !== 'en' ? 'selected' : ''}>Français</option><option value="en" ${cfg.uiLang === 'en' ? 'selected' : ''}>English</option></select></div>
+    <div class="card" style="display:block">${swd('friendSrv', 'Amis : voir le serveur où ils jouent', 'Tes amis voient le serveur où tu joues, et tu vois le leur avec un bouton « Rejoindre ». Désactivé : tu ne vois rien et tu ne partages rien. Les adresses locales ne sont jamais envoyées.')}${swd('voiceEcho', 'Appels vocaux : annulation d’écho', 'Évite que ton ami s’entende dans tes haut-parleurs. Coupe-la si tu portes un casque : la voix reste alors totalement naturelle.')}</div>
     <div class="card"><div><b>Règles d’utilisation et vie privée</b><small>Ce que fait (et ne fait pas) Hydarium avec tes données, et les règles à respecter.</small></div><button class="btn g" data-a="tosView">Relire</button></div>
     <div class="card"><div><b>Assistant de bienvenue</b><small>Revoir la connexion et l’import automatique.</small></div><button class="btn g" data-a="wizre">Relancer</button></div><p class="mu">Langue : français (d’autres langues viendront). Hydarium ${esc(pf.version || '')} · ${esc(pf.id || '')} ${esc(pf.arch || '')} · <a class="hmail" data-a="mail" title="Contact">help@hydarium.net</a></p>`;
   if (st === 'new') b = `<p class="mu" style="margin-top:0">Ces réglages s’appliquent aux instances que tu crées ensuite.</p><div class="card" style="display:block">
@@ -631,8 +632,10 @@ async function crGo() {
 /* ===== assistant de bienvenue (aussi utilisé pour l’import manuel) ===== */
 const dots = n => `<div class="dots">${[0, 1, 2, 3, 4].map(i => `<i class="${i == n ? 'a' : ''}"></i>`).join('')}</div>`;
 const spin = t => `<div class="spin"></div><h1 style="font-size:22px">${t}</h1>`;
+const LANGS = [['fr', 'Français', '🇫🇷', true], ['en', 'English', '🇬🇧', true], ['es', 'Español', '🇪🇸', false]];   // espagnol : bientôt (désactivé tant que la traduction n'existe pas)
 async function wiz(s) {
   const w = $('#wl'); w.hidden = false; let b = '';
+  if (s === -1) b = `<svg width=\"64\" height=\"64\" viewBox=\"0 0 24 24\"><path d=\"M12 2l9 5v10l-9 5-9-5V7z\" fill=\"#3ddc84\"/><path d=\"M12 12l9-5M12 12L3 7M12 12v10\" stroke=\"#0b0d11\" stroke-width=\"1.4\"/></svg><h1 data-notr>${cfg.uiLang === 'en' ? 'Choose your language' : 'Choisis ta langue'}</h1><p data-notr>${cfg.uiLang === 'en' ? 'You can change it later in Settings.' : 'Tu pourras la changer plus tard dans les paramètres.'}</p><div class=\"lgrid wlang\">${LANGS.map(([k, n, f, ok]) => `<button class=\"lc ${cfg.uiLang === k ? 'sel' : ''}\" data-a=\"wlang\" data-v=\"${k}\" ${ok ? '' : 'disabled'}><span class=\"wf\">${f}</span><b data-notr>${n}</b>${ok ? '' : `<small data-notr>${cfg.uiLang === 'en' ? 'Coming soon' : 'Bientôt'}</small>`}</button>`).join('')}</div><button class=\"btn big\" data-a=\"w2\" data-v=\"0\" data-notr>${cfg.uiLang === 'en' ? 'Continue' : 'Continuer'}</button>`;
   if (s == 0) b = `<svg width="64" height="64" viewBox="0 0 24 24"><path d="M12 2l9 5v10l-9 5-9-5V7z" fill="#3ddc84"/><path d="M12 12l9-5M12 12L3 7M12 12v10" stroke="#0b0d11" stroke-width="1.4"/></svg><h1>Bienvenue sur Hydarium</h1><p>Le launcher Minecraft simple, beau et communautaire. Quelques secondes pour tout préparer.</p><button class="btn big" data-a="w2" data-v="1">Commencer</button>${dots(0)}`;
   if (s == 1) b = `<h1>Connecte ton compte Microsoft</h1><p>Hydarium utilise ton compte Microsoft pour lancer Minecraft Java. Une fenêtre Microsoft va s’ouvrir.</p><button class="btn big" data-a="wlogin">Se connecter avec Microsoft</button><a data-a="w2" data-v="2">Continuer sans me connecter</a>${dots(1)}`;
   if (s == 2) { const l = await call('imp:detect').catch(() => []); b = `<h1>Importer depuis un autre launcher ?</h1><p>${l.length ? 'Hydarium a trouvé ces launchers sur ton ordinateur.' : 'Aucun autre launcher détecté automatiquement.'}</p><div class="lgrid">${l.map(x => `<div class="lc" data-a="wl" data-v="${esc(x.key)}"><b>${esc(x.name)}</b><small>${x.count} instance(s)</small></div>`).join('')}<div class="lc" data-a="impman"><b>Autre…</b><small>Choisir un dossier</small></div></div><button class="btn sec big" data-a="w2" data-v="4">${l.length ? 'Non merci, c’est ma première fois' : 'Continuer'}</button>${dots(2)}`; }
@@ -726,6 +729,11 @@ function hostNew() {
   <label class="ckb" style="margin:8px 0"><input type="checkbox" data-hc="eula" ${HC.eula ? 'checked' : ''}> J’accepte le <a href="https://aka.ms/MinecraftEULA" target="_blank" style="color:var(--ac)">contrat de licence de Minecraft (CLUF)</a></label>
   <div class="row end" style="margin-top:12px"><button class="btn sec" data-a="mclose">Annuler</button><button class="btn" data-a="hgo">Créer le serveur</button></div>`);
 }
+/* Têtes des joueurs (mc-heads.net). avatarSrc() est le point d'entrée UNIQUE : plus tard, un avatar choisi par la personne (cfg.avatars[pseudo]) passera ici sans rien changer d'autre.
+   La lettre reste dessous : si la tête ne charge pas (hors ligne, pseudo inconnu), l'image est retirée (voir l'écouteur « error » en bas du fichier). */
+const avatarSrc = (name, px = 64) => { const o = ((typeof cfg === 'object' && cfg && cfg.avatars) || {})[String(name).toLowerCase()]; return typeof o === 'string' && /^(data:image\/(png|jpeg|webp);base64,|https:\/\/mc-heads\.net\/)/.test(o) ? o : 'https://mc-heads.net/avatar/' + encodeURIComponent(name) + '/' + px; };
+const headAv = (name, cls = '', px = 64) => `<span class="hav ${cls}"><span class="hl" data-notr>${esc(([...String(name || '?')][0] || '?').toUpperCase())}</span><img class="hi" src="${esc(avatarSrc(name, px))}" alt=""></span>`;
+document.addEventListener('error', e => { const t = e.target; if (t && t.tagName === 'IMG' && t.classList.contains('hi')) t.remove(); }, true);
 const av = n => `<img class="pav" src="https://mc-heads.net/avatar/${encodeURIComponent(n)}/32" alt="">`;
 function playersHtml(h, P, on) {
   const run = h.state === 'running', pl = (nm, tag) => `<div class="pl">${av(nm)}<b>${esc(nm)}</b>${tag || ''}`;
@@ -758,17 +766,26 @@ const p2pCard = (h, I) => {
 let FR = null, FRINV = null;
 const frDot = f => `<span class="fdot ${f.online ? (f.st === 'playing' ? 'play' : 'on') : ''}"></span>`;
 const frWhat = f => f.online ? (f.st === 'playing' ? 'en jeu' + (f.what ? ' · ' + esc(f.what) : '') : 'en ligne') : 'hors ligne';
+const frSrvOn = () => (cfg || {}).friendSrv !== false;   // « voir le serveur où jouent mes amis » (Paramètres › Amis) : coupé = je ne le montre pas, et je ne partage pas le mien non plus
+const frSrv = f => (frSrvOn() && f.online && f.st === 'playing' && f.srv ? f.srv : '');
+const frSrvLine = f => { const a = frSrv(f); return a ? `<div class=\"frs\"><span class=\"frsi\">${ic('globe', 13)}</span><span class=\"frsa\" data-notr>${priv(esc(a))}</span><button class=\"btn sm\" data-a=\"join\" data-v=\"${esc(a)}\" ${playing ? 'disabled' : ''}>${ic('play', 12)} Rejoindre</button></div>` : ''; };
 function frUpdate(s) {   // nouvel état : on redessine ce qui l'affiche, sans perdre ce que la personne est en train de taper
   FR = s; const inp = $('#frcode'), keep = inp ? inp.value : null;
   if ($('#frmodal')) { friendsModal(); const n = $('#frcode'); if (n && keep) n.value = keep; }
   if (['home', 'profile'].includes(page)) render();   // pas la page d'un serveur : on n'y redessine pas en pleine saisie
   if (typeof chatOnFriends === 'function') chatOnFriends();   // page Amis : liste des discussions
 }
+function frCard(f) {
+  const pl = f.online && f.st === 'playing';
+  return `<div class=\"frc ${f.online ? '' : 'off'} ${pl ? 'pl' : ''}\"><div class=\"frh\"><div class=\"cha lg\">${headAv(f.name)}${frDot(f)}</div><div class=\"frn\"><b data-notr>${esc(f.name)}</b><small>${frWhat(f)}</small></div>${f.online ? `<div class=\"frb\"><button class=\"ib\" data-a=\"frChat\" data-k=\"${esc(f.key)}\" title=\"Envoyer un message\" aria-label=\"Envoyer un message\">${ic('msg', 15)}</button><button class=\"ib\" data-a=\"frCall\" data-k=\"${esc(f.key)}\" title=\"Appel vocal\" aria-label=\"Appel vocal\" ${VC.st ? 'disabled' : ''}>${ic('phone', 15)}</button></div>` : `<div class=\"frb\"><button class=\"ib\" data-a=\"frChat\" data-k=\"${esc(f.key)}\" title=\"Envoyer un message\" aria-label=\"Envoyer un message\">${ic('msg', 15)}</button></div>`}</div>${frSrvLine(f)}</div>`;
+}
 function friendsHome() {
   const s = FR;
-  if (!s || !s.on) return `<div class="card soon" data-a="frOpen" style="cursor:pointer"><div><b>${s && s.enabled ? 'Connexion en cours…' : 'Retrouve tes amis'}</b><small>Vois qui est en ligne et invite-les sur ton serveur, sans serveur central. Désactivé par défaut.</small></div><button class="btn sm" data-a="frOpen">${s && s.enabled ? 'Ouvrir' : 'Activer'}</button></div>`;
-  const on = s.friends.filter(f => f.online);
-  return `<div class="card col">${on.length ? on.slice(0, 6).map(f => `<div class="row" style="gap:8px">${frDot(f)}<b>${esc(f.name)}</b><small class="mu">${frWhat(f)}</small></div>`).join('') : '<small class="mu">Aucun ami en ligne pour le moment.</small>'}<div class="row between" style="margin-top:6px"><small class="mu">${s.friends.length} ami${s.friends.length > 1 ? 's' : ''}${s.inbox.length ? ' · <b>' + s.inbox.length + ' demande' + (s.inbox.length > 1 ? 's' : '') + '</b>' : ''}</small><button class="btn sm" data-a="frOpen">Gérer</button></div></div>`;
+  if (!s || !s.on) return `<div class=\"card soon\" data-a=\"frOpen\" style=\"cursor:pointer\"><div><b>${s && s.enabled ? 'Connexion en cours…' : 'Retrouve tes amis'}</b><small>Vois qui est en ligne et invite-les sur ton serveur, sans serveur central. Désactivé par défaut.</small></div><button class=\"btn sm\" data-a=\"frOpen\">${s && s.enabled ? 'Ouvrir' : 'Activer'}</button></div>`;
+  const on = s.friends.filter(f => f.online), shown = on.slice(0, 8), more = on.length - shown.length;
+  const foot = `<div class=\"row between frfoot\"><small class=\"mu\">${on.length} en ligne sur ${s.friends.length} ami${s.friends.length > 1 ? 's' : ''}${s.inbox.length ? ' · <b>' + s.inbox.length + ' demande' + (s.inbox.length > 1 ? 's' : '') + '</b>' : ''}${more > 0 ? ' · +' + more + ' non affiché' + (more > 1 ? 's' : '') : ''}</small><span class=\"row\" style=\"gap:6px\"><button class=\"btn g sm\" data-a=\"p\" data-v=\"friends\">Ouvrir le chat</button><button class=\"btn sec sm\" data-a=\"frOpen\">Gérer</button></span></div>`;
+  if (!s.friends.length) return `<div class=\"card col frempty\"><b>Pas encore d’amis ici</b><small class=\"mu\">Ajoute un ami avec son code : tu le verras en ligne, pourras lui écrire, l’appeler et le rejoindre sur son serveur.</small><div><button class=\"btn sm\" data-a=\"frOpen\">Ajouter un ami</button></div></div>`;
+  return `${shown.length ? `<div class=\"frg\">${shown.map(frCard).join('')}</div>` : '<div class=\"card\"><small class=\"mu\">Aucun ami en ligne pour le moment.</small></div>'}${foot}`;
 }
 const frInvRow = I => FR && FR.on && I && I.sharing && FR.friends.some(f => f.online) ? `<div class="row" style="margin-top:10px;gap:8px"><select id="frinv" class="in" style="max-width:220px">${FR.friends.filter(f => f.online).map(f => `<option value="${esc(f.key)}">${esc(f.name)}</option>`).join('')}</select><button class="btn sm" data-a="frInvGo">Inviter cet ami</button></div>` : '';
 function friendsModal() {
@@ -778,8 +795,9 @@ function friendsModal() {
     <div class="row" style="margin-top:12px"><button class="btn" data-a="frOn">Activer les amis</button><button class="btn sec" data-a="mclose">Plus tard</button></div>`;
   const reqs = s.inbox.length ? `<div class="sh"><h3>Demandes reçues (${s.inbox.length})</h3></div>${s.inbox.map(r => `<div class="ml"><div style="flex:1"><b>${esc(r.name)}</b><br><small class="mu">veut être ton ami</small></div><button class="btn sm" data-a="frAcc" data-k="${esc(r.key)}">Accepter</button><button class="btn g sm" data-a="frDec" data-k="${esc(r.key)}">Refuser</button><button class="btn dg sm" data-a="frBlk" data-k="${esc(r.key)}">Bloquer</button></div>`).join('')}` : '';
   const outs = s.out.length ? `<div class="sh"><h3>Demandes envoyées (${s.out.length})</h3></div>${s.out.map(r => `<div class="ml"><div style="flex:1"><b>${esc(r.key.slice(0, 8))}…</b><br><small class="mu">${r.delivered ? 'envoyée, en attente de réponse' : 'en attente : livrée quand la personne sera en ligne'}</small></div><button class="btn g sm" data-a="frCan" data-k="${esc(r.key)}">Annuler</button></div>`).join('')}` : '';
-  const list = `<div class="sh"><h3>Mes amis (${s.friends.length})</h3></div>${s.friends.length ? s.friends.map(f => `<div class="ml">${frDot(f)}<div style="flex:1"><b>${esc(f.name)}</b><br><small class="mu">${f.pendingAccept ? 'en attente de sa connexion pour finaliser' : frWhat(f)}</small></div><button class="btn g sm" data-a="frRm" data-k="${esc(f.key)}" data-n="${esc(f.name)}">Retirer</button></div>`).join('') : '<p class="mu">Aucun ami pour l’instant. Donne ton code ou ajoute celui d’un ami ci-dessus.</p>'}`;
+  const list = `<div class="sh"><h3>Mes amis (${s.friends.length})</h3></div>${s.friends.length ? s.friends.map(f => `<div class="ml"><div class="cha">${headAv(f.name)}${frDot(f)}</div><div style="flex:1"><b>${esc(f.name)}</b><br><small class="mu">${f.pendingAccept ? 'en attente de sa connexion pour finaliser' : frWhat(f)}${frSrv(f) ? ' · <span data-notr>' + priv(esc(frSrv(f))) + '</span>' : ''}</small></div><button class="btn g sm" data-a="frRm" data-k="${esc(f.key)}" data-n="${esc(f.name)}">Retirer</button></div>`).join('') : '<p class="mu">Aucun ami pour l’instant. Donne ton code ou ajoute celui d’un ami ci-dessus.</p>'}`;
   const body = `<div class="row between" style="margin-top:6px"><small class="mu">Connecté au réseau d’amis${s.name ? ' en tant que <b>' + esc(s.name) + '</b>' : ''}</small><div class="row" style="gap:8px"><small>Apparaître hors ligne</small><button class="swt ${s.hidden ? 'on' : ''}" data-a="frHide" title="Tes amis ne te voient plus connecté"></button></div></div>
+    <div class="row between" style="margin-top:8px"><small title="Quand c’est activé, tes amis voient le serveur où tu joues (et tu vois le leur). Les adresses locales ne sont jamais partagées.">Voir et partager le serveur où l’on joue</small><button class="swt ${frSrvOn() ? 'on' : ''}" data-a="frSrvTgl" title="Voir le serveur de mes amis, et leur montrer le mien"></button></div>
     <div class="sh"><h3>Mon code ami</h3></div><div class="card col"><div class="row between"><code class="frcode">${priv(esc(s.code))}</code><div class="row"><button class="btn g sm" data-a="frCopy">${ic('copy', 13)} Copier</button><button class="btn g sm" data-a="frReset">Nouveau code</button></div></div><small class="mu">Permanent. Donne-le à un ami pour qu’il t’envoie une demande. « Nouveau code » efface tous tes contacts.</small></div>
     <div class="sh"><h3>Ajouter un ami</h3></div><div class="row" style="gap:8px"><input id="frcode" class="in" placeholder="Code ami de ton ami (HYA-…)" style="flex:1" autocomplete="off" spellcheck="false"><button class="btn" data-a="frAdd">Envoyer la demande</button></div>
     ${reqs}${outs}${list}
@@ -1500,7 +1518,8 @@ const ACT = {
   sdelgo: async d => { await call('srv:del', d.id, !!d.game); saved = await call('srv:saved'); closeModal(); render(); flash('Serveur retiré'); },
   jyes: () => call('join:answer', { vanilla: true, version: ($('#jver') || {}).value }), jno: () => call('join:answer', { vanilla: false }), jcancel: () => call('join:cancel'),
   mail: () => call('help:mail'), logs: () => call('logs:open'), logcopy: async () => { await call('logs:copy'); note('Rapport copié : colle-le dans ta demande d’aide.'); },
-  wizre: async () => { await call('wiz:reset'); wiz(0); },
+  wizre: async () => { await call('wiz:reset'); wiz(-1); },
+  wlang: async d => { if (!['fr', 'en'].includes(d.v)) return; cfg.uiLang = d.v; await call('set:set', { uiLang: d.v }); document.documentElement.lang = window.UILANG = d.v; renderNav(); render(); wiz(-1); },
   /* assistant */
   w2: d => wiz(+d.v),
   wl: async d => { W.key = d.v; $('#wl').innerHTML = spin('Analyse en cours…'); W.list = await call('imp:scan', d.v); wiz(3); },
@@ -1568,7 +1587,7 @@ async function chatInit() {
 }
 function chItem(c) {
   const sub = c.last ? `${c.last.mine ? 'Toi : ' : ''}<span data-notr>${esc(c.last.text)}</span>` : c.kind === 'dm' ? frWhat(c) : c.g.st === 'invited' ? 'Invitation à accepter' : c.g.members.length + ' membres';
-  return `<div class="chi ${CH.conv === c.id ? 'a' : ''}" data-a="chOpen" data-c="${esc(c.id)}"><div class="cha ${c.kind === 'group' ? 'g' : ''}">${c.kind === 'group' ? ic('users', 16) : esc(chLetter(c.name))}${c.kind === 'dm' ? frDot(c) : ''}</div><div class="chn"><b data-notr>${esc(c.name)}</b><small>${sub}</small></div>${c.unread ? `<i class="nb">${c.unread > 99 ? '99+' : c.unread}</i>` : ''}</div>`;
+  return `<div class="chi ${CH.conv === c.id ? 'a' : ''}" data-a="chOpen" data-c="${esc(c.id)}"><div class="cha ${c.kind === 'group' ? 'g' : ''}">${c.kind === 'group' ? ic('users', 16) : headAv(c.name)}${c.kind === 'dm' ? frDot(c) : ''}</div><div class="chn"><b data-notr>${esc(c.name)}</b><small>${sub}</small></div>${c.unread ? `<i class="nb">${c.unread > 99 ? '99+' : c.unread}</i>` : ''}</div>`;
 }
 function chatPaintList() {
   const n = $('#chlist'); if (!n) return; const l = chConvs();
@@ -1578,7 +1597,7 @@ function chatPaintHead() {
   const n = $('#chhd'); if (!n) return; const c = chCur(); n.hidden = !c; if (!c) { n.innerHTML = ''; return; }
   n.innerHTML = c.kind === 'group'
     ? `<div class="cha g">${ic('users', 16)}</div><div style="flex:1;min-width:0"><b data-notr>${esc(c.name)}</b><small data-notr>${c.g.members.map(m => esc(m.me ? 'Toi' : m.n)).join(', ')}</small></div><button class="ib" data-a="chClear" title="Vider la discussion pour moi" aria-label="Vider la discussion pour moi">${ic('trash', 15)}</button><button class="btn g sm" data-a="chManage">Gérer le groupe</button>`
-    : `<div class="cha">${esc(chLetter(c.name))}${frDot(c)}</div><div style="flex:1"><b data-notr>${esc(c.name)}</b><small>${c.online ? frWhat(c) : 'hors ligne · il recevra tes messages à sa connexion'}</small></div>${c.online && !VC.st ? `<button class="ib" data-a="vcCall" title="Appel vocal" aria-label="Appel vocal">${ic('phone', 15)}</button>` : ''}<button class="ib" data-a="chClear" title="Vider la discussion pour moi" aria-label="Vider la discussion pour moi">${ic('trash', 15)}</button>`;
+    : `<div class="cha">${headAv(c.name)}${frDot(c)}</div><div style="flex:1"><b data-notr>${esc(c.name)}</b><small>${c.online ? frWhat(c) : 'hors ligne · il recevra tes messages à sa connexion'}${frSrv(c) ? ' · <span data-notr>' + priv(esc(frSrv(c))) + '</span>' : ''}</small></div>${c.online && !VC.st ? `<button class="ib" data-a="vcCall" title="Appel vocal" aria-label="Appel vocal">${ic('phone', 15)}</button>` : ''}<button class="ib" data-a="chClear" title="Vider la discussion pour moi" aria-label="Vider la discussion pour moi">${ic('trash', 15)}</button>`;
   trNode(n);
 }
 const chSize = n => (n >= 2 ** 30 ? (n / 2 ** 30).toFixed(1).replace('.', ',') + ' Go' : mo(n));
@@ -1613,8 +1632,9 @@ function chMsg(m, prev, grp) {
   const body = m.del ? `<i class="mu">🚫 Message supprimé${m.dby ? ' par l’administrateur' : ''}</i>` : m.c ? chCard(m) : m.bad ? '<i class="mu">Message non pris en charge : mets Hydarium à jour.</i>' : `<span data-notr>${esc(m.x)}</span>`;
   const own = m.mine && !m.del ? `${!m.c && !m.bad ? `<button class="ib" data-a="chEdit" data-m="${esc(m.id)}" title="Modifier" aria-label="Modifier">${ic('edit', 12)}</button>` : ''}<button class="ib" data-a="chDel" data-m="${esc(m.id)}" title="Supprimer pour tout le monde" aria-label="Supprimer">${ic('trash', 12)}</button>` : '';
   const mod = CH.adm && !m.mine && !m.del ? `<button class="ib" data-a="chMod" data-m="${esc(m.id)}" title="Supprimer pour tout le monde (administrateur)" aria-label="Supprimer pour tout le monde (administrateur)">${ic('trash', 12)}</button>` : '';   // réservé à l'administrateur du groupe
-  const acts = `<span class="chact">${own}${mod}<button class="ib" data-a="chHide" data-m="${esc(m.id)}" title="Masquer pour moi" aria-label="Masquer pour moi">${ic('eye', 12)}</button></span>`;   // masquer : chez soi seulement
-  return `<div class="chr ${m.mine ? 'me' : ''}">${!m.mine && grp && first ? `<div class="chw" data-notr>${esc(m.who)}</div>` : ''}<div class="chb ${m.c ? 'cd' : ''} ${m.c && m.c.k === 'img' ? 'im' : ''} ${m.del ? 'dl' : ''}">${acts}${body}<small class="cht">${chTime(m.ts)}${m.ed && !m.del ? ' <span title="Ce message a été modifié">(modifié)</span>' : ''} ${m.del ? '' : st}</small></div></div>`;
+  const cp = !m.del && !m.c && !m.bad && m.x ? `<button class="ib" data-a="chCopy" data-m="${esc(m.id)}" title="Copier le message" aria-label="Copier le message">${ic('copy', 12)}</button>` : '';
+  const acts = `<span class="chact">${cp}${own}${mod}<button class="ib" data-a="chHide" data-m="${esc(m.id)}" title="Supprimer chez moi" aria-label="Supprimer chez moi">${ic('eye', 12)}</button></span>`;   // chez soi seulement (avec confirmation)
+  return `<div class="chr ${m.mine ? 'me' : ''}">${!m.mine && grp && first ? `<div class="chw">${headAv(m.who, 'xs', 32)}<span data-notr>${esc(m.who)}</span></div>` : ''}<div class="chb ${m.c ? 'cd' : ''} ${m.c && m.c.k === 'img' ? 'im' : ''} ${m.del ? 'dl' : ''} ${!m.c && !m.del && !m.bad && m.x && m.x.length <= 40 && !m.x.includes('\n') ? 'sh' : ''}">${acts}<div class="chx">${body}</div><small class="cht">${chTime(m.ts)}${m.ed && !m.del ? ' <span title="Ce message a été modifié">(modifié)</span>' : ''} ${m.del ? '' : st}</small></div></div>`;
 }
 function chatPaintMsgs() {
   const n = $('#chms'); if (!n) return;
@@ -1686,7 +1706,11 @@ Object.assign(ACT, {
     if (!(await ask('Supprimer ce message ?', 'Il disparaît pour tout le monde dans cette discussion. Les personnes hors ligne le verront disparaître à leur connexion.', 'Supprimer', true))) return;
     try { await call('chat:del', CH.conv, d.m); } catch (e) { return flash('Erreur : ' + e.message); } await chatRefresh(CH.conv);
   },
-  chHide: async d => { try { await call('chat:hide', CH.conv, d.m); } catch (e) { return flash('Erreur : ' + e.message); } await chatRefresh(CH.conv); },
+  frSrvTgl: async () => { cfg.friendSrv = !frSrvOn(); await call('set:set', { friendSrv: cfg.friendSrv }); friendsModal(); if (page === 'home') render(); },
+  frChat: d => { page = 'friends'; CH.conv = d.k; CH.stick = true; render(); },
+  frCall: async d => { if (VC.st) return; try { const caps = await vcCaps(); vcOnState(await call('voice:start', d.k, caps)); } catch (e) { flash(e.message || 'Appel impossible'); } },
+  chCopy: async d => { const m = CH.msgs.find(x => x.id === d.m); if (!m || m.c || m.del || !m.x) return; try { await navigator.clipboard.writeText(m.x); flash('Message copié ✓'); } catch (e) { flash('Copie impossible'); } },
+  chHide: async d => { if (!(await ask('Supprimer ce message chez toi ?', 'Il disparaît seulement de ton écran. Les autres personnes le gardent.', 'Supprimer', true))) return; try { await call('chat:hide', CH.conv, d.m); } catch (e) { return flash('Erreur : ' + e.message); } await chatRefresh(CH.conv); },
   chMod: async d => {
     if (!(await ask('Supprimer ce message pour tout le monde ?', 'En tant qu’administrateur du groupe, tu supprimes le message de quelqu’un d’autre. Tous les membres verront « Message supprimé par l’administrateur ».', 'Supprimer', true))) return;
     try { await call('chat:mod', CH.conv, d.m); } catch (e) { return flash('Erreur : ' + e.message); } await chatRefresh(CH.conv);
@@ -1758,20 +1782,22 @@ document.addEventListener('keydown', e => { if (e.target && e.target.id === 'chi
 document.addEventListener('input', e => { if (e.target && e.target.id === 'chin') { CH.draft[CH.conv] = e.target.value; chatGrow(e.target); } });
 /* ===== Chat vocal (voir src/main/voice.js) : appel à deux avec un ami ===== */
 /* Le processus principal transporte des paquets de 20 ms ; ici : micro → encodage → paquets, et paquets → décodage → haut-parleurs.
-   Format « opus » (WebCodecs, ~24 kb/s) si le système le sait, sinon « pcm » (16 bits, 16 kHz, ~256 kb/s). L'annulation d'écho, la réduction de bruit et le gain automatique sont ceux de Chromium (contraintes du micro). */
+   Format « opus » (WebCodecs, 48 kHz, ~48 kb/s) si le système le sait, sinon « pcm » (16 bits, 16 kHz, ~256 kb/s). Seule l'annulation d'écho de Chromium est gardée (réglage « Annulation d'écho ») : la réduction de bruit et le gain automatique sont coupés pour ne pas altérer la voix. */
 Object.assign(P, {
   phone: '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z"/>',
+  msg: '<path d="M4 5h16v11H10l-5 4v-4H4z"/>',
   hang: '<path d="M3 14c5-4 13-4 18 0l-1 3-4-1v-2a10 10 0 00-8 0v2l-4 1z"/>',
   mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/>',
   micoff: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3M3 3l18 18"/>',
 });
-const VR = 16000, VN = 320;   // 16 kHz ; 20 ms = 320 échantillons
+const VR_OPUS = 48000, VR_PCM = 16000;   // Opus : 48 kHz (voix naturelle) ; PCM de secours : 16 kHz (un paquet de 20 ms doit tenir dans 1 200 octets)
+const vcRate = codec => (codec === 'opus' ? VR_OPUS : VR_PCM);   // 20 ms = rate / 50 échantillons
 const VC = { st: null, eng: null, starting: false, caps: null, tick: null, lvl: 0, peer: 0, ring: null };
 async function vcCaps() {
   if (VC.caps) return VC.caps; const c = [];
   try {
     if (window.AudioEncoder && window.AudioDecoder) {
-      const e = await AudioEncoder.isConfigSupported({ codec: 'opus', sampleRate: VR, numberOfChannels: 1, bitrate: 24000 }), d = await AudioDecoder.isConfigSupported({ codec: 'opus', sampleRate: VR, numberOfChannels: 1 });
+      const e = await AudioEncoder.isConfigSupported({ codec: 'opus', sampleRate: VR_OPUS, numberOfChannels: 1, bitrate: 48000 }), d = await AudioDecoder.isConfigSupported({ codec: 'opus', sampleRate: VR_OPUS, numberOfChannels: 1 });
       if (e.supported && d.supported) c.push('opus');
     }
   } catch (e) { /* pas de WebCodecs : PCM */ }
@@ -1783,9 +1809,9 @@ const vcRms = f => { let s = 0; for (let i = 0; i < f.length; i++) s += f[i] * f
 async function vcEngineStart(codec) {
   try { await call('voice:micaccess'); } catch (e) { /* hors macOS : rien à demander */ }
   let stream;
-  try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 }, video: false }); }
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: (cfg || {}).voiceEcho !== false, noiseSuppression: false, autoGainControl: false, channelCount: 1 }, video: false })   /* ni réduction de bruit ni gain auto : c'est ce qui rendait la voix métallique */; }
   catch (e) { throw new Error(e && e.name === 'NotFoundError' ? 'Aucun micro détecté.' : 'Micro refusé : autorise-le dans les réglages de ton système (confidentialité › microphone).'); }
-  const ctx = new AudioContext({ sampleRate: VR, latencyHint: 'interactive' }); await ctx.resume();
+  const VR = vcRate(codec), VN = VR / 50, ctx = new AudioContext({ sampleRate: VR, latencyHint: 'interactive' }); await ctx.resume();
   const E = { stream, ctx, codec, next: 0, ts: 0, rts: 0, acc: new Float32Array(VN), fill: 0, enc: null, dec: null, nodes: [], dead: false };
   const out = ctx.createGain(); out.gain.value = 1; out.connect(ctx.destination); E.out = out;
   const sendPkt = b => { if (!E.dead && b.length && b.length <= 1200) hyd.send('voice:pcm', b); };
@@ -1802,7 +1828,7 @@ async function vcEngineStart(codec) {
   };
   if (codec === 'opus') {
     E.enc = new AudioEncoder({ output: ch => { const b = new Uint8Array(ch.byteLength); ch.copyTo(b); sendPkt(b); }, error: () => {} });
-    E.enc.configure({ codec: 'opus', sampleRate: VR, numberOfChannels: 1, bitrate: 24000, opus: { frameDuration: 20000, useinbandfec: true, packetlossperc: 10 } });
+    E.enc.configure({ codec: 'opus', sampleRate: VR, numberOfChannels: 1, bitrate: 48000, opus: { application: 'audio', complexity: 10, frameDuration: 20000, useinbandfec: true, packetlossperc: 10 } });
     E.dec = new AudioDecoder({ output: ad => { try { const f = new Float32Array(ad.numberOfFrames); ad.copyTo(f, { planeIndex: 0, format: 'f32-planar' }); play(f); } finally { ad.close(); } }, error: () => {} });
     E.dec.configure({ codec: 'opus', sampleRate: VR, numberOfChannels: 1 });
   }
@@ -1843,7 +1869,7 @@ function vcPaint() {
   if (!n) { n = document.createElement('div'); n.id = 'vcbar'; document.body.appendChild(n); }
   const name = `<b data-notr>${esc(s.name)}</b>`, live = s.st === 'live';
   n.className = s.st === 'ring' && s.role === 'in' ? 'in' : '';
-  n.innerHTML = `<div class="vcl"><span class="vcp ${live ? 'on' : ''}" id="vcpeer">${ic('phone', 16)}</span><div>${s.st === 'ring' ? (s.role === 'in' ? `${name}<small>t’appelle…</small>` : `${name}<small>Ça sonne…</small>`) : live ? `${name}<small><span id="vcdur">${vcTime(Date.now() - s.t0)}</span>${s.peerMuted ? ' · micro coupé' : ''}</small>` : `${name}<small>Connexion…</small>`}</div></div>
+  n.innerHTML = `<div class="vcl"><span class="vcp ${live ? 'on' : ''}" id="vcpeer">${headAv(s.name, '', 64)}</span><div>${s.st === 'ring' ? (s.role === 'in' ? `${name}<small>t’appelle…</small>` : `${name}<small>Ça sonne…</small>`) : live ? `${name}<small><span id="vcdur">${vcTime(Date.now() - s.t0)}</span>${s.peerMuted ? ' · micro coupé' : ''}</small>` : `${name}<small>Connexion…</small>`}</div></div>
     <div class="row" style="gap:6px">${s.st === 'ring' && s.role === 'in' ? `<button class="btn sm" data-a="vcAccept">${ic('phone', 13)} Décrocher</button><button class="btn dg sm" data-a="vcDecline">Refuser</button>`
       : `${live ? `<button class="ib ${s.muted ? 'off' : ''}" data-a="vcMute" title="${s.muted ? 'Rétablir le micro' : 'Couper le micro'}" aria-label="${s.muted ? 'Rétablir le micro' : 'Couper le micro'}">${ic(s.muted ? 'micoff' : 'mic', 15)}</button>` : ''}<button class="btn dg sm" data-a="vcHang">${ic('hang', 13)} ${s.st === 'ring' ? 'Annuler' : 'Raccrocher'}</button>`}</div>`;
   trNode(n);
@@ -2017,5 +2043,5 @@ hyd.on('game:close', () => { call('srv:sync').then(() => call('srv:saved')).then
   inst = await call('inst:list'); saved = await call('srv:saved').catch(() => []); vers = await call('versions').catch(() => []);
   call('friends:status').then(s => frUpdate(s)).catch(() => {});
   if (OVL) { document.body.classList.add('ovl'); if (QS.get('world')) { catT = 'datapack'; CW = QS.get('world'); ovT = 'content'; } if (QS.get('type') === 'resourcepack') { catT = 'resourcepack'; ovT = 'content'; } if (QS.get('addr')) ovT = 'join'; setInterval(() => call('media:get').then(t => { NP = t; const e = $('#ovnp'); if (e) e.innerHTML = ovBar(t); }).catch(() => {}), 4000); page = 'ovl'; hyd.on('ovl:page', o => { const p = typeof o === 'string' ? o : o.page; ovT = p === 'hub' ? 'modules' : p; if (o && o.addr) JADDR = o.addr; if (o && o.world) { catT = 'datapack'; CW = o.world; BR = null; } if (o && o.type === 'resourcepack') { catT = 'resourcepack'; BR = null; } render(); }); document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#modal').hidden) call('ovl:close'); }); render(); return; }
-  render(); npPoll(); hrun(); if (!(await call('wiz:state'))) wiz(0); else if (!cfg.tour) setTimeout(tourStart, 700);
+  render(); npPoll(); hrun(); if (!(await call('wiz:state'))) wiz(-1); else if (!cfg.tour) setTimeout(tourStart, 700);
 })();

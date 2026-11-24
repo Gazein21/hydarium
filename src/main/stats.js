@@ -70,9 +70,13 @@ const flush = () => {
   sv.secs = 0; sv.deaths = 0; sv.dist = 0; store.save();
 };
 exports.srvBegin = addr => { srvEnd(); sv = { addr: String(addr).toLowerCase(), ok: false, t: Date.now(), w: Date.now(), seen: false, secs: 0, dist: 0, deaths: 0, p: null }; }; // le jeu se connecte
-exports.srvOk = () => { if (sv) { sv.ok = true; flush(); clearInterval(wallT); wallT = setInterval(flush, 60000); if (wallT.unref) wallT.unref(); } };                                                                                      // pas de refus : la connexion a marché
-exports.srvAbort = () => { clearInterval(wallT); sv = null; };                                                                                                          // refus ou échec : rien n’est compté
-const srvEnd = () => { clearInterval(wallT); if (sv) { flush(); sv = null; } };
+const srvCbs = []; const srvNote = () => { for (const f of srvCbs) { try { f(); } catch (e) { /* affichage seulement */ } } };
+/** adresse du serveur où le joueur est connecté en ce moment ('' = aucun) ; onServer : appelé quand elle change (pour prévenir les amis) */
+exports.currentServer = () => (sv && sv.ok ? sv.addr : '');
+exports.onServer = f => { if (typeof f === 'function') srvCbs.push(f); };
+exports.srvOk = () => { if (sv) { sv.ok = true; srvNote(); flush(); clearInterval(wallT); wallT = setInterval(flush, 60000); if (wallT.unref) wallT.unref(); } };                                                                                      // pas de refus : la connexion a marché
+exports.srvAbort = () => { clearInterval(wallT); sv = null; srvNote(); };                                                                                                          // refus ou échec : rien n’est compté
+const srvEnd = () => { clearInterval(wallT); if (sv) { flush(); sv = null; srvNote(); } };
 exports.srvEnd = srvEnd;
 exports.onState = b => {
   if (!sv) return; const now = Date.now(); if (!sv.seen) { sv.seen = true; sv.w = now; sv.secs = 0; } sv.secs += Math.min(2, (now - sv.t) / 1000); sv.t = now;

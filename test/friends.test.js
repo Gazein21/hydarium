@@ -131,15 +131,16 @@ function ui(over = {}) {
   assert.ok(a > 0 && b > a, 'bloc des amis introuvable');
   const dom = { frmodal: false, frcode: { value: '' } }, opened = [], rendered = [];
   const ctx = { esc: s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'), priv: h => '<span class="priv">' + h + '</span>', ic: n => '[' + n + ']', page: 'home',
-    $: sel => (sel === '#frmodal' ? (dom.frmodal ? {} : null) : sel === '#frcode' ? (dom.frmodal ? dom.frcode : null) : null), openModal: h => { dom.frmodal = /id="frmodal"/.test(h); opened.push(h); }, render: () => rendered.push(ctx.page), ...over };
+    $: sel => (sel === '#frmodal' ? (dom.frmodal ? {} : null) : sel === '#frcode' ? (dom.frmodal ? dom.frcode : null) : null), openModal: h => { dom.frmodal = /id="frmodal"/.test(h); opened.push(h); }, render: () => rendered.push(ctx.page), cfg: {}, VC: { st: null }, playing: null, headAv: n => '<span class="hav">' + String(n).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span>', ...over };
   vm.createContext(ctx); vm.runInContext(app.slice(a, b) + '\nthis.X = { friendsHome, friendsModal, frInvRow, frUpdate, set: v => { FR = v; }, get: () => FR };', ctx); return { X: ctx.X, ctx, dom, opened, rendered };
 }
 const S = (o = {}) => ({ on: true, enabled: true, hidden: false, code: 'HYA-ABCDEF-GHJKMN', name: 'Moi', friends: [], inbox: [], out: [], blocked: 0, blockedKeys: [], ...o });
 test('interface : accueil — invitation à activer tant que c’est désactivé, puis les amis en ligne seulement, pseudos neutralisés', () => {
   const { X } = ui(); assert.match(X.friendsHome(), /Retrouve tes amis[\s\S]*Désactivé par défaut[\s\S]*data-a="frOpen"/); X.set(S({ on: false, enabled: true })); assert.match(X.friendsHome(), /Connexion en cours/);
   X.set(S({ friends: [{ key: 'k1', name: 'Alice', online: true, st: 'playing', what: 'Minecraft 1.20.1' }, { key: 'k2', name: '<img src=x onerror=alert(1)>', online: true, st: 'online', what: '' }, { key: 'k3', name: 'Hors', online: false, st: '', what: '' }], inbox: [{ key: 'q', name: 'Demandeur', at: 1 }] }));
-  const h = X.friendsHome(); assert.match(h, /Alice[\s\S]*en jeu · Minecraft 1\.20\.1/); assert.ok(!/Hors<\/b>/.test(h), 'les amis hors ligne ne sont pas listés sur l’accueil'); assert.ok(!/<img/.test(h) && h.includes('&lt;img'), 'pseudo hostile neutralisé'); assert.match(h, /3 amis · <b>1 demande<\/b>/);
-  X.set(S()); assert.match(X.friendsHome(), /Aucun ami en ligne pour le moment/);
+  const h = X.friendsHome(); assert.match(h, /Alice[\s\S]*en jeu · Minecraft 1\.20\.1/); assert.ok(!/Hors<\/b>/.test(h), 'les amis hors ligne ne sont pas listés sur l’accueil'); assert.ok(!/<img/.test(h) && h.includes('&lt;img'), 'pseudo hostile neutralisé'); assert.match(h, /2 en ligne sur 3 amis · <b>1 demande<\/b>/);
+  X.set(S()); assert.match(X.friendsHome(), /Pas encore d’amis/); X.set(S({ friends: [{ key: 'k3', name: 'Hors', online: false, st: '', what: '' }] })); assert.match(X.friendsHome(), /Aucun ami en ligne pour le moment/);
+  X.set(S({ friends: [{ key: 'k1', name: 'Alice', online: true, st: 'playing', what: 'Minecraft 1.20.1', srv: 'mc.exemple.net' }] })); assert.match(X.friendsHome(), /mc\.exemple\.net[\s\S]*data-a="join"/, 'serveur de l’ami + Rejoindre'); const off = ui({ cfg: { friendSrv: false } }); off.X.set(S({ friends: [{ key: 'k1', name: 'Alice', online: true, st: 'playing', what: '', srv: 'mc.exemple.net' }] })); assert.ok(!off.X.friendsHome().includes('mc.exemple.net'), 'fonction désactivée : aucun serveur affiché');
 });
 test('interface : fenêtre — avertissement IP avant d’activer ; une fois activée : code flouté, demandes, amis, blocages, tout échappé', () => {
   const u = ui(); u.X.set(S({ on: false, enabled: false })); u.X.friendsModal(); const intro = u.opened.at(-1);

@@ -72,7 +72,7 @@ app.whenReady().then(async () => {
   on('win', a => { if (a === 'min') win.minimize(); else if (a === 'max') win.isMaximized() ? win.unmaximize() : win.maximize(); else if (a === 'close') win.close(); });
   on('set:get', () => store.get().settings);
   on('set:set', async o => {
-    const s = store.get().settings, T = { uiScale: 'number', notif: 'boolean', minimize: 'boolean', autostart: 'boolean', wall: 'string', theme: 'string', mem: 'number', java: 'string', accent: 'string', view: 'string', dl: 'number', favMods: 'object', srvMods: 'object', favContent: 'object', snaps: 'boolean', defJvm: 'string', defResMode: 'string', defW: 'number', defH: 'number', defOptim: 'boolean', gameLang: 'string', langSync: 'boolean', cProfiles: 'object', uiLang: 'string', spotifyId: 'string', notifLaunch: 'boolean', notifCrash: 'boolean', notifShot: 'boolean', notifDone: 'boolean', notifServer: 'boolean', notifFriends: 'boolean', notifQuiet: 'boolean', logDays: 'number', cfKey: 'string', tour: 'boolean', music: 'string', overlayKey: 'string', autoJava: 'boolean', showLog: 'boolean', cfClean: 'boolean', autoUpdate: 'boolean', autoInstall: 'boolean', inGameMenu: 'boolean', privacy: 'boolean', tosAccepted: 'number', tosAt: 'number' };
+    const s = store.get().settings, T = { uiScale: 'number', notif: 'boolean', minimize: 'boolean', autostart: 'boolean', wall: 'string', theme: 'string', mem: 'number', java: 'string', accent: 'string', view: 'string', dl: 'number', favMods: 'object', srvMods: 'object', favContent: 'object', snaps: 'boolean', defJvm: 'string', defResMode: 'string', defW: 'number', defH: 'number', defOptim: 'boolean', gameLang: 'string', langSync: 'boolean', cProfiles: 'object', uiLang: 'string', spotifyId: 'string', notifLaunch: 'boolean', notifCrash: 'boolean', notifShot: 'boolean', notifDone: 'boolean', notifServer: 'boolean', notifFriends: 'boolean', notifQuiet: 'boolean', logDays: 'number', cfKey: 'string', tour: 'boolean', music: 'string', overlayKey: 'string', autoJava: 'boolean', showLog: 'boolean', cfClean: 'boolean', autoUpdate: 'boolean', autoInstall: 'boolean', inGameMenu: 'boolean', privacy: 'boolean', friendSrv: 'boolean', voiceEcho: 'boolean', tosAccepted: 'number', tosAt: 'number' };
     for (const [k, v] of Object.entries(o || {})) {
       if (typeof v !== T[k]) continue;
       if (k === 'cProfiles') { s.cProfiles = (Array.isArray(v) ? v : []).slice(0, 12).map(p => ({ name: String((p && p.name) || '').slice(0, 24), modules: cleanModules((p && p.modules) || {}) })).filter(p => p.name); continue; }
@@ -100,6 +100,7 @@ app.whenReady().then(async () => {
       s[k] = k === 'logDays' ? Math.round(v) : v; if (k === 'logDays') log.rotate(logDays()); if (k === 'autostart') app.setLoginItemSettings({ openAtLogin: v });
     }
     store.save(); applyScale();
+    if (o && 'friendSrv' in o && friends) friends.refresh();   // les amis voient (ou ne voient plus) le serveur tout de suite
   });
   on('java:list', force => plat.javas(store.get().settings.javas, !!force));
   on('java:add', async () => {
@@ -140,7 +141,8 @@ app.whenReady().then(async () => {
     store, log, DHT: require('hyperdht'),
     onStream: (k, sock, m) => { if (m && m.t === 'vstream') { if (voice) voice.serve(k, sock, m); else sock.destroy(); } else if (xfer) xfer.serve(k, sock, m); else sock.destroy(); },   // un ami ouvre l'audio d'un appel (voice.js) ou demande des fichiers qu'on lui a proposés (xfer.js)
     onMessage: (k, m) => { if (m && m.t === 'vc') { if (voice) voice.onMessage(k, m); } else if (chat) chat.onMessage(k, m); }, onOnline: k => { if (chat) chat.onOnline(k); },   // voice.js : sonnerie des appels ; chat.js : messages d'amis et envoi de ce qui attendait la reconnexion
-    profile: () => { let c = null; try { c = require('./game').isRunning() ? session.current() : null; } catch (e) { /* pas de jeu */ } const i = c ? store.get().instances.find(x => x.id === c.id) : null; return { name: auth.name() || 'Joueur', st: c ? 'playing' : 'online', what: i ? 'Minecraft ' + i.version : '' }; },
+    profile: () => { let c = null; try { c = require('./game').isRunning() ? session.current() : null; } catch (e) { /* pas de jeu */ } const i = c ? store.get().instances.find(x => x.id === c.id) : null; let srv = ''; if (c && store.get().settings.friendSrv !== false) { try { srv = require('./stats').currentServer(); } catch (e) { /* pas de stats */ } }   // serveur joué : partagé avec les amis sauf si la fonction est coupée (Paramètres › Amis)
+      return { name: auth.name() || 'Joueur', st: c ? 'playing' : 'online', what: i ? 'Minecraft ' + i.version : '', srv }; },
     seal: s => (encOk() ? 'e:' + safeStorage.encryptString(s).toString('base64') : 'p:' + s), unseal: s => (String(s).startsWith('e:') ? safeStorage.decryptString(Buffer.from(String(s).slice(2), 'base64')) : String(s).slice(2)),
     notify: (kind, d) => {
       if (kind === 'changed') { if (chat) chat.sync(); return send('friends:changed', {}); }
@@ -150,6 +152,7 @@ app.whenReady().then(async () => {
       else if (kind === 'removed') fnote('Ami retiré', d.name + ' t’a retiré de ses amis.', 'friends:open');
     },
   });
+  try { require('./stats').onServer(() => { if (friends) friends.refresh(); }); } catch (e) { /* stats absentes */ }   // le serveur joué change : les amis le voient tout de suite
   /* Chat : messages, cartes de partage, groupes. Créé avant le démarrage des amis pour ne rater aucun message. */
   let chatPing = null;   // plusieurs messages d'un coup = un seul rafraîchissement de l'interface
   chat = require('./chat').create({

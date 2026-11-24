@@ -1,6 +1,6 @@
 # À faire (liste de souhaits, du plus simple au plus dur)
 
-Mise à jour : 0.11.0. ✅ = fait · 🔜 = prochain · ⬜ = plus tard.
+Mise à jour : 0.11.1. ✅ = fait · 🔜 = prochain · ⬜ = plus tard.
 
 | # | Fonction | État |
 |---|----------|------|
