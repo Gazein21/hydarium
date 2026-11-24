@@ -72,7 +72,7 @@ app.whenReady().then(async () => {
   on('win', a => { if (a === 'min') win.minimize(); else if (a === 'max') win.isMaximized() ? win.unmaximize() : win.maximize(); else if (a === 'close') win.close(); });
   on('set:get', () => store.get().settings);
   on('set:set', async o => {
-    const s = store.get().settings, T = { uiScale: 'number', notif: 'boolean', minimize: 'boolean', autostart: 'boolean', wall: 'string', theme: 'string', mem: 'number', java: 'string', accent: 'string', view: 'string', dl: 'number', favMods: 'object', srvMods: 'object', favContent: 'object', snaps: 'boolean', defJvm: 'string', defResMode: 'string', defW: 'number', defH: 'number', defOptim: 'boolean', gameLang: 'string', langSync: 'boolean', cProfiles: 'object', uiLang: 'string', spotifyId: 'string', notifLaunch: 'boolean', notifCrash: 'boolean', notifShot: 'boolean', notifDone: 'boolean', notifServer: 'boolean', notifFriends: 'boolean', notifQuiet: 'boolean', logDays: 'number', cfKey: 'string', tour: 'boolean', music: 'string', overlayKey: 'string', autoJava: 'boolean', showLog: 'boolean', cfClean: 'boolean', autoUpdate: 'boolean', autoInstall: 'boolean', inGameMenu: 'boolean', privacy: 'boolean', friendSrv: 'boolean', voiceEcho: 'boolean', tosAccepted: 'number', tosAt: 'number' };
+    const s = store.get().settings, T = { uiScale: 'number', notif: 'boolean', minimize: 'boolean', autostart: 'boolean', wall: 'string', theme: 'string', mem: 'number', java: 'string', accent: 'string', view: 'string', dl: 'number', favMods: 'object', srvMods: 'object', favContent: 'object', snaps: 'boolean', defJvm: 'string', defResMode: 'string', defW: 'number', defH: 'number', defOptim: 'boolean', gameLang: 'string', langSync: 'boolean', cProfiles: 'object', uiLang: 'string', spotifyId: 'string', notifLaunch: 'boolean', notifCrash: 'boolean', notifShot: 'boolean', notifDone: 'boolean', notifServer: 'boolean', notifFriends: 'boolean', notifQuiet: 'boolean', logDays: 'number', cfKey: 'string', tour: 'boolean', music: 'string', overlayKey: 'string', autoJava: 'boolean', showLog: 'boolean', cfClean: 'boolean', autoUpdate: 'boolean', autoInstall: 'boolean', inGameMenu: 'boolean', privacy: 'boolean', friendSrv: 'boolean', voiceEcho: 'boolean', voiceVol: 'number', tosAccepted: 'number', tosAt: 'number' };
     for (const [k, v] of Object.entries(o || {})) {
       if (typeof v !== T[k]) continue;
       if (k === 'cProfiles') { s.cProfiles = (Array.isArray(v) ? v : []).slice(0, 12).map(p => ({ name: String((p && p.name) || '').slice(0, 24), modules: cleanModules((p && p.modules) || {}) })).filter(p => p.name); continue; }
@@ -96,6 +96,7 @@ app.whenReady().then(async () => {
       if (k === 'theme' && !['dark', 'light'].includes(v)) continue;
       if (k === 'mem' && !(v >= 1 && v <= 32)) continue;
       if (k === 'uiScale' && !(v >= 0.75 && v <= 1.5)) continue;
+      if (k === 'voiceVol' && !(v >= 0 && v <= 1.5)) continue;
       if (k === 'java' && v && !(await plat.javaInfo(v))) throw new Error('Java inutilisable : ' + v);
       s[k] = k === 'logDays' ? Math.round(v) : v; if (k === 'logDays') log.rotate(logDays()); if (k === 'autostart') app.setLoginItemSettings({ openAtLogin: v });
     }
@@ -142,7 +143,7 @@ app.whenReady().then(async () => {
     onStream: (k, sock, m) => { if (m && m.t === 'vstream') { if (voice) voice.serve(k, sock, m); else sock.destroy(); } else if (xfer) xfer.serve(k, sock, m); else sock.destroy(); },   // un ami ouvre l'audio d'un appel (voice.js) ou demande des fichiers qu'on lui a proposés (xfer.js)
     onMessage: (k, m) => { if (m && m.t === 'vc') { if (voice) voice.onMessage(k, m); } else if (chat) chat.onMessage(k, m); }, onOnline: k => { if (chat) chat.onOnline(k); },   // voice.js : sonnerie des appels ; chat.js : messages d'amis et envoi de ce qui attendait la reconnexion
     profile: () => { let c = null; try { c = require('./game').isRunning() ? session.current() : null; } catch (e) { /* pas de jeu */ } const i = c ? store.get().instances.find(x => x.id === c.id) : null; let srv = ''; if (c && store.get().settings.friendSrv !== false) { try { srv = require('./stats').currentServer(); } catch (e) { /* pas de stats */ } }   // serveur joué : partagé avec les amis sauf si la fonction est coupée (Paramètres › Amis)
-      return { name: auth.name() || 'Joueur', st: c ? 'playing' : 'online', what: i ? 'Minecraft ' + i.version : '', srv }; },
+      return { name: auth.name() || '', st: c ? 'playing' : 'online', what: i ? 'Minecraft ' + i.version : '', srv }; },
     seal: s => (encOk() ? 'e:' + safeStorage.encryptString(s).toString('base64') : 'p:' + s), unseal: s => (String(s).startsWith('e:') ? safeStorage.decryptString(Buffer.from(String(s).slice(2), 'base64')) : String(s).slice(2)),
     notify: (kind, d) => {
       if (kind === 'changed') { if (chat) chat.sync(); return send('friends:changed', {}); }
@@ -213,18 +214,35 @@ app.whenReady().then(async () => {
   /** miniature carrée de 96 px (JPEG ≤ 11 Ko) de l'image d'une instance, ou '' : elle voyage avec la carte, l'ami la voit tout de suite */
   const thumbOf = id => {
     try {
-      const r = require('./instimg').get(id); if (!r) return ''; let img = nativeImage.createFromBuffer(Buffer.from(r.u.split(',')[1], 'base64')); if (img.isEmpty()) return '';
-      const { width: w, height: h } = img.getSize(), s = Math.min(w, h); img = img.crop({ x: Math.floor((w - s) / 2), y: Math.floor((h - s) / 2), width: s, height: s }).resize({ width: 96, height: 96, quality: 'good' });
-      for (const q of [72, 55, 40]) { const b = img.toJPEG(q).toString('base64'); if (b.length <= 11000) return b; }
+      const r = require('./instimg').get(id); if (!r) return ''; const src = nativeImage.createFromBuffer(Buffer.from(r.u.split(',')[1], 'base64')); if (src.isEmpty()) return '';
+      const { width: w, height: h } = src.getSize(), s = Math.min(w, h), sq = src.crop({ x: Math.floor((w - s) / 2), y: Math.floor((h - s) / 2), width: s, height: s });
+      for (const px of [128, 96]) { const img = sq.resize({ width: px, height: px, quality: 'good' }); for (const q of [78, 62, 48, 38]) { const b = img.toJPEG(q).toString('base64'); if (b.length <= 11000) return b; } }
     } catch (e) { log.warn('miniature de partage', e.message); }
     return '';
   };
+  /** aspect de l'instance partagé avec la carte : décor + objet choisis (l'interface les connaît : « ex »), type de l'image perso ; tout est revalidé par chat.js */
+  const BIOK = ['plains', 'cherry', 'sunset', 'night', 'snow', 'desert', 'nether', 'end', 'jungle', 'mesa', 'taiga', 'swamp', 'mushroom', 'deepdark'];
+  const lookOf = (i, ex) => {
+    ex = ex && typeof ex === 'object' ? ex : {}; const cv = BIOK.includes(i.cover) ? i.cover : BIOK.includes(ex.cv) ? ex.cv : '', it = typeof i.item === 'string' && i.item ? i.item : typeof ex.it === 'string' ? ex.it : '';
+    return { cv, it: /^[a-z0-9_]{1,50}$/.test(it) ? it : '', ik: i.img && (i.img.kind === 'logo' || i.img.kind === 'photo') ? i.img.kind : '' };
+  };
+  /** à la réception : même décor, même objet, même image que l'instance de l'ami (l'image est la miniature de la carte) */
+  const applyLook = (inst, card) => {
+    if (!inst) return;
+    try {
+      if (card.cv) inst.cover = card.cv;
+      if (card.it && (card.it === 'none' || require('./mctex').valid(card.it))) inst.item = card.it;
+      if (card.ik && card.th) { const b = Buffer.from(String(card.th), 'base64'); if (b.length > 100) require('./instimg').save(inst.id, b, card.ik); }
+      store.save();
+    } catch (e) { log.warn('aspect de l’instance reçue', e.message); }
+  };
   /** carte d'une instance : un modpack du catalogue se partage par RÉFÉRENCE ; sinon par recette (mods Modrinth) ; jamais de fichiers */
-  const shareCard = id => {
+  const shareCard = (id, ex) => {
     const i = store.get().instances.find(x => x.id === id); if (!i) throw new Error('Instance introuvable.');
-    const p = i.pack, byRef = p && (p.src === 'modrinth' || p.src === 'curseforge') && typeof p.pid === 'string';
-    if (byRef) return { card: { k: 'pack', n: i.name, src: p.src, pid: p.pid, v: i.version }, skipped: 0, thumb: thumbOf(id) };
-    const s = mods.share(id); return { card: { k: 'inst', n: i.name, v: i.version, l: i.loader, lv: s.lv, m: s.count, code: s.code }, skipped: s.skipped, thumb: thumbOf(id) };
+    const p = i.pack, byRef = p && (p.src === 'modrinth' || p.src === 'curseforge') && typeof p.pid === 'string', lk = lookOf(i, ex);
+    const thumb = thumbOf(id) || (ex && typeof ex.th === 'string' ? ex.th : '');   // image perso, sinon le décor + l'objet dessinés par l'interface (revalidés par chat.js)
+    if (byRef) return { card: { k: 'pack', n: i.name, src: p.src, pid: p.pid, v: i.version, ...lk }, skipped: 0, thumb };
+    const s = mods.share(id); return { card: { k: 'inst', n: i.name, v: i.version, l: i.loader, lv: s.lv, m: s.count, code: s.code, ...lk }, skipped: s.skipped, thumb };
   };
   const dlBusy = new Set();
   on('chat:list', () => chat.list());
@@ -238,13 +256,13 @@ app.whenReady().then(async () => {
   on('chat:mod', (c, mid) => { const card = chat.moderate(conv(c), String(mid || '')); if (card && card.tid && TIDRE.test(card.tid)) { try { xfer.discard(card.tid); } catch (e) { /* rien n'avait été reçu */ } } return true; });   // administrateur d'un groupe : supprime le message d'un autre pour tous (chat.js vérifie)
   on('chat:read', c => chat.read(conv(c)));
   on('chat:active', c => chat.setActive(c ? conv(c) : null));
-  on('chat:share', (c, instId) => { const t = (Array.isArray(c) ? c : [c]).slice(0, 10).map(conv), s = shareCard(String(instId || '')); for (const x of t) chat.sendCard(x, s.card, s.thumb); return { sent: t.length, skipped: s.skipped, kind: s.card.k }; });   // l'envoi est la confirmation : la personne a choisi à qui
+  on('chat:share', (c, instId, ex) => { const t = (Array.isArray(c) ? c : [c]).slice(0, 10).map(conv), s = shareCard(String(instId || ''), ex); for (const x of t) chat.sendCard(x, s.card, s.thumb); return { sent: t.length, skipped: s.skipped, kind: s.card.k }; });   // l'envoi est la confirmation : la personne a choisi à qui
   on('chat:dl', async (c, mid) => {   // « Télécharger » / « Rejoindre » sur une carte reçue : rien ne part tant qu'on n'a pas cliqué
     c = conv(c); mid = String(mid || ''); const card = chat.card(c, mid), bk = c + '|' + mid; if (dlBusy.has(bk)) throw new Error('Déjà en cours.'); dlBusy.add(bk);
     try {
       let out;
-      if (card.k === 'inst') { const r = await mods.importCode(card.code); r.inst.name = String(card.n).slice(0, 40); store.save(); out = { kind: 'inst', id: r.inst.id, name: r.inst.name, failed: r.failed.length }; }
-      else if (card.k === 'pack') { const r = await require('./packs').install('modpack', card.pid, card.src, null, p => send('import:progress', p)); out = { kind: 'pack', id: r.id, name: r.name, failed: (r.bad || []).length }; }
+      if (card.k === 'inst') { const r = await mods.importCode(card.code); r.inst.name = String(card.n).slice(0, 40); applyLook(r.inst, card); store.save(); out = { kind: 'inst', id: r.inst.id, name: r.inst.name, failed: r.failed.length }; }
+      else if (card.k === 'pack') { const r = await require('./packs').install('modpack', card.pid, card.src, null, p => send('import:progress', p)); applyLook(store.get().instances.find(x => x.id === r.id), card); out = { kind: 'pack', id: r.id, name: r.name, failed: (r.bad || []).length }; }
       else if (card.k === 'srv') { const r = await joinFriendSrv(card.code, card.n); out = { kind: 'srv', addr: r.addr, name: card.n }; }
       else if (card.k === 'img') {   // image entière : récupérée puis vérifiée par son contenu avant d'être montrée
         const r = await xfer.fetch(chat.author(c, mid), card.tid, { count: 1, size: card.size }), f = path.join(r.dir, r.items[0]);

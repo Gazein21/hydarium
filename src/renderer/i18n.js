@@ -708,6 +708,9 @@ Amis : voir le serveur où ils jouent|Friends: see the server they play on
 Tes amis voient le serveur où tu joues, et tu vois le leur avec un bouton « Rejoindre ». Désactivé : tu ne vois rien et tu ne partages rien. Les adresses locales ne sont jamais envoyées.|Your friends see the server you play on, and you see theirs with a “Join” button. Off: you see nothing and share nothing. Local addresses are never sent.
 Appels vocaux : annulation d’écho|Voice calls: echo cancellation
 Évite que ton ami s’entende dans tes haut-parleurs. Coupe-la si tu portes un casque : la voix reste alors totalement naturelle.|Stops your friend from hearing themselves through your speakers. Turn it off with a headset: the voice then stays completely natural.
+Bonne qualité|Good quality
+Connexion instable|Unstable connection
+Volume de l’ami|Friend’s volume
 Voir et partager le serveur où l’on joue|See and share the server being played on
 Voir le serveur de mes amis, et leur montrer le mien|See my friends’ server, and show them mine
 `;

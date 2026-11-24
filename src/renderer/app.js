@@ -30,12 +30,13 @@ function texNeed() {
   if (TEXQ || (TEX && (Object.keys(TEX.img).length || Date.now() - TEXT < 60000))) return;   // vide : on réessaie au plus une fois par minute (un jeu a pu être téléchargé entre-temps)
   TEXQ = true; call('tex:items').then(r => { TEX = r && r.img ? r : { order: [], img: {} }; }).catch(() => { TEX = { order: [], img: {} }; }).finally(() => { TEXT = Date.now(); TEXQ = false; if (Object.keys(TEX.img).length) { clearTimeout(imgT); imgT = setTimeout(() => render(), 60); } });
 }
-function itemOf(i) {   // choisi par la personne, sinon automatique (stable : dépend de l'identifiant de l'instance)
+function itemKeyOf(i) {   // nom de l'objet affiché sur l'icône : choisi par la personne, sinon automatique (stable : dépend de l'identifiant de l'instance)
   texNeed(); if (!TEX || i.item === 'none') return '';
-  if (i.item && TEX.img[i.item]) return TEX.img[i.item];
-  const o = TEX.order; for (let k = 0; k < o.length; k++) { const n = o[(hash(i.id) + k) % o.length]; if (TEX.img[n]) return TEX.img[n]; }
+  if (i.item && TEX.img[i.item]) return i.item;
+  const o = TEX.order; for (let k = 0; k < o.length; k++) { const n = o[(hash(i.id) + k) % o.length]; if (TEX.img[n]) return n; }
   return '';
 }
+function itemOf(i) { const k = itemKeyOf(i); return k ? TEX.img[k] : ''; }
 const cover = (i, w, h) => { const m = imgOf(i); if (m) return m.kind === 'logo' ? `<img class="cbg" src="${m.u}" alt=""><div class="clogo"><img src="${m.u}" alt=""></div>` : `<img class="cphoto" src="${m.u}" alt="">`; const it = itemOf(i); return scene(i.srv ? 42 : hash(i.id) % 97 + 3, biome(i), w, h) + (it ? `<div class="cobj"><img src="${it}" alt=""></div>` : ''); }; // instances créées pour un serveur : toujours la même image
 const ldn = l => ({ neoforge: 'NeoForge', forge: 'Forge', fabric: 'Fabric', quilt: 'Quilt', vanilla: 'Vanilla' }[l] || cap(l));
 const cap = s => s ? s[0].toUpperCase() + s.slice(1) : '';
@@ -1634,7 +1635,7 @@ function chMsg(m, prev, grp) {
   const mod = CH.adm && !m.mine && !m.del ? `<button class="ib" data-a="chMod" data-m="${esc(m.id)}" title="Supprimer pour tout le monde (administrateur)" aria-label="Supprimer pour tout le monde (administrateur)">${ic('trash', 12)}</button>` : '';   // réservé à l'administrateur du groupe
   const cp = !m.del && !m.c && !m.bad && m.x ? `<button class="ib" data-a="chCopy" data-m="${esc(m.id)}" title="Copier le message" aria-label="Copier le message">${ic('copy', 12)}</button>` : '';
   const acts = `<span class="chact">${cp}${own}${mod}<button class="ib" data-a="chHide" data-m="${esc(m.id)}" title="Supprimer chez moi" aria-label="Supprimer chez moi">${ic('eye', 12)}</button></span>`;   // chez soi seulement (avec confirmation)
-  return `<div class="chr ${m.mine ? 'me' : ''}">${!m.mine && grp && first ? `<div class="chw">${headAv(m.who, 'xs', 32)}<span data-notr>${esc(m.who)}</span></div>` : ''}<div class="chb ${m.c ? 'cd' : ''} ${m.c && m.c.k === 'img' ? 'im' : ''} ${m.del ? 'dl' : ''} ${!m.c && !m.del && !m.bad && m.x && m.x.length <= 40 && !m.x.includes('\n') ? 'sh' : ''}">${acts}<div class="chx">${body}</div><small class="cht">${chTime(m.ts)}${m.ed && !m.del ? ' <span title="Ce message a été modifié">(modifié)</span>' : ''} ${m.del ? '' : st}</small></div></div>`;
+  return `<div data-cmid="${esc(m.id)}" class="chr ${m.mine ? 'me' : ''}">${!m.mine && grp && first ? `<div class="chw">${headAv(m.who, 'xs', 32)}<span data-notr>${esc(m.who)}</span></div>` : ''}<div class="chb ${m.c ? 'cd' : ''} ${m.c && m.c.k === 'img' ? 'im' : ''} ${m.del ? 'dl' : ''} ${!m.c && !m.del && !m.bad && m.x && m.x.length <= 40 && !m.x.includes('\n') ? 'sh' : ''}">${acts}<div class="chx">${body}</div><small class="cht">${chTime(m.ts)}${m.ed && !m.del ? ' <span title="Ce message a été modifié">(modifié)</span>' : ''} ${m.del ? '' : st}</small></div></div>`;
 }
 function chatPaintMsgs() {
   const n = $('#chms'); if (!n) return;
@@ -1678,12 +1679,50 @@ async function chatSend() {
 }
 const chFriendBoxes = (attr, skip = []) => FR.friends.filter(f => !skip.includes(f.key)).map(f => `<label class="ml ckb"><input type="checkbox" ${attr}="${esc(f.key)}"> ${frDot(f)}<b data-notr>${esc(f.name)}</b><small style="margin-left:auto">${frWhat(f)}</small></label>`).join('');
 const chChecked = attr => [...document.querySelectorAll('#modal [' + attr + ']:checked')].map(x => x.getAttribute(attr));
+const chLoadImg = src => new Promise((ok, ko) => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => ko(new Error('image')); im.src = src; });
+/** ce que voit l'ami sur la carte : { th (miniature JPEG base64 du décor + objet, '' si l'instance a sa propre image), cv (décor), it (objet) } */
+async function chLook(i) {
+  const cv = biome(i), it = itemKeyOf(i); let th = '';
+  if (!i.img) {
+    try {
+      const S = 128, svg = scene(i.srv ? 42 : hash(i.id) % 97 + 3, cv, S, S).replace('<svg ', `<svg width="${S}" height="${S}" `), c = document.createElement('canvas'); c.width = c.height = S;
+      const g = c.getContext('2d'); g.drawImage(await chLoadImg('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)), 0, 0, S, S);
+      if (it && TEX && TEX.img[it]) { const z = Math.round(S * 0.6), o = Math.round((S - z) / 2); g.imageSmoothingEnabled = false; g.shadowColor = 'rgba(0,0,0,.35)'; g.shadowOffsetY = 3; g.drawImage(await chLoadImg(TEX.img[it]), o, o, z, z); }
+      for (const q of [0.82, 0.68, 0.54, 0.42]) { const b = c.toDataURL('image/jpeg', q).split(',')[1]; if (b && b.length <= 11000) { th = b; break; } }
+    } catch (e) { th = ''; }
+  }
+  return { th, cv, it };
+}
+/* ----- menu clic droit sur un message : copier, modifier, supprimer pour tous, masquer chez soi (mêmes actions que les boutons de la bulle) ----- */
+function chCtxClose() { const n = document.getElementById('chctx'); if (n) n.remove(); }
+function chCtxOpen(e) {
+  chCtxClose(); const r = e.target.closest && e.target.closest('.chr[data-cmid]'); if (!r || page !== 'friends') return;
+  const m = CH.msgs.find(x => x.id === r.dataset.cmid); if (!m) return; e.preventDefault();
+  const sel = String(window.getSelection ? window.getSelection() : '').trim(), inSel = sel && window.getSelection().anchorNode && r.contains(window.getSelection().anchorNode);
+  CH.ctxSel = inSel ? sel.slice(0, 1000) : '';
+  const it = (a, ico, label, danger) => `<button class="cmi ${danger ? 'dg' : ''}" data-a="${a}" data-m="${esc(m.id)}">${ic(ico, 14)}<span>${label}</span></button>`;
+  const txt = !m.del && !m.c && !m.bad && m.x, rows = [];
+  if (txt) rows.push(it('chCopy', 'copy', CH.ctxSel ? 'Copier la sélection' : 'Copier le message'));
+  if (m.mine && !m.del && !m.c && !m.bad) rows.push(it('chEdit', 'edit', 'Modifier'));
+  const del = [];
+  if (m.mine && !m.del) del.push(it('chDel', 'trash', 'Supprimer pour tout le monde', true));
+  if (CH.adm && !m.mine && !m.del) del.push(it('chMod', 'trash', 'Supprimer pour tous (administrateur)', true));
+  del.push(it('chHide', 'eye', 'Masquer chez moi', true));
+  const n = document.createElement('div'); n.id = 'chctx'; n.setAttribute('role', 'menu'); n.innerHTML = rows.join('') + (rows.length ? '<div class="cmsep"></div>' : '') + del.join('');
+  document.body.appendChild(n); trNode(n);
+  const w = n.offsetWidth, h = n.offsetHeight; n.style.left = Math.max(6, Math.min(e.clientX, innerWidth - w - 6)) + 'px'; n.style.top = Math.max(6, Math.min(e.clientY, innerHeight - h - 6)) + 'px';
+}
+document.addEventListener('contextmenu', e => { try { chCtxOpen(e); } catch (x) { chCtxClose(); } });
+document.addEventListener('click', () => setTimeout(chCtxClose, 0));   // l'action du bouton part avant la fermeture (le menu disparaît après le clic)
+document.addEventListener('keydown', e => { if (e.key === 'Escape') chCtxClose(); });
+window.addEventListener('blur', chCtxClose); window.addEventListener('resize', chCtxClose);
+document.addEventListener('scroll', chCtxClose, true);
 async function chShareModal(id) {
   const i = byId(id); if (!i) return;
   if (!FR || !FR.on) { friendsModal(); return; }
   if (!FR.friends.length) return note('Ajoute d’abord un ami (page Amis › ⚙) pour lui envoyer des instances.', 'Amis');
-  await chatLoadList(); const gs = CH.list.groups.filter(g => g.st === 'member'), exp = ['forge', 'neoforge'].includes(i.loader) && !i.pack;
-  openModal(`<h3>Envoyer à un ami</h3><div class="chcard"><div class="chct">${tile(null, i.name)}</div><div class="chci"><b data-notr>${esc(i.name)}</b><small>${esc(chInstMeta(i))}</small></div></div>
+  await chatLoadList(); const gs = CH.list.groups.filter(g => g.st === 'member'), exp = ['forge', 'neoforge'].includes(i.loader) && !i.pack, lk = await chLook(i), pv = lk.th ? 'data:image/jpeg;base64,' + lk.th : (imgOf(i) || {}).u || null;
+  openModal(`<h3>Envoyer à un ami</h3><div class="chcard"><div class="chct">${tile(pv, i.name)}</div><div class="chci"><b data-notr>${esc(i.name)}</b><small>${esc(chInstMeta(i))}</small></div></div>
     <p class="mu" style="margin:10px 0">Ton ami reçoit une carte dans le chat et choisit de la télécharger. <b>Aucun fichier ne part de ton PC</b> : ses mods sont retéléchargés depuis Modrinth${i.pack ? ' (modpack du catalogue : version d’origine)' : ''}.</p>
     ${exp ? `<small>${CHL[i.loader]} : ton ami recevra la même version du loader (${esc(i.loaderVer || '?')}), installée à son premier lancement. Le support de Forge et NeoForge reste expérimental dans Hydarium.</small>` : ''}<div class="sh" style="margin:12px 0 6px"><h3>Amis</h3></div><div class="chpick">${chFriendBoxes('data-chs')}</div>${gs.length ? `<div class="sh" style="margin:12px 0 6px"><h3>Groupes</h3></div><div class="chpick">${gs.map(g => `<label class="ml ckb"><input type="checkbox" data-chs="${esc(g.id)}">${ic('users', 14)}<b data-notr>${esc(g.name)}</b><small style="margin-left:auto">${g.members.length} membres</small></label>`).join('')}</div>` : ''}
     <div class="row end" style="margin-top:14px"><button class="btn sec" data-a="mclose">Annuler</button><button class="btn" data-a="chShareGo" data-id="${esc(id)}">Envoyer</button></div>`, false);
@@ -1709,7 +1748,7 @@ Object.assign(ACT, {
   frSrvTgl: async () => { cfg.friendSrv = !frSrvOn(); await call('set:set', { friendSrv: cfg.friendSrv }); friendsModal(); if (page === 'home') render(); },
   frChat: d => { page = 'friends'; CH.conv = d.k; CH.stick = true; render(); },
   frCall: async d => { if (VC.st) return; try { const caps = await vcCaps(); vcOnState(await call('voice:start', d.k, caps)); } catch (e) { flash(e.message || 'Appel impossible'); } },
-  chCopy: async d => { const m = CH.msgs.find(x => x.id === d.m); if (!m || m.c || m.del || !m.x) return; try { await navigator.clipboard.writeText(m.x); flash('Message copié ✓'); } catch (e) { flash('Copie impossible'); } },
+  chCopy: async d => { const m = CH.msgs.find(x => x.id === d.m); if (!m || m.c || m.del || !m.x) return; const part = CH.ctxSel; CH.ctxSel = ''; try { await navigator.clipboard.writeText(part || m.x); flash(part ? 'Sélection copiée ✓' : 'Message copié ✓'); } catch (e) { flash('Copie impossible'); } },
   chHide: async d => { if (!(await ask('Supprimer ce message chez toi ?', 'Il disparaît seulement de ton écran. Les autres personnes le gardent.', 'Supprimer', true))) return; try { await call('chat:hide', CH.conv, d.m); } catch (e) { return flash('Erreur : ' + e.message); } await chatRefresh(CH.conv); },
   chMod: async d => {
     if (!(await ask('Supprimer ce message pour tout le monde ?', 'En tant qu’administrateur du groupe, tu supprimes le message de quelqu’un d’autre. Tous les membres verront « Message supprimé par l’administrateur ».', 'Supprimer', true))) return;
@@ -1721,9 +1760,9 @@ Object.assign(ACT, {
   },
   chGRename: async () => { const n = (($('#chgr') || {}).value || '').trim(); if (!n) return flash('Donne un nom au groupe'); try { await call('chat:grename', CH.conv, n); } catch (e) { return flash('Erreur : ' + e.message); } await chatRefresh(CH.conv); chManageModal(); },
   chShare: d => chShareModal(d.id),
-  chShareGo: async d => { const to = chChecked('data-chs'); if (!to.length) return flash('Choisis au moins un destinataire'); await chShareDone(await call('chat:share', to, d.id)); },
+  chShareGo: async d => { const to = chChecked('data-chs'); if (!to.length) return flash('Choisis au moins un destinataire'); await chShareDone(await call('chat:share', to, d.id, await chLook(byId(d.id)))); },
   chPick: () => openModal(`<h3>Partager une instance</h3><p class="mu">Une carte part dans cette discussion ; aucun fichier n’est envoyé.</p>${inst.map(i => `<div class="ml"><div style="flex:1"><b data-notr>${esc(i.name)}</b><br><small>${esc(chInstMeta(i))}</small></div><button class="btn sm" data-a="chPickGo" data-id="${esc(i.id)}">Envoyer</button></div>`).join('') || '<p class="mu">Aucune instance.</p>'}<div class="row end" style="margin-top:12px"><button class="btn sec" data-a="mclose">Fermer</button></div>`),
-  chPickGo: async d => { await chShareDone(await call('chat:share', [CH.conv], d.id)); },
+  chPickGo: async d => { await chShareDone(await call('chat:share', [CH.conv], d.id, await chLook(byId(d.id)))); },
   chDl: async d => {
     const cv = CH.conv, m = CH.msgs.find(x => x.id === d.m); if (!m || !m.c) return;
     if (m.c.k === 'files' && m.c.jar && !(await ask('Recevoir des mods ?', `Cet envoi contient des mods (.jar). Ce sont des programmes qui s’exécutent dans le jeu : ne continue que si tu fais confiance à <b>${esc(m.who)}</b> et à ce qu’il t’envoie. Rien n’est ajouté à une instance tant que tu ne le demandes pas.`, 'Recevoir', false))) return;
@@ -1788,6 +1827,7 @@ Object.assign(P, {
   msg: '<path d="M4 5h16v11H10l-5 4v-4H4z"/>',
   hang: '<path d="M3 14c5-4 13-4 18 0l-1 3-4-1v-2a10 10 0 00-8 0v2l-4 1z"/>',
   mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/>',
+  vol: '<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 9a4 4 0 010 6M18.5 6.5a8 8 0 010 11"/>',
   micoff: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3M3 3l18 18"/>',
 });
 const VR_OPUS = 48000, VR_PCM = 16000;   // Opus : 48 kHz (voix naturelle) ; PCM de secours : 16 kHz (un paquet de 20 ms doit tenir dans 1 200 octets)
@@ -1813,7 +1853,7 @@ async function vcEngineStart(codec) {
   catch (e) { throw new Error(e && e.name === 'NotFoundError' ? 'Aucun micro détecté.' : 'Micro refusé : autorise-le dans les réglages de ton système (confidentialité › microphone).'); }
   const VR = vcRate(codec), VN = VR / 50, ctx = new AudioContext({ sampleRate: VR, latencyHint: 'interactive' }); await ctx.resume();
   const E = { stream, ctx, codec, next: 0, ts: 0, rts: 0, acc: new Float32Array(VN), fill: 0, enc: null, dec: null, nodes: [], dead: false };
-  const out = ctx.createGain(); out.gain.value = 1; out.connect(ctx.destination); E.out = out;
+  const out = ctx.createGain(); out.gain.value = Math.max(0, Math.min(1.5, Number((cfg || {}).voiceVol ?? 1))); out.connect(ctx.destination); E.out = out; E.jb = VoiceBuf.create();   // jb : tampon adaptatif (voicebuf.js)
   const sendPkt = b => { if (!E.dead && b.length && b.length <= 1200) hyd.send('voice:pcm', b); };
   const onFrame = f => {   // 320 échantillons du micro
     VC.lvl = vcRms(f); if (E.dead || (VC.st && VC.st.muted) || !VC.st || VC.st.st !== 'live') return;
@@ -1821,10 +1861,11 @@ async function vcEngineStart(codec) {
     else { const p = new Int16Array(VN); for (let i = 0; i < VN; i++) p[i] = Math.max(-1, Math.min(1, f[i])) * 32767; sendPkt(new Uint8Array(p.buffer)); }
   };
   const feed = c => { let i = 0; while (i < c.length) { const n = Math.min(VN - E.fill, c.length - i); E.acc.set(c.subarray(i, i + n), E.fill); E.fill += n; i += n; if (E.fill === VN) { onFrame(E.acc.slice()); E.fill = 0; } } };
-  const play = f => {   // petit tampon d'écoute (60 ms) ; si on prend trop de retard, on se resynchronise
+  const play = f => {   // chaque paquet est placé par le tampon adaptatif : enchaînement sans trou, reprise en douceur après une coupure
     if (E.dead || !f.length) return; VC.peer = vcRms(f);
-    const b = ctx.createBuffer(1, f.length, VR); b.copyToChannel(f, 0); const s = ctx.createBufferSource(); s.buffer = b; s.connect(out);
-    const t = ctx.currentTime; if (E.next < t + 0.02 || E.next - t > 0.4) E.next = t + 0.06; s.start(E.next); E.next += b.duration;
+    const r = E.jb.place(ctx.currentTime, f.length / VR); if (!r) return;
+    if (r.fade) { const n = Math.min(f.length, Math.round(VR * 0.005)); for (let i = 0; i < n; i++) f[i] *= i / n; }   // fondu de 5 ms : pas de « clic » au redémarrage
+    const b = ctx.createBuffer(1, f.length, VR); b.copyToChannel(f, 0); const s = ctx.createBufferSource(); s.buffer = b; s.connect(out); s.start(r.at);
   };
   if (codec === 'opus') {
     E.enc = new AudioEncoder({ output: ch => { const b = new Uint8Array(ch.byteLength); ch.copyTo(b); sendPkt(b); }, error: () => {} });
@@ -1863,17 +1904,41 @@ function vcRing(kind) {   // sonnerie : « in » (on t'appelle) ou « out » (ç
   } catch (e) { VC.ring = null; }
 }
 const vcTime = ms => { const s = Math.max(0, Math.floor(ms / 1000)); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
+const vcLv = r => Math.min(6, Math.round(Math.sqrt(r * 8) * 6));   // niveau sonore 0..6 pour les vumètres
+const vcMeter = id => `<span class=\"vcm\" id=\"${id}\" aria-hidden=\"true\"><i></i><i></i><i></i><i></i><i></i><i></i></span>`;
+const vcSetMeter = (id, n) => { const m = document.getElementById(id); if (m) [...m.children].forEach((c, k) => c.classList.toggle('on', k < n)); };
 function vcPaint() {
   let n = document.getElementById('vcbar'); const s = VC.st;
   if (!s) { if (n) n.remove(); clearInterval(VC.tick); VC.tick = null; return; }
   if (!n) { n = document.createElement('div'); n.id = 'vcbar'; document.body.appendChild(n); }
-  const name = `<b data-notr>${esc(s.name)}</b>`, live = s.st === 'live';
-  n.className = s.st === 'ring' && s.role === 'in' ? 'in' : '';
-  n.innerHTML = `<div class="vcl"><span class="vcp ${live ? 'on' : ''}" id="vcpeer">${headAv(s.name, '', 64)}</span><div>${s.st === 'ring' ? (s.role === 'in' ? `${name}<small>t’appelle…</small>` : `${name}<small>Ça sonne…</small>`) : live ? `${name}<small><span id="vcdur">${vcTime(Date.now() - s.t0)}</span>${s.peerMuted ? ' · micro coupé' : ''}</small>` : `${name}<small>Connexion…</small>`}</div></div>
-    <div class="row" style="gap:6px">${s.st === 'ring' && s.role === 'in' ? `<button class="btn sm" data-a="vcAccept">${ic('phone', 13)} Décrocher</button><button class="btn dg sm" data-a="vcDecline">Refuser</button>`
-      : `${live ? `<button class="ib ${s.muted ? 'off' : ''}" data-a="vcMute" title="${s.muted ? 'Rétablir le micro' : 'Couper le micro'}" aria-label="${s.muted ? 'Rétablir le micro' : 'Couper le micro'}">${ic(s.muted ? 'micoff' : 'mic', 15)}</button>` : ''}<button class="btn dg sm" data-a="vcHang">${ic('hang', 13)} ${s.st === 'ring' ? 'Annuler' : 'Raccrocher'}</button>`}</div>`;
+  const live = s.st === 'live', inc = s.st === 'ring' && s.role === 'in';
+  n.className = (inc ? 'in ' : '') + (live ? 'live' : '');
+  const me = (acc && acc.name) || 'Toi', peerMuted = !!s.peerMuted;
+  const state = inc ? 'Appel entrant' : s.st === 'ring' ? 'Ça sonne…' : live ? 'Appel vocal' : 'Connexion…';
+  const vol = Math.round(Math.max(0, Math.min(1.5, Number((cfg || {}).voiceVol ?? 1))) * 100);
+  const mb = on => on ? `<span class="vcb" title="Micro coupé">${ic('micoff', 12)}</span>` : '';
+  const tile = (id, name, who, muted, cls) => `<div class="vtl ${cls || ''}" id="${id}"><span class="vtav">${headAv(name, '', 96)}</span><span class="vtn"><span data-notr>${esc(name)}</span>${who ? `<em>${who}</em>` : ''}</span>${mb(muted)}</div>`;
+  const head = `<div class="vch"><span class="vcs ${live ? 'on' : ''}"></span><b>${state}</b>${live ? `<span class="vcq" id="vcq"></span><span class="vcqt" id="vcqt">Bonne qualité</span><span class="vcdur" id="vcdur">${vcTime(Date.now() - s.t0)}</span>` : ''}</div>`;
+  n.innerHTML = inc
+    ? `<div class="vcr"><span class="vcrp"><i></i><i></i><i></i><span class="vcrav">${headAv(s.name, '', 96)}</span></span><b data-notr>${esc(s.name)}</b><small>t’appelle…</small></div>
+       <div class="vcc"><button class="btn vcacc" data-a="vcAccept">${ic('phone', 15)} Décrocher</button><button class="btn dg vcdec" data-a="vcDecline">${ic('hang', 15)} Refuser</button></div>`
+    : `${head}
+       <div class="vtiles">${tile('vcpeer', s.name, '', peerMuted)}${tile('vcself', me, 'toi', live && s.muted)}</div>
+       <div class="vcc">${live ? `<button class="ib vcbt ${s.muted ? 'off' : ''}" data-a="vcMute" title="${s.muted ? 'Rétablir le micro' : 'Couper le micro'}" aria-label="${s.muted ? 'Rétablir le micro' : 'Couper le micro'}">${ic(s.muted ? 'micoff' : 'mic', 18)}</button>
+         <span class="vcv" title="Volume de l’ami">${ic('vol', 16)}<input type="range" min="0" max="150" step="5" value="${vol}" data-vcvol aria-label="Volume de l’ami"><span class="vcvn">${vol} %</span></span>` : '<span class="vcgrow"></span>'}
+         <button class="btn dg vcbye" data-a="vcHang" title="${s.st === 'ring' ? 'Annuler' : 'Raccrocher'}">${ic('hang', 16)} ${s.st === 'ring' ? 'Annuler' : 'Raccrocher'}</button></div>`;
   trNode(n);
-  if (!VC.tick) VC.tick = setInterval(() => { const s2 = VC.st; if (!s2) return; const d = document.getElementById('vcdur'); if (d && s2.t0) d.textContent = vcTime(Date.now() - s2.t0); const p = document.getElementById('vcpeer'); if (p) p.classList.toggle('talk', s2.st === 'live' && VC.peer > 0.015); VC.peer *= 0.6; }, 250);
+  if (!VC.tick) VC.tick = setInterval(() => {
+    const s2 = VC.st; if (!s2) return; const live2 = s2.st === 'live';
+    const d = document.getElementById('vcdur'); if (d && s2.t0) d.textContent = vcTime(Date.now() - s2.t0);
+    const p = document.getElementById('vcpeer'); if (p) p.classList.toggle('talk', live2 && VC.peer > 0.015);
+    const me2 = document.getElementById('vcself'); if (me2) me2.classList.toggle('talk', live2 && !s2.muted && VC.lvl > 0.015);
+    if (live2) {
+      const bad = !!(VC.eng && VC.eng.jb && VC.eng.ctx && VC.eng.jb.unstable(VC.eng.ctx.currentTime)), q = document.getElementById('vcq'), qt = document.getElementById('vcqt');
+      if (q) q.classList.toggle('bad', bad); if (qt && qt.dataset.bad !== String(bad)) { qt.dataset.bad = String(bad); qt.textContent = bad ? 'Connexion instable' : 'Bonne qualité'; trNode(qt); }
+    }
+    VC.peer *= 0.75;
+  }, 100);
 }
 /** état de l'appel reçu du launcher (null = pas d'appel) */
 function vcOnState(s) {
@@ -1913,6 +1978,7 @@ document.addEventListener('click', guard(async e => {
 document.addEventListener('input', guard(async e => {
   const t = e.target, d = t.dataset;
   if (d.live) document.getElementById(d.live).textContent = t.value + (d.unit || '');
+  if ('vcvol' in d) { const v = Math.max(0, Math.min(150, Number(t.value) || 0)) / 100; if (VC.eng) VC.eng.out.gain.value = v; } if ('vcvol' in d) { const o = t.parentNode.querySelector('.vcvn'); if (o) o.textContent = t.value + ' %'; }
   if (t.id === 'bq' && BR) { BR.q = t.value; clearTimeout(brT); brT = setTimeout(() => brSearch(false), 350); }
   if (t.id === 'modf') modFilter(t.value);
   if (d.cr === 'name') CR.name = t.value;
@@ -1923,6 +1989,7 @@ document.addEventListener('input', guard(async e => {
 }));
 document.addEventListener('change', guard(async e => {
   const t = e.target, d = t.dataset, i = t.id;
+  if ('vcvol' in d) { cfg.voiceVol = Math.max(0, Math.min(150, Number(t.value) || 0)) / 100; return call('set:set', { voiceVol: cfg.voiceVol }); }   // volume de l'ami : retenu pour les prochains appels
   if (d.cr === 'version') { CR.version = t.value; crLv(); }
   else if (d.cr === 'lv') CR.lv = t.value;
   else if (d.cr === 'loader') { CR.loader = t.value; crOptApply(); crModal(); crLv(); }

@@ -8,7 +8,7 @@ body{margin:0;height:100vh;display:flex;flex-direction:column;background:var(--p
 .brand{display:flex;align-items:center;gap:8px;padding:2px 10px 14px;font-size:16px}.sp{flex:1}
 .nav{display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border-radius:9px;color:var(--mu);cursor:pointer;font:500 13.5px inherit;border:0;background:none;text-align:left}.nav svg{fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .nav:hover{background:var(--p2);color:var(--tx)}.nav.a{background:var(--p3);color:var(--tx);box-shadow:inset 3px 0 0 var(--ac)}
-.me{display:flex;gap:10px;align-items:center;width:100%;padding:8px 10px;border-radius:10px;background:var(--p2);border:1px solid var(--ln);cursor:pointer;color:var(--tx);font:inherit;text-align:left}.me:hover{border-color:var(--ac)}.me small{display:block;color:var(--mu);font-size:11px}
+button.me{display:flex;gap:10px;align-items:center;width:100%;padding:8px 10px;border-radius:10px;background:var(--p2);border:1px solid var(--ln);cursor:pointer;color:var(--tx);font:inherit;text-align:left}button.me:hover{border-color:var(--ac)}button.me small{display:block;color:var(--mu);font-size:11px}
 .dot{width:30px;height:30px;border-radius:8px;background:var(--p3);display:grid;place-items:center;font-weight:700;color:var(--ac)}
 #col{flex:1;display:flex;flex-direction:column;min-width:0;position:relative}#wall{position:absolute;inset:50px 0 0 0;opacity:.32;pointer-events:none}#wall svg{width:100%;height:100%;display:block}#top{position:relative;z-index:1}
 #top{height:50px;flex:none;display:flex;align-items:center;padding:0 20px;border-bottom:1px solid var(--ln)}#top h2{margin:0;font-size:16px}
@@ -47,7 +47,7 @@ footer{height:28px;flex:none;display:flex;align-items:center;gap:12px;padding:0 
 .stat{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}.stat .card{display:block;margin:0}.stat b{font-size:26px;display:block}
 .bars>div{display:flex;align-items:center;gap:10px;margin:6px 0}.bars span{width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bars i{display:block;height:8px;border-radius:9px;background:var(--ac)}
 .pf{display:flex;gap:18px;align-items:center;margin-bottom:14px}.pf img,.av{width:84px;height:84px;border-radius:14px;background:var(--p3);image-rendering:pixelated}
-.me img{width:30px;height:30px;border-radius:8px;image-rendering:pixelated}.dot{position:relative}
+button.me img{width:30px;height:30px;border-radius:8px;image-rendering:pixelated}.dot{position:relative}
 .soon{opacity:.75}.fld{display:grid;gap:5px;margin-top:10px}.fld label{color:var(--mu);font-size:12px}.fld input{width:100%}
 .java{display:flex;align-items:center;gap:12px}.java .k{font:700 18px Sora,Inter;width:64px}
 /* ===== v0.5 : fenêtres, tuiles, captures, skins, réglages d’instance ===== */
@@ -385,3 +385,71 @@ input.privin:focus{-webkit-text-security:none}
 .wlang .lc{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:130px;padding:16px 18px;background:var(--p1);color:var(--tx);border:2px solid var(--ln);border-radius:14px;font:inherit;cursor:pointer;transition:border-color .12s,transform .12s}
 .wlang .lc:hover:not(:disabled){border-color:var(--ac);transform:translateY(-2px)}.wlang .lc.sel{border-color:var(--ac);box-shadow:0 0 0 3px rgba(61,220,132,.2)}
 .wlang .lc:disabled{opacity:.5;cursor:not-allowed}.wlang .wf{font-size:30px;line-height:1}.wlang small{color:var(--mu);font-size:11.5px}
+
+/* ===== Appel vocal : carte refaite (0.11.1) ===== */
+#vcbar{flex-direction:column;align-items:stretch;gap:12px;justify-content:flex-start;width:330px;min-width:0;padding:14px;background:var(--p1);border:1px solid var(--ln);border-top:3px solid var(--ac);border-left:1px solid var(--ln);box-shadow:0 12px 34px rgba(0,0,0,.45)}
+#vcbar.in{animation:vcr 1.4s ease-in-out infinite}
+#vcbar .vct{display:flex;align-items:center;gap:12px;min-width:0}
+#vcbar .vci{flex:1;min-width:0}#vcbar .vci b{font-size:15px}#vcbar .vci small{display:flex;align-items:center;gap:6px}
+.vcp{width:52px;height:52px;position:relative;overflow:visible;border:2px solid var(--ln);background:var(--p3)}.vcp .hav{position:absolute;inset:0}
+.vcp.on{border-color:var(--ln)}.vcp.talk{border-color:var(--ac);box-shadow:0 0 0 3px rgba(61,220,132,.3),0 0 16px rgba(61,220,132,.35)}
+.vcp.pulse{animation:vcpulse 1.2s ease-in-out infinite}@keyframes vcpulse{50%{box-shadow:0 0 0 6px rgba(61,220,132,.22)}}
+.vcb{position:absolute;right:-6px;bottom:-6px;width:20px;height:20px;display:grid;place-items:center;background:var(--er);color:#fff;border:2px solid var(--p1)}.vcb svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2}
+.vcq{width:8px;height:8px;background:var(--ac);flex:none;display:inline-block}.vcq.bad{background:#f5a524}
+.vcm{display:inline-flex;align-items:flex-end;gap:2px;height:20px;flex:none}.vcm i{display:block;width:4px;background:var(--p3);transition:background .08s}.vcm i:nth-child(1){height:5px}.vcm i:nth-child(2){height:8px}.vcm i:nth-child(3){height:11px}.vcm i:nth-child(4){height:14px}.vcm i:nth-child(5){height:17px}.vcm i:nth-child(6){height:20px}.vcm i.on{background:var(--ac)}
+.vcc{display:flex;align-items:center;gap:10px}.vcc .btn{flex:1}.vcc .vcgrow{flex:1}.vcc .vcc-sp{flex:1}
+.vcc .ib.off{color:#fff;background:var(--er);border-color:var(--er)}
+.vcv{flex:1;display:flex;align-items:center;gap:6px;color:var(--mu);min-width:0}.vcv svg{flex:none;fill:none;stroke:currentColor;stroke-width:1.8}.vcv input{flex:1;min-width:0;accent-color:var(--ac)}
+#vcbar.live .vcc .btn{flex:none}
+
+/* ===== Appel vocal : carte façon Discord (0.11.2) — tuiles toi / ami, anneau vert quand ça parle ===== */
+#vcbar{width:372px;gap:12px;padding:12px;background:linear-gradient(180deg,#171b24,#10131a);border:1px solid var(--ln);border-top:1px solid var(--ln);box-shadow:0 18px 48px rgba(0,0,0,.55);animation:vcin .18s ease-out}
+@keyframes vcin{from{opacity:0;transform:translateY(-8px)}}
+#vcbar.in{border-color:var(--ac);animation:vcin .18s ease-out,vcr 1.6s ease-in-out .18s infinite}
+.vch{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mu);min-height:20px}
+.vch b{color:var(--tx);font-size:12.5px;letter-spacing:.02em}
+.vcs{width:8px;height:8px;background:var(--wa);flex:none;animation:vcblink 1.1s ease-in-out infinite}.vcs.on{background:var(--ac);animation:none;box-shadow:0 0 8px var(--ac)}
+@keyframes vcblink{50%{opacity:.25}}
+.vch .vcq{margin-left:auto}.vch .vcqt{font-size:11.5px}
+.vch .vcdur{font:600 12px ui-monospace,Consolas,monospace;color:var(--tx);background:var(--p3);padding:2px 7px;margin-left:4px;font-variant-numeric:tabular-nums}
+.vtiles{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.vtl{position:relative;aspect-ratio:1/.92;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 38%,#262d3b,#181c25 70%);border:2px solid transparent;overflow:hidden;transition:border-color .12s,box-shadow .12s}
+.vtl.talk{border-color:var(--ac);box-shadow:0 0 0 1px rgba(61,220,132,.35),0 0 22px rgba(61,220,132,.28) inset}
+.vtav{position:relative;width:64px;height:64px;display:block;margin-top:-12px;border:2px solid rgba(255,255,255,.08);transition:transform .12s}.vtav .hav{position:absolute;inset:0;width:100%;height:100%}
+.vtl.talk .vtav{transform:scale(1.06);border-color:var(--ac)}
+.vtn{position:absolute;left:6px;bottom:6px;max-width:calc(100% - 12px);display:flex;align-items:center;gap:6px;padding:2px 8px;background:rgba(0,0,0,.62);font-size:12px;font-weight:600;line-height:1.5}
+.vtn>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.vtn em{font-style:normal;color:var(--mu);font-weight:500;font-size:11px}
+.vtl .vcb{position:absolute;top:6px;right:6px;bottom:auto;width:22px;height:22px;border:0;background:var(--er)}
+.vcc{display:flex;align-items:center;gap:8px}
+.vcbt{width:40px;height:40px;flex:none;background:var(--p3);border:1px solid var(--ln);color:var(--tx)}
+.vcbt:hover{background:#2c3446;border-color:var(--mu);color:var(--tx)}
+.vcbt.off,.vcc .ib.off{background:var(--er);border-color:var(--er);color:#fff}
+.vcc .vcv{flex:1;display:flex;align-items:center;gap:7px;height:40px;padding:0 10px;background:var(--p2);border:1px solid var(--ln);min-width:0}
+.vcc .vcv input{flex:1;min-width:0;height:4px;accent-color:var(--ac)}
+.vcvn{font:600 11px ui-monospace,Consolas,monospace;color:var(--mu);min-width:38px;text-align:right}
+.vcc .vcbye{height:40px;padding:0 14px;flex:none}.vcc .vcbye svg{fill:currentColor;stroke:none}
+/* appel entrant : anneaux qui s'élargissent autour de l'avatar */
+.vcr{display:flex;flex-direction:column;align-items:center;gap:4px;padding:18px 0 6px;text-align:center}
+.vcr b{font-size:16px;margin-top:14px}.vcr small{color:var(--mu);font-size:12.5px}
+.vcrp{position:relative;width:76px;height:76px;display:block}
+.vcrp i{position:absolute;inset:0;border:2px solid var(--ac);opacity:0;animation:vcwave 2s ease-out infinite}.vcrp i:nth-child(2){animation-delay:.66s}.vcrp i:nth-child(3){animation-delay:1.33s}
+@keyframes vcwave{0%{opacity:.7;transform:scale(1)}100%{opacity:0;transform:scale(1.9)}}
+.vcrav{position:absolute;inset:0;display:block;border:2px solid var(--ac);box-shadow:0 0 18px rgba(61,220,132,.4)}.vcrav .hav{position:absolute;inset:0;width:100%;height:100%}
+.vcc .vcacc,.vcc .vcdec{flex:1;height:42px;font-size:13px}.vcc .vcdec svg,.vcc .vcbye svg{fill:currentColor;stroke:none}.vcc .vcacc svg{fill:currentColor;stroke:none}
+@media (prefers-reduced-motion:reduce){#vcbar,.vcrp i,.vcs{animation:none!important}}
+
+/* ===== Chat : cartes partagées (0.11.2) — plus de cadre vert autour, la carte se suffit à elle-même ===== */
+.chb.cd,.chr.me .chb.cd{background:transparent;color:var(--tx);padding:0;box-shadow:none;border:0}
+.chb.cd .cht,.chr.me .chb.cd .cht{margin:5px 2px 0 0;color:var(--mu);opacity:.85}
+.chcard{min-width:260px;gap:12px;padding:10px;background:var(--p2);border:1px solid var(--ln);border-left:3px solid var(--ac);color:var(--tx)}
+.chcard .chct{width:72px;height:72px}.chcard .chct img{image-rendering:auto}
+.chcard .chci b{color:var(--tx);font-size:14px}.chcard .chci small{display:block;color:var(--mu);font-size:12px;line-height:1.35;margin-top:2px}
+.chr.me .chcard small,.chr.me .chcard b{color:inherit}.chr.me .chcard .chci small{color:var(--mu)}
+
+/* ===== Chat : menu clic droit sur un message (0.11.4) ===== */
+#chctx{position:fixed;z-index:300;min-width:224px;padding:4px;background:var(--p1);border:1px solid var(--ln);box-shadow:0 14px 36px rgba(0,0,0,.6);animation:vcin .1s ease-out}
+#chctx .cmi{display:flex;align-items:center;gap:10px;width:100%;padding:8px 12px;background:none;border:0;color:var(--tx);font:500 13px inherit;text-align:left;cursor:pointer}
+#chctx .cmi svg{flex:none;fill:none;stroke:currentColor;stroke-width:1.7;opacity:.85}
+#chctx .cmi:hover,#chctx .cmi:focus-visible{background:var(--p3);outline:0}
+#chctx .cmi.dg{color:#ff7d7a}#chctx .cmi.dg:hover{background:rgba(239,83,80,.16)}
+#chctx .cmsep{height:1px;margin:4px 6px;background:var(--ln)}

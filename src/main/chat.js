@@ -19,6 +19,9 @@
 const fs = require('fs'), path = require('path'), crypto = require('crypto');
 const F = require('./friends');
 
+const BIOS = new Set(['plains', 'cherry', 'sunset', 'night', 'snow', 'desert', 'nether', 'end', 'jungle', 'mesa', 'taiga', 'swamp', 'mushroom', 'deepdark']);
+/** aspect d'une instance partagée (décor, objet de l'icône, type d'image) : trois petits champs optionnels, rien d'autre ne passe */
+const look = c => ({ cv: BIOS.has(c.cv) ? c.cv : '', it: typeof c.it === 'string' && /^[a-z0-9_]{1,50}$/.test(c.it) ? c.it : '', ik: c.ik === 'photo' || c.ik === 'logo' ? c.ik : '' });
 const L = { text: 1000, msgs: 200, seen: 400, group: 20, gname: 32, ttl: 14 * 86400e3, burst: [40, 10000], thumb: 12000, thumbPx: 256, pending: 100, flush: 100, newGroups: [5, 3600e3], invited: 10, pctl: 50 };
 const KEY = /^[0-9a-f]{64}$/, MID = /^[0-9a-f]{24}$/, GID = /^[0-9a-f]{16}$/, VER = /^[\w.+\- ]{1,32}$/, HYD1 = /^HYD1\.[\w-]{1,20000}$/, PID = /^([A-Za-z0-9]{8}|cf\d{1,10})$/;
 const recipe = require('./recipe');
@@ -56,11 +59,11 @@ function cleanCard(c) {
     let d; try { d = recipe.decode(c.code); } catch (e) { return null; }
     // la carte ne peut pas dire autre chose que le code : version, loader, version du loader et nombre de mods viennent du code lui-même
     if (c.v !== d.v || c.l !== d.l || (c.lv || '') !== d.lv || c.m !== d.m.length) return null;
-    return { k: 'inst', n, v: d.v, l: d.l, lv: d.lv, m: d.m.length, code: c.code, th };
+    return { k: 'inst', n, v: d.v, l: d.l, lv: d.lv, m: d.m.length, code: c.code, th, ...look(c) };
   }
   if (c.k === 'pack') {
     if (!n || (c.src !== 'modrinth' && c.src !== 'curseforge') || typeof c.pid !== 'string' || !PID.test(c.pid) || (c.src === 'curseforge') !== /^cf/.test(c.pid)) return null;
-    return { k: 'pack', n, src: c.src, pid: c.pid, v: typeof c.v === 'string' && VER.test(c.v) ? c.v : '', th };
+    return { k: 'pack', n, src: c.src, pid: c.pid, v: typeof c.v === 'string' && VER.test(c.v) ? c.v : '', th, ...look(c) };
   }
   if (c.k === 'files') {   // fichiers proposés (voir xfer.js) : seulement des chiffres et des noms, jamais de chemin
     if (!n || typeof c.tid !== 'string' || !MID.test(c.tid) || !Number.isInteger(c.cnt) || c.cnt < 1 || c.cnt > 3000 || !Number.isSafeInteger(c.size) || c.size < 0 || c.size > 4 * 2 ** 30) return null;
@@ -76,7 +79,7 @@ function cleanCard(c) {
   }
   return null;
 }
-const cardOut = c => c.k === 'img' ? { k: 'img', n: c.n, tid: c.tid, size: c.size, w: c.w, h: c.h, th: c.th || '' } : c.k === 'files' ? { k: 'files', n: c.n, tid: c.tid, cnt: c.cnt, size: c.size, jar: !!c.jar, top: c.top || [], th: '' } : c.k === 'inst' ? { k: 'inst', n: c.n, v: c.v, l: c.l, lv: c.lv || '', m: c.m, code: c.code, th: c.th || '' } : c.k === 'pack' ? { k: 'pack', n: c.n, src: c.src, pid: c.pid, v: c.v || '', th: c.th || '' } : { k: 'srv', n: c.n, code: c.code };   // ordre des champs fixe
+const cardOut = c => c.k === 'img' ? { k: 'img', n: c.n, tid: c.tid, size: c.size, w: c.w, h: c.h, th: c.th || '' } : c.k === 'files' ? { k: 'files', n: c.n, tid: c.tid, cnt: c.cnt, size: c.size, jar: !!c.jar, top: c.top || [], th: '' } : c.k === 'inst' ? { k: 'inst', n: c.n, v: c.v, l: c.l, lv: c.lv || '', m: c.m, code: c.code, th: c.th || '', ...look(c) } : c.k === 'pack' ? { k: 'pack', n: c.n, src: c.src, pid: c.pid, v: c.v || '', th: c.th || '', ...look(c) } : { k: 'srv', n: c.n, code: c.code };   // ordre des champs fixe
 
 /** o : dir (dossier des données), friends (API de friends.js : sendTo, isFriend, isOnline, friendName, friendKeys, myKey, sign, isRunning), myName(), focused(), notify(kind, data), log, saveMs */
 exports.create = (o = {}) => {

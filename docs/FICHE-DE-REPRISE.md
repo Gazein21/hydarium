@@ -1,6 +1,6 @@
 # Hydarium Launcher : fiche de reprise
 
-Version 0.11.1 · Windows en priorité, structure prête pour macOS et Linux · Électron (interface web + processus principal Node) · mod client en Java (`client-mod/`).
+Version 0.11.4 · Windows en priorité, structure prête pour macOS et Linux · Électron (interface web + processus principal Node) · mod client en Java (`client-mod/`).
 
 > Cette fiche est la version **condensée** : elle garde ce que fait le launcher, pourquoi, les décisions du propriétaire et les pièges. L'historique détaillé version par version (0.9.0 → 0.10.75) a été retiré ; il reste dans Git. La liste des envies est dans [`A-FAIRE.md`](A-FAIRE.md), le mod client dans [`HYDARIUM-CLIENT.md`](HYDARIUM-CLIENT.md) et [`MODE-CLIENT-IN-GAME.md`](MODE-CLIENT-IN-GAME.md), la publication dans [`PUBLIER-SUR-GITHUB.md`](PUBLIER-SUR-GITHUB.md).
 
@@ -183,12 +183,29 @@ Voir [`A-FAIRE.md`](A-FAIRE.md). En résumé : première CI Windows complète et
 - **DMG macOS** ajouté à la CI (Intel + Apple Silicon, non signé Apple) : voir §« macOS » plus haut. Aucune fonction du launcher changée.
 - **Interface cubique** : bloc `FORMES CUBIQUES` à la fin de `src/renderer/style.css` : style moderne d'origine, mais aucun coin arrondi. Pour revenir aux coins arrondis, supprimer ce bloc. Non essayé dans le vrai Electron.
 
-## 0.11.1 — version actuelle
+## 0.11.4 — version actuelle
+
+- **Chat, clic droit sur un message** : menu avec Copier (la sélection s'il y en a une, sinon le message), Modifier (ses propres messages texte), Supprimer pour tout le monde (les siens), Supprimer pour tous (administrateur d'un groupe) et Masquer chez moi. Mêmes actions que les boutons de la bulle (`chCtxOpen()` dans `app.js`, style `#chctx`). Vu en maquette navigateur, pas dans le vrai Electron.
+- **Bug « Joueur »** : un ami dont le launcher n'avait pas de compte connecté (hors ligne, reconnexion) annonçait « Joueur », et ce pseudo de remplacement écrasait son vrai pseudo chez les autres. Corrigé des deux côtés : la présence envoyée garde un nom vide (`hiMe()`, `friends.js`) et `keepName()` refuse qu'un « Joueur » remplace un pseudo déjà connu (présence, acceptation, demande en attente). Un ami déjà passé en « Joueur » retrouve son pseudo à sa prochaine connexion avec un compte. Test ajouté dans `test/friends.test.js`.
+
+## 0.11.3
+
+- **Chat, cartes partagées** : plus de cadre vert autour d'une carte (instance / modpack / serveur) ; la carte a son propre fond. Les messages envoyés n'ont plus de rectangle (`.me` limité à `button.me`, dans `style.css`).
+- **Partage d'instance avec son aspect** : la carte emporte maintenant l'image de l'instance, le décor et l'objet choisi. L'interface dessine le décor + l'objet dans une miniature JPEG de 128 px (`chLook()` dans `app.js`, ~4 Ko) quand l'instance n'a pas d'image perso ; sinon `thumbOf()` (main.js) prend l'image perso. Trois champs optionnels voyagent avec la carte : `cv` (décor), `it` (objet), `ik` (type d'image : photo / logo), tous revalidés dans `chat.js` (`look()`). À « Télécharger », `applyLook()` (main.js) applique le même décor et le même objet à l'instance créée ; si l'original avait une image perso, la miniature devient l'image de la copie (basse définition). Les anciennes cartes (sans ces champs) marchent toujours. Vu en maquette navigateur, pas dans le vrai Electron.
+
+## 0.11.2
+
+- **Appel vocal façon Discord** : deux tuiles (ami / toi) avec anneau vert qui s'allume quand quelqu'un parle (`vcpeer` / `vcself`, mis à jour toutes les 100 ms dans `vcPaint()`), pastille « micro coupé » sur la tuile, en-tête avec état + qualité + durée, barre de contrôles (micro, volume avec valeur en %, Raccrocher). Appel entrant : avatar entouré d'anneaux qui s'élargissent, boutons Décrocher / Refuser. Les vumètres ont été retirés. Style cubique conservé. Vu en maquette statique seulement, pas dans le vrai Electron.
+- Aussi : le rectangle autour des messages envoyés est corrigé (`.me` limité à `button.me`).
+
+## 0.11.1
 
 - **Voix** : Opus à 48 kHz / 48 kb/s (le PCM de secours reste à 16 kHz), réduction de bruit et gain automatique coupés ; seule l'annulation d'écho est gardée (réglage « Appels vocaux : annulation d'écho », lu à l'ouverture du micro). Compatible avec les versions précédentes. Non écouté avec un vrai micro.
+- **Voix, réception** : `src/renderer/voicebuf.js` (testé dans `test/voicebuf.test.js`) place chaque paquet décodé : marge adaptative 80 → 300 ms, fondu de 5 ms à la reprise, rafales jetées (plus de superposition). L'ancien code coupait la voix dès que la marge tombait sous 20 ms. Mesuré avec libopus : plus rien au-dessus de 8 kHz avant, bande complète après.
+- **Appel vocal, carte refaite** : grande tête, vumètres (micro / ami), volume de l'ami (`voiceVol`, 0–150 %), indicateur de qualité (« Connexion instable » après 3 coupures en 10 s).
 - **Têtes des joueurs** (`headAv()` / `avatarSrc()` dans `app.js`) à la place des initiales : barre d'appel, discussions, en-tête, groupes, fenêtre Amis. `avatarSrc()` est le point d'entrée prévu pour un futur avatar personnalisé (`cfg.avatars`).
 - **Chat** : bulles refaites (largeur adaptée au message, heure en bas à droite, fond plein), bouton Copier, confirmation avant « Supprimer chez moi ».
 - **Premier lancement** : écran de choix de la langue (français, English ; español grisé « Bientôt »).
 - **Accueil › Amis en ligne** refait (cartes, tête, Message, Appel) ; **serveur joué par les amis** avec bouton Rejoindre, désactivable (`friendSrv`, Paramètres › Général et fenêtre Amis : coupe l'affichage ET le partage). `friends.cleanSrv` écarte les adresses locales. Le serveur vient de `stats.currentServer()`.
 - **CI Linux** : `fetch-jre.js` copie maintenant le JRE avec `verbatimSymlinks: true` (liens relatifs cassés sinon) et l'étape AppImage a `DEBUG=electron-builder`. Cause réelle de l'échec Linux **non confirmée** : il faut le log GitHub Actions.
-- Publier : `npm run release -- 0.11.1`.
+- Publier : `npm run release -- 0.11.4`.

@@ -19,7 +19,7 @@ test('code ami : aller-retour, tolérance de saisie, fautes de frappe détectée
   const pk = crypto.randomBytes(32), c = F.encode(pk); assert.deepStrictEqual(F.decode(c.toLowerCase()), pk); assert.deepStrictEqual(F.decode('  ' + c.replace(/-/g, ' ') + '\n'), pk); assert.deepStrictEqual(F.decode(c.slice(4)), pk, 'sans le préfixe');
   const body = c.slice(4).replace(/-/g, ''); let caught = 0; for (let i = 0; i < 54; i++) { const ch = body[i], bad = ch === '2' ? '3' : '2', t = body.slice(0, i) + bad + body.slice(i + 1); if (F.decode('HYA' + t) === null) caught++; } assert.strictEqual(caught, 54, 'toute faute sur un caractère est détectée');
   for (const bad of ['', null, 'HYA-', 'HYD-ABCD-EFGH-JKMN-PQRS-TVWX-YZ01', 'x'.repeat(54), c + 'AA', c.slice(0, -2)]) assert.strictEqual(F.decode(bad), null, String(bad));
-  assert.strictEqual(F.cleanName('<b>Al"ice&\'</b>'), 'bAlice/b'); assert.strictEqual(F.cleanName('   '), 'Joueur'); assert.strictEqual(F.cleanName('x'.repeat(99)).length, 32); assert.strictEqual(F.cleanName(null), 'Joueur');
+  assert.strictEqual(F.cleanName('<b>Al"ice&\'</b>'), 'bAlice/b'); assert.strictEqual(F.cleanName('   '), 'Joueur'); assert.strictEqual(F.cleanName('x'.repeat(99)).length, 32); assert.strictEqual(F.keepName('Joueur', 'Gazein21'), 'Gazein21'); assert.strictEqual(F.keepName('', 'Gazein21'), 'Gazein21'); assert.strictEqual(F.keepName('Steve', 'Gazein21'), 'Steve'); assert.strictEqual(F.keepName('Joueur', ''), 'Joueur');   // « Joueur » (pseudo de remplacement) n'écrase jamais un vrai pseudo assert.strictEqual(F.cleanName(null), 'Joueur');
 });
 
 test('désactivé par défaut : aucun réseau, aucun code ; l’identité est gardée chiffrée et retrouvée au redémarrage', async () => {

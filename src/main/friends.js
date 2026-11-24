@@ -24,6 +24,8 @@ const decode = str => {
 };
 const hex = b => Buffer.from(b).toString('hex'), KEY = /^[0-9a-f]{64}$/;
 const cleanName = (s, d = 'Joueur') => { s = String(s == null ? '' : s).replace(/[\u0000-\u001f\u007f<>&"']/g, '').trim().slice(0, 32); return s || d; };
+/** pseudo reçu d'un ami : « Joueur » (ou rien) est un pseudo de remplacement envoyé quand son launcher n'a pas de compte connecté (hors ligne, reconnexion…) : il ne doit JAMAIS écraser le vrai pseudo déjà connu */
+const keepName = (incoming, current) => { const n = cleanName(incoming, ''); return !n || (n === 'Joueur' && current && current !== 'Joueur') ? (current || 'Joueur') : n; };
 /** adresse de serveur partageable : nom d'hôte ou IP PUBLIQUE (avec port facultatif). Les adresses locales (127.x, 10.x, 192.168.x, localhost…) ne servent à rien à un ami et ne sont jamais envoyées ni acceptées. */
 const cleanSrv = s => {
   s = String(s == null ? '' : s).trim().toLowerCase().slice(0, 80); if (!/^[a-z0-9._-]+(:\d{1,5})?$/.test(s)) return '';
@@ -43,6 +45,8 @@ exports.create = (o = {}) => {
 
   const seedOf = () => { const f = cfg(); if (f.seed) { try { const s = Buffer.from(unseal(f.seed), 'hex'); if (s.length === 32) return s; } catch (e) { log.warn('amis : graine illisible, nouvelle identité'); } } const s = crypto.randomBytes(32); f.seed = seal(s.toString('hex')); save(); return s; };
   const me = () => { const p = profile() || {}; return { name: cleanName(p.name), st: p.st === 'playing' ? 'playing' : 'online', what: cleanName(p.what || '', '').slice(0, 40), srv: p.st === 'playing' ? cleanSrv(p.srv) : '' }; };
+  /** présence envoyée aux amis : le pseudo reste vide si le launcher n'a pas (ou plus) de compte connecté, au lieu d'annoncer « Joueur » */
+  const hiMe = () => ({ ...me(), name: cleanName((profile() || {}).name, '') });
   const friendOf = key => cfg().list.find(f => f.key === key);
   const changed = () => { try { notify('changed', {}); } catch (e) { /* affichage seulement */ } };
   const send = (c, m) => { try { c.write(JSON.stringify(m) + '\n'); } catch (e) { /* connexion fermée */ } };
@@ -68,16 +72,16 @@ exports.create = (o = {}) => {
   function becomeFriends(key, name) {
     const f = cfg(); if (f.list.length >= MAX_FRIENDS || f.blocked.includes(key)) return null;
     f.inbox = f.inbox.filter(x => x.key !== key); f.out = f.out.filter(x => x.key !== key);
-    let fr = friendOf(key); if (!fr) { fr = { key, name: cleanName(name), since: Date.now() }; f.list.push(fr); } else { fr.name = cleanName(name, fr.name); delete fr.pendingAccept; }
+    let fr = friendOf(key); if (!fr) { fr = { key, name: cleanName(name), since: Date.now() }; f.list.push(fr); } else { fr.name = keepName(name, fr.name); delete fr.pendingAccept; }
     save(); changed(); startLoop(fr); return fr;
   }
   function handle(st, m) {
     const key = st.key, fr = friendOf(key), f = cfg();
     if (fr) {   // ----- ami -----
       if (m.t === 'hi') {
-        const was = st.seen, before = st.status + '|' + st.what + '|' + st.name + '|' + st.srv; st.seen = Date.now(); st.name = cleanName(m.name, fr.name); st.status = m.st === 'playing' ? 'playing' : 'online'; st.what = cleanName(m.what || '', '').slice(0, 40); st.srv = st.status === 'playing' ? cleanSrv(m.srv) : ''; fr.name = st.name;
+        const was = st.seen, before = st.status + '|' + st.what + '|' + st.name + '|' + st.srv; st.seen = Date.now(); st.name = keepName(m.name, fr.name); st.status = m.st === 'playing' ? 'playing' : 'online'; st.what = cleanName(m.what || '', '').slice(0, 40); st.srv = st.status === 'playing' ? cleanSrv(m.srv) : ''; fr.name = st.name;
         if (conns.get(key) !== st) { const old = conns.get(key); conns.set(key, st); if (old && old !== st) { try { old.sock.destroy(); } catch (e) { /* remplacée */ } } }
-        if (!was) { send(st.sock, { t: 'hi', ...me() }); save(); changed(); if (o.onOnline) { try { o.onOnline(key); } catch (e) { log.warn('amis : onOnline', e && e.message); } } } else if (before !== st.status + '|' + st.what + '|' + st.name + '|' + st.srv) changed();   // un simple battement de présence ne change rien à l'écran
+        if (!was) { send(st.sock, { t: 'hi', ...hiMe() }); save(); changed(); if (o.onOnline) { try { o.onOnline(key); } catch (e) { log.warn('amis : onOnline', e && e.message); } } } else if (before !== st.status + '|' + st.what + '|' + st.name + '|' + st.srv) changed();   // un simple battement de présence ne change rien à l'écran
       } else if (m.t === 'invite') {
         const now = Date.now(); st.invites = st.invites.filter(x => now - x < 60000); if (st.invites.length >= 5) return; st.invites.push(now);
         const code = require('./p2p').normalize(m.code); if (!code) return;   // un code d'invitation valide, rien d'autre
@@ -94,7 +98,7 @@ exports.create = (o = {}) => {
       const mine = f.out.find(x => x.key === key);
       if (mine) { becomeFriends(key, m.name); send(st.sock, { t: 'ack', accepted: true, ...me() }); notify('friend', { name: cleanName(m.name) }); return endSoon(st.sock); }   // demandes croisées : on devient amis tout de suite
       const ex = f.inbox.find(x => x.key === key);
-      if (ex) ex.name = cleanName(m.name); else { if (f.inbox.length >= MAX_INBOX) return st.sock.destroy(); f.inbox.push({ key, name: cleanName(m.name), at: Date.now() }); }
+      if (ex) ex.name = keepName(m.name, ex.name); else { if (f.inbox.length >= MAX_INBOX) return st.sock.destroy(); f.inbox.push({ key, name: cleanName(m.name), at: Date.now() }); }
       save(); changed(); if (!ex) notify('request', { name: cleanName(m.name) });
       send(st.sock, { t: 'ack' }); return endSoon(st.sock);
     }
@@ -110,7 +114,7 @@ exports.create = (o = {}) => {
       if (L.stop || !running || !friendOf(fr.key)) return; if (cfg().hidden || conns.has(fr.key)) { L.t = setTimeout(go, T.backoff[0]); return; }
       let sock; try { sock = dht.connect(Buffer.from(fr.key, 'hex'), { keyPair: kp }); } catch (e) { L.t = setTimeout(go, T.backoff[0]); return; }
       attach(sock, fr.key, true);
-      sock.on('open', () => { L.n = 0; send(sock, { t: 'hi', ...me() }); });
+      sock.on('open', () => { L.n = 0; send(sock, { t: 'hi', ...hiMe() }); });
       sock.on('close', () => { if (!L.stop && running) L.t = setTimeout(go, T.backoff[Math.min(L.n++, T.backoff.length - 1)]); });
     };
     go();
@@ -159,7 +163,7 @@ exports.create = (o = {}) => {
     },
     /** active ou désactive pour de bon (mémorisé : relancé au prochain démarrage) */
     async enable(on) { const f = cfg(); if (on) await api.start(); else { await api.stop(); f.on = false; save(); } changed(); },
-    refresh() { if (!running || cfg().hidden) return; const hi = { t: 'hi', ...me() }; for (const c of conns.values()) if (friendOf(c.key)) send(c.sock, hi); },
+    refresh() { if (!running || cfg().hidden) return; const hi = { t: 'hi', ...hiMe() }; for (const c of conns.values()) if (friendOf(c.key)) send(c.sock, hi); },
     setHidden(b) { cfg().hidden = !!b; save(); if (b) { for (const c of [...conns.values()]) { try { c.sock.destroy(); } catch (e) { /* fini */ } } conns.clear(); } changed(); },
     /** nouvelle identité : TOUS les contacts, demandes et blocages sont effacés (les anciens amis ne peuvent plus joindre cette personne) */
     async reset() { const was = running, f = cfg(), bye = running ? f.list.map(x => x.key) : []; await Promise.allSettled(bye.map(k => sendOnce(k, { t: 'bye' }, 4000))); /* prévenus en même temps ; hors ligne : tant pis */ if (was) await api.stop(); const keep = f.on; o.store.get().friends = { on: keep, hidden: !!f.hidden, list: [], inbox: [], out: [], blocked: [] }; save(); if (was) await api.start(); changed(); },
@@ -212,4 +216,4 @@ exports.create = (o = {}) => {
 const PKCS8 = Buffer.from('302e020100300506032b657004220420', 'hex'), SPKI = Buffer.from('302a300506032b6570032100', 'hex');
 /** vérifie une signature produite par sign() ; clé = 64 caractères hexadécimaux, jamais d'exception */
 exports.verify = (keyHex, data, sigHex) => { try { if (!KEY.test(keyHex) || !/^[0-9a-f]{128}$/.test(sigHex)) return false; return crypto.verify(null, Buffer.from(data), crypto.createPublicKey({ key: Buffer.concat([SPKI, Buffer.from(keyHex, 'hex')]), format: 'der', type: 'spki' }), Buffer.from(sigHex, 'hex')); } catch (e) { return false; } };
-exports.cleanSrv = cleanSrv; exports.encode = encode; exports.decode = decode; exports.cleanName = cleanName;
+exports.keepName = keepName; exports.cleanSrv = cleanSrv; exports.encode = encode; exports.decode = decode; exports.cleanName = cleanName;
